@@ -1,0 +1,98 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth/config'
+import { db } from '@/lib/db'
+import { deliveries, matchState, innings } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
+import type { DeliveryRecord } from '@/types/match'
+
+export const runtime = 'nodejs'
+
+export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { matchId, inningsId, deliveries: deliveryBuffer, overNumber, strikerId, nonStrikerId, currentBowlerId } = await req.json() as {
+    matchId: number
+    inningsId: number
+    deliveries: DeliveryRecord[]
+    overNumber: number
+    strikerId?: number | null
+    nonStrikerId?: number | null
+    currentBowlerId?: number | null
+  }
+
+  if (!matchId || !inningsId || !deliveryBuffer?.length) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  try {
+    // Compute innings totals from buffer
+    const totalRuns = deliveryBuffer.reduce((s, d) => s + d.runs + d.extraRuns, 0)
+    const totalWickets = deliveryBuffer.filter((d) => d.isWicket).length
+    const legalBalls = deliveryBuffer.filter((d) => d.isLegal).length
+
+    // Batch insert all deliveries
+    const inserted = await db
+      .insert(deliveries)
+      .values(
+        deliveryBuffer.map((d) => ({
+          inningsId,
+          overNumber: d.overNumber,
+          ballNumber: d.ballNumber,
+          batsmanId: d.batsmanId,
+          bowlerId: d.bowlerId,
+          runs: d.runs,
+          extraRuns: d.extraRuns,
+          isLegal: d.isLegal,
+          extraType: d.extraType,
+          isWicket: d.isWicket,
+          dismissalType: d.dismissalType,
+          fielder1Id: d.fielder1Id,
+          fielder2Id: d.fielder2Id,
+          timestamp: new Date(d.timestamp),
+        }))
+      )
+      .returning({ id: deliveries.id })
+
+    // Update match_state — clear the over buffer, advance over count, persist player IDs
+    await db
+      .update(matchState)
+      .set({
+        currentOver: overNumber + 1,
+        currentBalls: 0,
+        currentOverBuffer: [],
+        lastUpdated: new Date(),
+        ...(strikerId !== undefined && { strikerId }),
+        ...(nonStrikerId !== undefined && { nonStrikerId }),
+        ...(currentBowlerId !== undefined && { currentBowlerId }),
+      })
+      .where(eq(matchState.matchId, matchId))
+
+    // Update innings running totals
+    const currentInnings = await db.query.innings.findFirst({
+      where: eq(innings.id, inningsId),
+    })
+
+    if (currentInnings) {
+      const newOvers = currentInnings.overs + Math.floor(legalBalls / 6)
+      const newBalls = (currentInnings.balls + legalBalls) % 6
+
+      await db
+        .update(innings)
+        .set({
+          totalRuns: currentInnings.totalRuns + totalRuns,
+          wickets: currentInnings.wickets + totalWickets,
+          overs: newOvers,
+          balls: newBalls,
+        })
+        .where(eq(innings.id, inningsId))
+    }
+
+    return NextResponse.json({ ok: true, deliveryIds: inserted.map((r) => r.id) })
+  } catch (err) {
+    console.error('Persist error:', err)
+    return NextResponse.json({ error: 'Failed to persist deliveries' }, { status: 500 })
+  }
+}

@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  /* ProStream color palette */
+  --color-primary: #4F46E5;
+  --color-secondary: #10B981;
+  --color-accent: #8B5CF6;
+  --color-overlay-lime: #A3E635;
+  --color-overlay-cyan: #06B6D4;
+
+  /* ProStream font families — variables set by next/font in layout.tsx */
+  --font-family-display: var(--font-bebas), sans-serif;
+  --font-family-stats: var(--font-rajdhani), sans-serif;
+  --font-family-body: var(--font-inter), sans-serif;
+  --font-family-overlay: var(--font-barlow), sans-serif;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-inter), system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-gray-950 text-gray-100;
+  }
+}
