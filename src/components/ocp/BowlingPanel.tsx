@@ -1,14 +1,20 @@
 'use client'
 
 import { useMatchStore } from '@/store/matchStore'
+import { useUIStore } from '@/store/uiStore'
+import { EditIcon } from '@/components/shared/EditIcon'
+
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!
 
 export function BowlingPanel() {
   const snapshot = useMatchStore((s) => s.snapshot)
   const currentOverBalls = useMatchStore((s) => s.currentOverBalls)
+  const openPlayerEdit = useUIStore((s) => s.openPlayerEdit)
   if (!snapshot) return null
 
   // Fall back to squad list when bowler hasn't bowled a delivery yet
   const currentBowlerId = snapshot.currentBowlerId
+  const bowlingTeamId = snapshot.currentInningsState?.bowlingTeamId
   const currentBowler = snapshot.bowlers.find((b) => b.isCurrent) ?? (() => {
     if (!currentBowlerId) return undefined
     const p = snapshot.bowlingTeamPlayers.find((tp) => tp.id === currentBowlerId)
@@ -22,14 +28,40 @@ export function BowlingPanel() {
     }
   })()
 
+  const bowlerHeadshot = currentBowler
+    ? snapshot.bowlingTeamPlayers.find(p => p.id === currentBowler.playerId)?.headshotCloudinaryId ?? null
+    : null
+
   return (
     <div className="bg-gray-900 rounded-xl p-4 h-full flex flex-col gap-4">
       <h3 className="font-stats text-xs text-gray-400 uppercase tracking-wider">Bowling</h3>
 
       {/* Current bowler */}
       {currentBowler ? (
-        <div className="bg-gray-800 rounded-lg p-3 border border-accent/30">
-          <p className="font-stats font-semibold text-white mb-2">{currentBowler.displayName}</p>
+        <div className="relative group bg-gray-800 rounded-lg p-3 border border-accent/30">
+          <div className="flex items-center gap-3 mb-2">
+            {/* Headshot */}
+            {bowlerHeadshot
+              ? <img
+                  src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_36,h_36,f_webp/${bowlerHeadshot}`}
+                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                  alt=""
+                />
+              : <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center font-stats text-sm text-gray-300 flex-shrink-0">
+                  {currentBowler.displayName[0]?.toUpperCase()}
+                </div>
+            }
+            <p className="font-stats font-semibold text-white">{currentBowler.displayName}</p>
+            {bowlingTeamId && (
+              <button
+                onClick={() => openPlayerEdit(currentBowler.playerId, bowlingTeamId)}
+                className="text-red-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10"
+                title="Edit player"
+              >
+                <EditIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-4 gap-1 text-center">
             {[
               { label: 'O', value: `${currentBowler.overs}.${currentBowler.balls}` },

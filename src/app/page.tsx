@@ -21,6 +21,12 @@ export default async function Dashboard() {
               Manage Teams
             </Link>
             <Link
+              href="/admin/tournaments"
+              className="px-4 py-2.5 bg-gray-800 text-gray-300 font-stats font-semibold rounded-xl hover:bg-gray-700 transition-colors"
+            >
+              Tournaments
+            </Link>
+            <Link
               href="/match/new"
               className="px-5 py-2.5 bg-primary text-white font-stats font-semibold rounded-xl hover:bg-indigo-600 transition-colors"
             >

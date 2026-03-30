@@ -9,6 +9,7 @@ import {
   jsonb,
   varchar,
   char,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -79,6 +80,21 @@ export const inningsStatusEnum = pgEnum('innings_status', [
   'declared',
 ])
 
+export const tournamentStatusEnum = pgEnum('tournament_status', [
+  'upcoming',
+  'group_stage',
+  'knockout',
+  'complete',
+])
+
+export const matchStageEnum = pgEnum('match_stage', [
+  'group',
+  'quarter_final',
+  'semi_final',
+  'final',
+  'third_place',
+])
+
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 export const teams = pgTable('teams', {
@@ -107,6 +123,36 @@ export const players = pgTable('players', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+// ─── Tournaments ──────────────────────────────────────────────────────────────
+
+export const tournaments = pgTable('tournaments', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  shortName: varchar('short_name', { length: 20 }).notNull(),
+  status: tournamentStatusEnum('status').notNull().default('upcoming'),
+  format: matchFormatEnum('format').notNull().default('T20'),
+  totalOvers: integer('total_overs').notNull().default(20),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const tournamentTeams = pgTable(
+  'tournament_teams',
+  {
+    id: serial('id').primaryKey(),
+    tournamentId: integer('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    teamId: integer('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    groupName: varchar('group_name', { length: 10 }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    uniqueEnrollment: uniqueIndex('uq_tournament_team').on(t.tournamentId, t.teamId),
+  }),
+)
+
 // ─── Matches ──────────────────────────────────────────────────────────────────
 
 export const matches = pgTable('matches', {
@@ -124,6 +170,9 @@ export const matches = pgTable('matches', {
     .references(() => teams.id),
   tossWinnerId: integer('toss_winner_id').references(() => teams.id),
   tossDecision: tossDecisionEnum('toss_decision'),
+  tournamentId: integer('tournament_id').references(() => tournaments.id, { onDelete: 'set null' }),
+  matchStage: matchStageEnum('match_stage'),
+  matchLabel: varchar('match_label', { length: 20 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
@@ -224,6 +273,7 @@ export const teamsRelations = relations(teams, ({ many }) => ({
   players: many(players),
   homeMatches: many(matches, { relationName: 'homeTeam' }),
   awayMatches: many(matches, { relationName: 'awayTeam' }),
+  tournamentTeams: many(tournamentTeams),
 }))
 
 export const playersRelations = relations(players, ({ one }) => ({
@@ -245,6 +295,26 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
   state: one(matchState, {
     fields: [matches.id],
     references: [matchState.matchId],
+  }),
+  tournament: one(tournaments, {
+    fields: [matches.tournamentId],
+    references: [tournaments.id],
+  }),
+}))
+
+export const tournamentsRelations = relations(tournaments, ({ many }) => ({
+  tournamentTeams: many(tournamentTeams),
+  matches: many(matches),
+}))
+
+export const tournamentTeamsRelations = relations(tournamentTeams, ({ one }) => ({
+  tournament: one(tournaments, {
+    fields: [tournamentTeams.tournamentId],
+    references: [tournaments.id],
+  }),
+  team: one(teams, {
+    fields: [tournamentTeams.teamId],
+    references: [teams.id],
   }),
 }))
 
@@ -319,3 +389,7 @@ export type Partnership = typeof partnerships.$inferSelect
 export type NewPartnership = typeof partnerships.$inferInsert
 export type MatchState = typeof matchState.$inferSelect
 export type NewMatchState = typeof matchState.$inferInsert
+export type Tournament = typeof tournaments.$inferSelect
+export type NewTournament = typeof tournaments.$inferInsert
+export type TournamentTeam = typeof tournamentTeams.$inferSelect
+export type NewTournamentTeam = typeof tournamentTeams.$inferInsert

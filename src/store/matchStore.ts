@@ -109,6 +109,9 @@ type MatchStore = {
   // Track last flushed IDs for cross-flush undo
   lastFlushedDeliveryIds: number[]
 
+  // Set when batting team reaches the target mid-delivery (auto-win)
+  winDetected: boolean
+
   // Actions
   hydrate: (snapshot: MatchSnapshot) => void
   addDelivery: (input: DeliveryInput) => Promise<void>
@@ -120,6 +123,10 @@ type MatchStore = {
   setNonStriker: (batsmanId: number) => void
   setBowler: (bowlerId: number) => void
   startNextOver: () => void
+  clearWinDetected: () => void
+  updateTeamLogo: (teamId: number, logoCloudinaryId: string) => void
+  updatePlayerInSquad: (teamId: number, playerId: number, data: Partial<PlayerSummary>) => void
+  addPlayerToSquad: (teamId: number, player: PlayerSummary) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -158,6 +165,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   isFlushing: false,
   flushedBallCount: 0,
   lastFlushedDeliveryIds: [],
+  winDetected: false,
 
   hydrate(snapshot) {
     set({ snapshot })
@@ -214,6 +222,21 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       i.inningsNumber === snapshot.currentInnings ? updatedInnings : i
     )
 
+    // Recalculate run rates (mirrors getMatchSnapshot formula)
+    const newTotalBalls = newOvers * 6 + remainingBalls
+    const newCurrentRunRate = newTotalBalls > 0
+      ? Math.round((newRuns / (newTotalBalls / 6)) * 100) / 100
+      : 0
+
+    let newRequiredRunRate = snapshot.requiredRunRate
+    if (snapshot.currentInnings === 2 && innings.target) {
+      const remainingMatchBalls = snapshot.totalOvers * 6 - newTotalBalls
+      const runsNeeded = innings.target - newRuns
+      newRequiredRunRate = remainingMatchBalls > 0
+        ? Math.round((runsNeeded / (remainingMatchBalls / 6)) * 100) / 100
+        : 0
+    }
+
     // Optimistic UI update (including live batter/bowler stats)
     const updatedBatters = updateBattersOptimistically(
       snapshot.batters,
@@ -252,8 +275,36 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         batters: updatedBatters,
         bowlers: updatedBowlers,
         partnership: updatedPartnership,
+        currentRunRate: newCurrentRunRate,
+        requiredRunRate: newRequiredRunRate,
       },
     })
+
+    // ── Win detection: batting team reaches target in 2nd innings ──────────────
+    const isMatchWon =
+      snapshot.currentInnings === 2 &&
+      innings.target != null &&
+      newRuns >= innings.target
+
+    if (isMatchWon) {
+      // Flush any unflushed deliveries, then mark the match complete
+      if (!isFlushing) await get().flushOverToNeon()
+      await fetch(`/api/match/${snapshot.matchId}/innings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete' }),
+      })
+      await fetch(`/api/match/${snapshot.matchId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'complete' }),
+      })
+      set((s) => ({
+        winDetected: true,
+        snapshot: s.snapshot ? { ...s.snapshot, status: 'complete' } : null,
+      }))
+      return
+    }
 
     // Push real-time event to all viewers
     await triggerPusherEvent(snapshot.matchId, 'delivery.added', {
@@ -482,6 +533,76 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     } finally {
       set({ isFlushing: false })
     }
+  },
+
+  clearWinDetected() {
+    set({ winDetected: false })
+  },
+
+  updateTeamLogo(teamId, logoCloudinaryId) {
+    set((s) => {
+      if (!s.snapshot) return {}
+      return {
+        snapshot: {
+          ...s.snapshot,
+          homeTeam: s.snapshot.homeTeam.id === teamId
+            ? { ...s.snapshot.homeTeam, logoCloudinaryId }
+            : s.snapshot.homeTeam,
+          awayTeam: s.snapshot.awayTeam.id === teamId
+            ? { ...s.snapshot.awayTeam, logoCloudinaryId }
+            : s.snapshot.awayTeam,
+        },
+      }
+    })
+  },
+
+  updatePlayerInSquad(teamId, playerId, data) {
+    set((s) => {
+      if (!s.snapshot) return {}
+      const isBatting = s.snapshot.currentInningsState?.battingTeamId === teamId
+      const isBowling = s.snapshot.currentInningsState?.bowlingTeamId === teamId
+
+      const patchSquad = (arr: PlayerSummary[]) =>
+        arr.map((p) => (p.id === playerId ? { ...p, ...data } : p))
+
+      const patchBatters = (arr: typeof s.snapshot.batters) =>
+        data.displayName
+          ? arr.map((b) => (b.playerId === playerId ? { ...b, displayName: data.displayName! } : b))
+          : arr
+
+      const patchBowlers = (arr: typeof s.snapshot.bowlers) =>
+        data.displayName
+          ? arr.map((b) => (b.playerId === playerId ? { ...b, displayName: data.displayName! } : b))
+          : arr
+
+      return {
+        snapshot: {
+          ...s.snapshot,
+          battingTeamPlayers: isBatting ? patchSquad(s.snapshot.battingTeamPlayers) : s.snapshot.battingTeamPlayers,
+          bowlingTeamPlayers: isBowling ? patchSquad(s.snapshot.bowlingTeamPlayers) : s.snapshot.bowlingTeamPlayers,
+          batters: isBatting ? patchBatters(s.snapshot.batters) : s.snapshot.batters,
+          bowlers: isBowling ? patchBowlers(s.snapshot.bowlers) : s.snapshot.bowlers,
+        },
+      }
+    })
+  },
+
+  addPlayerToSquad(teamId, player) {
+    set((s) => {
+      if (!s.snapshot) return {}
+      const isBatting = s.snapshot.currentInningsState?.battingTeamId === teamId
+      return {
+        snapshot: {
+          ...s.snapshot,
+          battingTeamPlayers: isBatting
+            ? [...s.snapshot.battingTeamPlayers, player]
+            : s.snapshot.battingTeamPlayers,
+          bowlingTeamPlayers: !isBatting
+            ? [...s.snapshot.bowlingTeamPlayers, player]
+            : s.snapshot.bowlingTeamPlayers,
+        },
+      }
+    })
   },
 }))
 

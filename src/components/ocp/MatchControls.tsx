@@ -5,6 +5,7 @@ import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 import { useRouter } from 'next/navigation'
 
+
 async function updateMatchStatus(matchId: number, status: string) {
   await fetch(`/api/match/${matchId}/status`, {
     method: 'PATCH',
@@ -19,6 +20,7 @@ export function MatchControls() {
   const flushOverToNeon = useMatchStore((s) => s.flushOverToNeon)
   const hydrate = useMatchStore((s) => s.hydrate)
   const openBowlerSelect = useUIStore((s) => s.openBowlerSelect)
+  const openSquadPanel = useUIStore((s) => s.openSquadPanel)
   const router = useRouter()
   const [endingInnings, setEndingInnings] = useState(false)
 
@@ -178,6 +180,14 @@ export function MatchControls() {
       <div className="font-stats text-xs text-gray-500 uppercase tracking-wider">
         Innings {currentInnings}
       </div>
+
+      {/* Squads button */}
+      <button
+        onClick={openSquadPanel}
+        className="px-4 py-2 bg-indigo-600 border border-indigo-500 text-white font-stats font-semibold text-sm rounded-lg hover:bg-indigo-500 transition-colors"
+      >
+        Squads
+      </button>
 
       {/* Status badge */}
       <div className="ml-auto flex items-center gap-2">

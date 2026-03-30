@@ -2,10 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { useSession, signIn } from 'next-auth/react'
-import { CloudinaryUpload } from '@/components/shared/CloudinaryUpload'
+import { ImageUpload } from '@/components/shared/ImageUpload'
 import type { Player } from '@/types/player'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
@@ -21,6 +20,15 @@ const ROLE_COLORS: Record<Role, string> = {
   keeper: 'text-overlay-cyan',
 }
 
+const emptyForm = {
+  name: '',
+  displayName: '',
+  role: 'batsman' as Role,
+  battingStyle: '',
+  bowlingStyle: '',
+  headshotCloudinaryId: '',
+}
+
 function PlayersContent() {
   const { status } = useSession()
   const isAuthed = status === 'authenticated'
@@ -30,12 +38,23 @@ function PlayersContent() {
 
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Add form
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', displayName: '', role: 'batsman' as Role, battingStyle: '', bowlingStyle: '' })
-  const [error, setError] = useState('')
+  const [form, setForm] = useState(emptyForm)
+  const [addError, setAddError] = useState('')
+
+  // Edit modal
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
+  const [editForm, setEditForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+
+  // CSV
   const [csvText, setCsvText] = useState('')
   const [csvMode, setCsvMode] = useState(false)
+  const [csvAdding, setCsvAdding] = useState(false)
 
   async function loadPlayers() {
     if (!teamId) return
@@ -46,14 +65,19 @@ function PlayersContent() {
 
   useEffect(() => { loadPlayers() }, [teamId])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleAddChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
     setForm((f) => ({ ...f, [name]: value }))
   }
 
+  function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target
+    setEditForm((f) => ({ ...f, [name]: value }))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
+    setAddError('')
     setAdding(true)
     try {
       const payload = {
@@ -62,6 +86,7 @@ function PlayersContent() {
         role: form.role,
         battingStyle: form.battingStyle || null,
         bowlingStyle: form.bowlingStyle || null,
+        headshotCloudinaryId: form.headshotCloudinaryId || null,
       }
       const res = await fetch(`/api/teams/${teamId}/players`, {
         method: 'POST',
@@ -69,12 +94,12 @@ function PlayersContent() {
         body: JSON.stringify(payload),
       })
       if (res.ok) {
-        setForm({ name: '', displayName: '', role: 'batsman', battingStyle: '', bowlingStyle: '' })
+        setForm(emptyForm)
         setShowForm(false)
         await loadPlayers()
       } else {
         const data = await res.json()
-        setError(data.error ?? 'Failed to add player')
+        setAddError(data.error ?? 'Failed to add player')
       }
     } finally {
       setAdding(false)
@@ -82,8 +107,8 @@ function PlayersContent() {
   }
 
   async function handleCsvImport() {
-    setError('')
-    setAdding(true)
+    setAddError('')
+    setCsvAdding(true)
     try {
       const lines = csvText.trim().split('\n').filter(Boolean)
       const parsed = lines.map((line) => {
@@ -106,10 +131,55 @@ function PlayersContent() {
         setCsvMode(false)
         await loadPlayers()
       } else {
-        setError('CSV import failed')
+        setAddError('CSV import failed')
       }
     } finally {
-      setAdding(false)
+      setCsvAdding(false)
+    }
+  }
+
+  function openEdit(p: Player) {
+    setEditingPlayer(p)
+    setEditForm({
+      name: p.name,
+      displayName: p.displayName,
+      role: p.role as Role,
+      battingStyle: p.battingStyle ?? '',
+      bowlingStyle: p.bowlingStyle ?? '',
+      headshotCloudinaryId: p.headshotCloudinaryId ?? '',
+    })
+    setEditError('')
+  }
+
+  function closeEdit() { setEditingPlayer(null) }
+
+  async function handleEditSave() {
+    if (!editingPlayer) return
+    setSaving(true)
+    setEditError('')
+    try {
+      const res = await fetch(`/api/teams/${teamId}/players/${editingPlayer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          displayName: editForm.displayName || editForm.name,
+          role: editForm.role,
+          battingStyle: editForm.battingStyle || null,
+          bowlingStyle: editForm.bowlingStyle || null,
+          headshotCloudinaryId: editForm.headshotCloudinaryId || null,
+        }),
+      })
+      if (res.ok) {
+        const updated: Player = await res.json()
+        setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+        closeEdit()
+      } else {
+        const data = await res.json()
+        setEditError(data.error ?? 'Failed to save')
+      }
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -124,6 +194,42 @@ function PlayersContent() {
 
   const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
   const labelCls = 'block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider'
+
+  // Shared player fields (role + batting/bowling style selects)
+  function StyleFields({ f, onChange }: { f: typeof emptyForm; onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void }) {
+    return (
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <label className={labelCls}>Role</label>
+          <select name="role" value={f.role} onChange={onChange} className={inputCls}>
+            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Batting Style</label>
+          <select name="battingStyle" value={f.battingStyle} onChange={onChange} className={inputCls}>
+            <option value="">—</option>
+            <option value="right-hand">Right Hand</option>
+            <option value="left-hand">Left Hand</option>
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Bowling Style</label>
+          <select name="bowlingStyle" value={f.bowlingStyle} onChange={onChange} className={inputCls}>
+            <option value="">—</option>
+            <option value="right-arm-fast">RA Fast</option>
+            <option value="right-arm-medium">RA Medium</option>
+            <option value="right-arm-offbreak">RA Off Break</option>
+            <option value="right-arm-legbreak">RA Leg Break</option>
+            <option value="left-arm-fast">LA Fast</option>
+            <option value="left-arm-medium">LA Medium</option>
+            <option value="left-arm-orthodox">LA Orthodox</option>
+            <option value="left-arm-chinaman">LA Chinaman</option>
+          </select>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-gray-950 p-8">
@@ -152,7 +258,7 @@ function PlayersContent() {
                   {csvMode ? 'Cancel CSV' : 'CSV Import'}
                 </button>
                 <button
-                  onClick={() => { setShowForm((v) => !v); setCsvMode(false); setError('') }}
+                  onClick={() => { setShowForm((v) => !v); setCsvMode(false); setAddError('') }}
                   className="px-4 py-2 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 transition-colors text-sm"
                 >
                   {showForm ? 'Cancel' : '+ Add Player'}
@@ -169,54 +275,34 @@ function PlayersContent() {
           </div>
         </div>
 
-        {error && <p className="text-red-400 font-stats text-sm mb-4">{error}</p>}
+        {addError && <p className="text-red-400 font-stats text-sm mb-4">{addError}</p>}
 
-        {/* Single player form */}
+        {/* ── Add Player form ── */}
         {showForm && isAuthed && (
           <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-4">
             <h2 className="font-stats font-semibold text-gray-200">Add Player</h2>
 
+            <ImageUpload
+              value={form.headshotCloudinaryId || null}
+              onChange={(publicId) => setForm((f) => ({ ...f, headshotCloudinaryId: publicId }))}
+              folder="player-headshots"
+              label="Player Photo (optional)"
+              previewShape="circle"
+              id="add-player-photo"
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Full Name</label>
-                <input name="name" value={form.name} onChange={handleChange} className={inputCls} placeholder="e.g. Rohit Sharma" required />
+                <input name="name" value={form.name} onChange={handleAddChange} className={inputCls} placeholder="e.g. Rohit Sharma" required />
               </div>
               <div>
                 <label className={labelCls}>Display Name</label>
-                <input name="displayName" value={form.displayName} onChange={handleChange} className={inputCls} placeholder="e.g. RG Sharma" />
+                <input name="displayName" value={form.displayName} onChange={handleAddChange} className={inputCls} placeholder="e.g. RG Sharma" />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className={labelCls}>Role</label>
-                <select name="role" value={form.role} onChange={handleChange} className={inputCls}>
-                  {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Batting Style</label>
-                <select name="battingStyle" value={form.battingStyle} onChange={handleChange} className={inputCls}>
-                  <option value="">—</option>
-                  <option value="right-hand">Right Hand</option>
-                  <option value="left-hand">Left Hand</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Bowling Style</label>
-                <select name="bowlingStyle" value={form.bowlingStyle} onChange={handleChange} className={inputCls}>
-                  <option value="">—</option>
-                  <option value="right-arm-fast">RA Fast</option>
-                  <option value="right-arm-medium">RA Medium</option>
-                  <option value="right-arm-offbreak">RA Off Break</option>
-                  <option value="right-arm-legbreak">RA Leg Break</option>
-                  <option value="left-arm-fast">LA Fast</option>
-                  <option value="left-arm-medium">LA Medium</option>
-                  <option value="left-arm-orthodox">LA Orthodox</option>
-                  <option value="left-arm-chinaman">LA Chinaman</option>
-                </select>
-              </div>
-            </div>
+            <StyleFields f={form} onChange={handleAddChange} />
 
             <button type="submit" disabled={adding} className="w-full py-2.5 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 disabled:opacity-40 transition-colors text-sm">
               {adding ? 'Adding...' : 'Add Player'}
@@ -224,7 +310,7 @@ function PlayersContent() {
           </form>
         )}
 
-        {/* CSV import */}
+        {/* ── CSV import ── */}
         {csvMode && isAuthed && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-3">
             <div>
@@ -241,15 +327,15 @@ function PlayersContent() {
             />
             <button
               onClick={handleCsvImport}
-              disabled={adding || !csvText.trim()}
+              disabled={csvAdding || !csvText.trim()}
               className="w-full py-2.5 bg-secondary text-white font-stats font-semibold rounded-lg hover:bg-emerald-600 disabled:opacity-40 transition-colors text-sm"
             >
-              {adding ? 'Importing...' : `Import ${csvText.trim().split('\n').filter(Boolean).length} Players`}
+              {csvAdding ? 'Importing...' : `Import ${csvText.trim().split('\n').filter(Boolean).length} Players`}
             </button>
           </div>
         )}
 
-        {/* Player list */}
+        {/* ── Player list ── */}
         {loading ? (
           <div className="text-center py-12 font-stats text-gray-500">Loading players...</div>
         ) : players.length === 0 ? (
@@ -277,41 +363,35 @@ function PlayersContent() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {p.headshotCloudinaryId ? (
-                          <Image
+                          <img
                             src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_32,h_32,f_webp/${p.headshotCloudinaryId}`}
                             alt={p.displayName}
-                            width={32}
-                            height={32}
-                            className="rounded-full object-cover"
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center font-stats text-xs text-gray-400">
+                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center font-stats text-xs text-gray-400 flex-shrink-0">
                             {p.displayName.charAt(0)}
                           </div>
                         )}
-                      <p className="font-stats font-semibold text-white text-sm">{p.displayName}</p>
-                      {p.displayName !== p.name && <p className="font-stats text-xs text-gray-500">{p.name}</p>}
+                        <div>
+                          <p className="font-stats font-semibold text-white text-sm">{p.displayName}</p>
+                          {p.displayName !== p.name && <p className="font-stats text-xs text-gray-500">{p.name}</p>}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`font-stats text-xs font-semibold capitalize ${ROLE_COLORS[p.role]}`}>{p.role}</span>
+                      <span className={`font-stats text-xs font-semibold capitalize ${ROLE_COLORS[p.role as Role]}`}>{p.role}</span>
                     </td>
                     <td className="px-4 py-3 font-stats text-xs text-gray-400">{p.battingStyle ?? '—'}</td>
                     <td className="px-4 py-3 font-stats text-xs text-gray-400">{p.bowlingStyle ?? '—'}</td>
                     {isAuthed && (
                       <td className="px-4 py-3">
-                        <CloudinaryUpload
-                          label="Photo"
-                          preset="player-headshot"
-                          onUploaded={async (publicId) => {
-                            await fetch(`/api/teams/${teamId}/players/${p.id}`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ headshotCloudinaryId: publicId }),
-                            })
-                            await loadPlayers()
-                          }}
-                        />
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-xs rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          Edit
+                        </button>
                       </td>
                     )}
                   </tr>
@@ -321,6 +401,63 @@ function PlayersContent() {
           </div>
         )}
       </div>
+
+      {/* ── Edit Player Modal ── */}
+      {editingPlayer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={(e) => { if (e.target === e.currentTarget) closeEdit() }}
+        >
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md mx-4 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="font-stats font-semibold text-white text-lg">Edit Player</h2>
+              <button onClick={closeEdit} className="text-gray-400 hover:text-white transition-colors text-xl leading-none">✕</button>
+            </div>
+
+            {editError && <p className="text-red-400 font-stats text-sm">{editError}</p>}
+
+            <ImageUpload
+              value={editForm.headshotCloudinaryId || null}
+              onChange={(publicId) => setEditForm((f) => ({ ...f, headshotCloudinaryId: publicId }))}
+              folder="player-headshots"
+              label="Player Photo"
+              previewShape="circle"
+              id={`edit-player-photo-${editingPlayer.id}`}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Full Name</label>
+                <input name="name" value={editForm.name} onChange={handleEditChange} className={inputCls} required />
+              </div>
+              <div>
+                <label className={labelCls}>Display Name</label>
+                <input name="displayName" value={editForm.displayName} onChange={handleEditChange} className={inputCls} />
+              </div>
+            </div>
+
+            <StyleFields f={editForm} onChange={handleEditChange} />
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEditSave}
+                disabled={saving}
+                className="flex-1 px-4 py-2 bg-primary text-white font-stats font-semibold text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
