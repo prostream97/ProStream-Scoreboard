@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
-import { tournamentTeams } from '@/lib/db/schema'
+import { teams } from '@/lib/db/schema'
 
 export const runtime = 'nodejs'
 
@@ -14,23 +14,29 @@ export async function POST(
 
   const { id } = await params
   const tournamentId = parseInt(id, 10)
-  const { teamId, groupName } = await req.json()
 
-  if (!teamId) {
-    return NextResponse.json({ error: 'teamId is required' }, { status: 400 })
+  const body = await req.json()
+  const { name, shortCode, primaryColor, secondaryColor, logoCloudinaryId } = body
+
+  if (!name?.trim() || !shortCode?.trim()) {
+    return NextResponse.json({ error: 'name and shortCode are required' }, { status: 400 })
   }
 
   try {
-    const [row] = await db
-      .insert(tournamentTeams)
-      .values({ tournamentId, teamId, groupName: groupName ?? null })
+    const [team] = await db
+      .insert(teams)
+      .values({
+        tournamentId,
+        name: name.trim(),
+        shortCode: shortCode.toUpperCase().trim().slice(0, 3),
+        primaryColor: primaryColor ?? '#4F46E5',
+        secondaryColor: secondaryColor ?? '#10B981',
+        logoCloudinaryId: logoCloudinaryId || null,
+      })
       .returning()
-    return NextResponse.json(row, { status: 201 })
-  } catch (err: unknown) {
-    if ((err as { code?: string }).code === '23505') {
-      return NextResponse.json({ error: 'Team already enrolled' }, { status: 409 })
-    }
-    console.error('Enroll team error:', err)
-    return NextResponse.json({ error: 'Failed to enroll team' }, { status: 500 })
+    return NextResponse.json(team, { status: 201 })
+  } catch (err) {
+    console.error('Create team error:', err)
+    return NextResponse.json({ error: 'Failed to create team' }, { status: 500 })
   }
 }

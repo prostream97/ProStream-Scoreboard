@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
-import { matches, matchState, innings, tournamentTeams, tournaments } from '@/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { matches, matchState, innings, tournaments, teams } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
 
@@ -39,16 +39,16 @@ export async function POST(
     return NextResponse.json({ error: 'homeTeamId and awayTeamId are required' }, { status: 400 })
   }
 
-  // Validate both teams are enrolled
-  const enrollments = await db
-    .select({ teamId: tournamentTeams.teamId })
-    .from(tournamentTeams)
-    .where(eq(tournamentTeams.tournamentId, tournamentId))
+  // Validate both teams belong to this tournament
+  const tournamentTeams = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId))
 
-  const enrolledIds = new Set(enrollments.map((e) => e.teamId))
-  if (!enrolledIds.has(homeTeamId) || !enrolledIds.has(awayTeamId)) {
+  const teamIds = new Set(tournamentTeams.map((t) => t.id))
+  if (!teamIds.has(homeTeamId) || !teamIds.has(awayTeamId)) {
     return NextResponse.json(
-      { error: 'Both teams must be enrolled in this tournament' },
+      { error: 'Both teams must belong to this tournament' },
       { status: 400 },
     )
   }

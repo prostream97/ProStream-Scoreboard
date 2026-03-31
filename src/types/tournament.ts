@@ -11,20 +11,14 @@ export type Tournament = {
   createdAt: string
 }
 
-export type TournamentTeam = {
+export type TournamentTeamSummary = {
   id: number
   tournamentId: number
-  teamId: number
-  groupName: string | null
-  createdAt: string
-  team: {
-    id: number
-    name: string
-    shortCode: string
-    primaryColor: string
-    secondaryColor: string
-    logoCloudinaryId: string | null
-  }
+  name: string
+  shortCode: string
+  primaryColor: string
+  secondaryColor: string
+  logoCloudinaryId: string | null
 }
 
 export type TournamentMatch = {
@@ -41,7 +35,7 @@ export type TournamentMatch = {
 }
 
 export type TournamentWithDetails = Tournament & {
-  enrolledTeams: TournamentTeam[]
+  teams: TournamentTeamSummary[]
   matches: TournamentMatch[]
 }
 

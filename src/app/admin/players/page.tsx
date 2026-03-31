@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useSession, signIn } from 'next-auth/react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
+import { TournamentNav } from '@/components/shared/TournamentNav'
 import type { Player } from '@/types/player'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
@@ -35,6 +36,8 @@ function PlayersContent() {
   const searchParams = useSearchParams()
   const teamId = searchParams.get('teamId')
   const teamName = searchParams.get('teamName') ?? 'Team'
+  const tournamentId = searchParams.get('tournamentId')
+  const tournamentName = searchParams.get('tournamentName') ?? 'Tournament'
 
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
@@ -238,12 +241,22 @@ function PlayersContent() {
         <div className="flex items-center gap-2 mb-6 font-stats text-sm text-gray-500">
           <Link href="/" className="hover:text-gray-300 transition-colors">Dashboard</Link>
           <span>/</span>
-          <Link href="/admin/teams" className="hover:text-gray-300 transition-colors">Teams</Link>
+          <Link href="/admin/tournaments" className="hover:text-gray-300 transition-colors">Tournaments</Link>
+          {tournamentId && (
+            <>
+              <span>/</span>
+              <Link href={`/admin/tournaments/${tournamentId}`} className="hover:text-gray-300 transition-colors">{tournamentName}</Link>
+            </>
+          )}
           <span>/</span>
           <span className="text-gray-300">{teamName}</span>
         </div>
 
-        <div className="flex items-center justify-between mb-6">
+        {tournamentId && (
+          <TournamentNav tournamentId={parseInt(tournamentId, 10)} activeSegment="players" />
+        )}
+
+        <div className="flex items-center justify-between mb-6 mt-6">
           <div>
             <h1 className="font-display text-4xl text-primary tracking-wider">PLAYERS</h1>
             <p className="font-stats text-gray-400 text-sm mt-1">{teamName} · {players.length} players</p>

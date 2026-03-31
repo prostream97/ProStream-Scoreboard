@@ -3,8 +3,8 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
+import { TournamentNav } from '@/components/shared/TournamentNav'
 import type { TournamentWithDetails, StandingRow, TournamentMatch, MatchStage } from '@/types/tournament'
-import type { Team } from '@/types/player'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
@@ -39,6 +39,7 @@ const MATCH_STAGES: { value: MatchStage; label: string }[] = [
   { value: 'third_place', label: 'Third Place' },
 ]
 
+
 const emptyMatchForm = {
   homeTeamId: '',
   awayTeamId: '',
@@ -58,13 +59,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   const [tournament, setTournament] = useState<TournamentWithDetails | null>(null)
   const [standings, setStandings] = useState<StandingRow[]>([])
-  const [allTeams, setAllTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Enroll team
-  const [enrollTeamId, setEnrollTeamId] = useState('')
-  const [enrolling, setEnrolling] = useState(false)
-  const [enrollError, setEnrollError] = useState('')
 
   // Add match form
   const [showMatchForm, setShowMatchForm] = useState(false)
@@ -73,14 +68,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [matchError, setMatchError] = useState('')
 
   async function load() {
-    const [tRes, sRes, teamsRes] = await Promise.all([
+    const [tRes, sRes] = await Promise.all([
       fetch(`/api/tournaments/${tournamentId}`),
       fetch(`/api/tournaments/${tournamentId}/standings`),
-      fetch('/api/teams'),
     ])
     if (tRes.ok) setTournament(await tRes.json())
     if (sRes.ok) setStandings(await sRes.json())
-    if (teamsRes.ok) setAllTeams(await teamsRes.json())
     setLoading(false)
   }
 
@@ -93,33 +86,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       body: JSON.stringify({ status: newStatus }),
     })
     if (res.ok) setTournament((t) => t ? { ...t, status: newStatus as TournamentWithDetails['status'] } : t)
-  }
-
-  async function handleEnroll() {
-    if (!enrollTeamId) return
-    setEnrolling(true)
-    setEnrollError('')
-    try {
-      const res = await fetch(`/api/tournaments/${tournamentId}/teams`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: parseInt(enrollTeamId, 10) }),
-      })
-      if (res.ok) {
-        setEnrollTeamId('')
-        await load()
-      } else {
-        const data = await res.json()
-        setEnrollError(data.error ?? 'Failed to enroll team')
-      }
-    } finally {
-      setEnrolling(false)
-    }
-  }
-
-  async function handleRemoveTeam(teamId: number) {
-    await fetch(`/api/tournaments/${tournamentId}/teams/${teamId}`, { method: 'DELETE' })
-    await load()
   }
 
   function handleMatchFormChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
@@ -176,12 +142,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     )
   }
 
-  const enrolledIds = new Set(tournament.enrolledTeams.map((et) => et.teamId))
-  const unenrolledTeams = allTeams.filter((t) => !enrolledIds.has(t.id))
-
   const tossTeams = [
-    ...(matchForm.homeTeamId ? tournament.enrolledTeams.filter((et) => et.teamId === parseInt(matchForm.homeTeamId, 10)) : []),
-    ...(matchForm.awayTeamId ? tournament.enrolledTeams.filter((et) => et.teamId === parseInt(matchForm.awayTeamId, 10)) : []),
+    ...(matchForm.homeTeamId ? tournament.teams.filter((t) => t.id === parseInt(matchForm.homeTeamId, 10)) : []),
+    ...(matchForm.awayTeamId ? tournament.teams.filter((t) => t.id === parseInt(matchForm.awayTeamId, 10)) : []),
   ]
 
   const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
@@ -199,6 +162,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           <span className="text-gray-300">{tournament.name}</span>
         </div>
 
+        {/* ── Tab nav ── */}
+        <TournamentNav tournamentId={tournamentId} />
+
         {/* ── Header ── */}
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
           <div className="flex items-start justify-between gap-4">
@@ -207,6 +173,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <h1 className="font-display text-4xl text-primary tracking-wider">{tournament.name}</h1>
                 <span className="font-display text-sm tracking-wider text-gray-500 bg-gray-800 px-2 py-1 rounded">
                   {tournament.shortName}
+                </span>
+                <span className="font-stats text-xs text-gray-600 bg-gray-800/60 px-2 py-1 rounded font-mono">
+                  TRN-{tournament.id.toString().padStart(3, '0')}
                 </span>
               </div>
               <p className="font-stats text-sm text-gray-400 mt-1">
@@ -233,71 +202,45 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
 
-        {/* ── Enrolled Teams ── */}
+        {/* ── Teams ── */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
-              Enrolled Teams ({tournament.enrolledTeams.length})
+              Teams ({tournament.teams.length})
             </h2>
+            <Link
+              href={`/admin/tournaments/${tournamentId}/teams`}
+              className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Manage Teams →
+            </Link>
           </div>
 
-          {tournament.enrolledTeams.length === 0 ? (
-            <p className="font-stats text-xs text-gray-600">No teams enrolled yet.</p>
+          {tournament.teams.length === 0 ? (
+            <p className="font-stats text-xs text-gray-600">
+              No teams yet.{' '}
+              <Link href={`/admin/tournaments/${tournamentId}/teams`} className="text-primary hover:underline">
+                Add teams
+              </Link>{' '}
+              to get started.
+            </p>
           ) : (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {tournament.enrolledTeams.map((et) => (
-                <div
-                  key={et.id}
-                  className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2"
-                >
-                  {et.team.logoCloudinaryId ? (
+            <div className="flex flex-wrap gap-2">
+              {tournament.teams.map((team) => (
+                <div key={team.id} className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
+                  {team.logoCloudinaryId ? (
                     <img
-                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_24,h_24,f_webp/${et.team.logoCloudinaryId}`}
+                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_24,h_24,f_webp/${team.logoCloudinaryId}`}
                       alt=""
                       className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: et.team.primaryColor }} />
+                    <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: team.primaryColor }} />
                   )}
-                  <span className="font-display text-sm tracking-wider" style={{ color: et.team.primaryColor }}>
-                    {et.team.shortCode}
-                  </span>
-                  <span className="font-stats text-xs text-gray-300">{et.team.name}</span>
-                  {isAuthed && (
-                    <button
-                      onClick={() => handleRemoveTeam(et.teamId)}
-                      className="text-gray-600 hover:text-red-400 transition-colors text-sm leading-none ml-1"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  <span className="font-display text-sm tracking-wider" style={{ color: team.primaryColor }}>{team.shortCode}</span>
+                  <span className="font-stats text-xs text-gray-300">{team.name}</span>
                 </div>
               ))}
-            </div>
-          )}
-
-          {isAuthed && unenrolledTeams.length > 0 && (
-            <div className="flex items-center gap-2 mt-2">
-              {enrollError && <p className="text-red-400 font-stats text-xs">{enrollError}</p>}
-              <select
-                value={enrollTeamId}
-                onChange={(e) => setEnrollTeamId(e.target.value)}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-300 font-stats text-sm focus:outline-none focus:border-primary"
-              >
-                <option value="">+ Add Team</option>
-                {unenrolledTeams.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
-                ))}
-              </select>
-              {enrollTeamId && (
-                <button
-                  onClick={handleEnroll}
-                  disabled={enrolling}
-                  className="px-3 py-2 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 disabled:opacity-40 transition-colors"
-                >
-                  {enrolling ? 'Adding...' : 'Enroll'}
-                </button>
-              )}
             </div>
           )}
         </section>
@@ -358,7 +301,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
               Matches ({tournament.matches.length})
             </h2>
-            {isAuthed && tournament.enrolledTeams.length >= 2 && (
+            {isAuthed && tournament.teams.length >= 2 && (
               <button
                 onClick={() => { setShowMatchForm((v) => !v); setMatchError('') }}
                 className="px-3 py-1.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors"
@@ -385,10 +328,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <label className={labelCls}>Home Team</label>
                   <select name="homeTeamId" value={matchForm.homeTeamId} onChange={handleMatchFormChange} className={inputCls} required>
                     <option value="">Select team</option>
-                    {tournament.enrolledTeams
-                      .filter((et) => et.teamId !== parseInt(matchForm.awayTeamId, 10))
-                      .map((et) => (
-                        <option key={et.teamId} value={et.teamId}>{et.team.name} ({et.team.shortCode})</option>
+                    {tournament.teams
+                      .filter((t) => t.id !== parseInt(matchForm.awayTeamId, 10))
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
                       ))
                     }
                   </select>
@@ -397,10 +340,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <label className={labelCls}>Away Team</label>
                   <select name="awayTeamId" value={matchForm.awayTeamId} onChange={handleMatchFormChange} className={inputCls} required>
                     <option value="">Select team</option>
-                    {tournament.enrolledTeams
-                      .filter((et) => et.teamId !== parseInt(matchForm.homeTeamId, 10))
-                      .map((et) => (
-                        <option key={et.teamId} value={et.teamId}>{et.team.name} ({et.team.shortCode})</option>
+                    {tournament.teams
+                      .filter((t) => t.id !== parseInt(matchForm.homeTeamId, 10))
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
                       ))
                     }
                   </select>
@@ -439,8 +382,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     <label className={labelCls}>Toss Winner (optional)</label>
                     <select name="tossWinnerId" value={matchForm.tossWinnerId} onChange={handleMatchFormChange} className={inputCls}>
                       <option value="">— TBD</option>
-                      {tossTeams.map((et) => (
-                        <option key={et.teamId} value={et.teamId}>{et.team.name}</option>
+                      {tossTeams.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
                   </div>
@@ -479,6 +422,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     </main>
   )
 }
+
 
 function MatchCard({ match }: { match: TournamentMatch }) {
   const stageLabel = match.matchStage

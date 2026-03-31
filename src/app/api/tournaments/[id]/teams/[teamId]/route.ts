@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
-import { tournamentTeams } from '@/lib/db/schema'
+import { teams } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
@@ -18,13 +18,8 @@ export async function DELETE(
   const teamIdNum = parseInt(teamId, 10)
 
   await db
-    .delete(tournamentTeams)
-    .where(
-      and(
-        eq(tournamentTeams.tournamentId, tournamentId),
-        eq(tournamentTeams.teamId, teamIdNum),
-      ),
-    )
+    .delete(teams)
+    .where(and(eq(teams.id, teamIdNum), eq(teams.tournamentId, tournamentId)))
 
   return NextResponse.json({ ok: true })
 }

@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { tournaments, tournamentTeams, matches, innings, teams } from '@/lib/db/schema'
+import { tournaments, matches, teams } from '@/lib/db/schema'
 import { eq, and, inArray, desc, asc } from 'drizzle-orm'
 import type { TournamentWithDetails, StandingRow } from '@/types/tournament'
 
@@ -9,15 +9,35 @@ export async function getTournamentList() {
   })
 }
 
+export async function getTournamentListWithCounts() {
+  const rows = await db.query.tournaments.findMany({
+    orderBy: [desc(tournaments.createdAt)],
+    with: {
+      teams: { columns: { id: true } },
+      matches: { columns: { id: true } },
+    },
+  })
+  return rows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    shortName: t.shortName,
+    status: t.status,
+    format: t.format,
+    totalOvers: t.totalOvers,
+    createdAt: t.createdAt,
+    teamCount: t.teams.length,
+    matchCount: t.matches.length,
+  }))
+}
+
 export async function getTournamentWithDetails(
   tournamentId: number,
 ): Promise<TournamentWithDetails | null> {
   const row = await db.query.tournaments.findFirst({
     where: eq(tournaments.id, tournamentId),
     with: {
-      tournamentTeams: {
-        with: { team: true },
-        orderBy: [asc(tournamentTeams.createdAt)],
+      teams: {
+        orderBy: [asc(teams.createdAt)],
       },
       matches: {
         with: { homeTeam: true, awayTeam: true },
@@ -36,20 +56,14 @@ export async function getTournamentWithDetails(
     format: row.format,
     totalOvers: row.totalOvers,
     createdAt: row.createdAt.toISOString(),
-    enrolledTeams: row.tournamentTeams.map((tt) => ({
-      id: tt.id,
-      tournamentId: tt.tournamentId,
-      teamId: tt.teamId,
-      groupName: tt.groupName ?? null,
-      createdAt: tt.createdAt.toISOString(),
-      team: {
-        id: tt.team.id,
-        name: tt.team.name,
-        shortCode: tt.team.shortCode,
-        primaryColor: tt.team.primaryColor,
-        secondaryColor: tt.team.secondaryColor,
-        logoCloudinaryId: tt.team.logoCloudinaryId ?? null,
-      },
+    teams: row.teams.map((t) => ({
+      id: t.id,
+      tournamentId: t.tournamentId,
+      name: t.name,
+      shortCode: t.shortCode,
+      primaryColor: t.primaryColor,
+      secondaryColor: t.secondaryColor,
+      logoCloudinaryId: t.logoCloudinaryId ?? null,
     })),
     matches: row.matches.map((m) => ({
       id: m.id,
@@ -79,14 +93,14 @@ export async function getTournamentWithDetails(
 export async function getTournamentStandings(
   tournamentId: number,
 ): Promise<StandingRow[]> {
-  // 1. Get enrolled team IDs
-  const enrolledRows = await db
-    .select({ teamId: tournamentTeams.teamId })
-    .from(tournamentTeams)
-    .where(eq(tournamentTeams.tournamentId, tournamentId))
+  // 1. Get team IDs belonging to this tournament
+  const tournamentTeams = await db
+    .select({ teamId: teams.id })
+    .from(teams)
+    .where(eq(teams.tournamentId, tournamentId))
 
-  if (enrolledRows.length === 0) return []
-  const enrolledTeamIds = enrolledRows.map((r) => r.teamId)
+  if (tournamentTeams.length === 0) return []
+  const teamIds = tournamentTeams.map((r) => r.teamId)
 
   // 2. Fetch completed group matches with their innings
   const groupMatches = await db.query.matches.findMany({
@@ -105,7 +119,7 @@ export async function getTournamentStandings(
   }
 
   const acc = new Map<number, Accum>()
-  for (const tid of enrolledTeamIds) {
+  for (const tid of teamIds) {
     acc.set(tid, { played: 0, won: 0, lost: 0, tied: 0, points: 0, runsFor: 0, oversFaced: 0, runsAgainst: 0, oversConced: 0 })
   }
 
@@ -122,7 +136,6 @@ export async function getTournamentStandings(
     const overs1 = inn1.overs + inn1.balls / 6
     const overs2 = inn2.overs + inn2.balls / 6
 
-    // NRR components
     const a1 = acc.get(team1)!
     const a2 = acc.get(team2)!
 
@@ -136,13 +149,10 @@ export async function getTournamentStandings(
     a2.played += 1
 
     if (inn2.totalRuns > inn1.totalRuns) {
-      // team2 (chasing) won
       a2.won += 1; a2.points += 2; a1.lost += 1
     } else if (inn1.totalRuns > inn2.totalRuns) {
-      // team1 (defending) won
       a1.won += 1; a1.points += 2; a2.lost += 1
     } else {
-      // tie
       a1.tied += 1; a1.points += 1; a2.tied += 1; a2.points += 1
     }
   }
@@ -151,7 +161,7 @@ export async function getTournamentStandings(
   const teamRows = await db
     .select({ id: teams.id, name: teams.name, shortCode: teams.shortCode, primaryColor: teams.primaryColor })
     .from(teams)
-    .where(inArray(teams.id, enrolledTeamIds))
+    .where(inArray(teams.id, teamIds))
   const teamMap = new Map(teamRows.map((t) => [t.id, t]))
 
   // 5. Build sorted StandingRow[]

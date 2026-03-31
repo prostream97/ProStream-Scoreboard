@@ -9,7 +9,6 @@ import {
   jsonb,
   varchar,
   char,
-  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -95,10 +94,26 @@ export const matchStageEnum = pgEnum('match_stage', [
   'third_place',
 ])
 
+// ─── Tournaments ──────────────────────────────────────────────────────────────
+// Defined before teams so teams can reference it
+
+export const tournaments = pgTable('tournaments', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  shortName: varchar('short_name', { length: 20 }).notNull(),
+  status: tournamentStatusEnum('status').notNull().default('upcoming'),
+  format: matchFormatEnum('format').notNull().default('T20'),
+  totalOvers: integer('total_overs').notNull().default(20),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 export const teams = pgTable('teams', {
   id: serial('id').primaryKey(),
+  tournamentId: integer('tournament_id')
+    .notNull()
+    .references(() => tournaments.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   shortCode: char('short_code', { length: 3 }).notNull(),
   primaryColor: varchar('primary_color', { length: 7 }).notNull().default('#4F46E5'),
@@ -122,36 +137,6 @@ export const players = pgTable('players', {
   headshotCloudinaryId: text('headshot_cloudinary_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
-
-// ─── Tournaments ──────────────────────────────────────────────────────────────
-
-export const tournaments = pgTable('tournaments', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  shortName: varchar('short_name', { length: 20 }).notNull(),
-  status: tournamentStatusEnum('status').notNull().default('upcoming'),
-  format: matchFormatEnum('format').notNull().default('T20'),
-  totalOvers: integer('total_overs').notNull().default(20),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-})
-
-export const tournamentTeams = pgTable(
-  'tournament_teams',
-  {
-    id: serial('id').primaryKey(),
-    tournamentId: integer('tournament_id')
-      .notNull()
-      .references(() => tournaments.id, { onDelete: 'cascade' }),
-    teamId: integer('team_id')
-      .notNull()
-      .references(() => teams.id, { onDelete: 'cascade' }),
-    groupName: varchar('group_name', { length: 10 }),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  },
-  (t) => ({
-    uniqueEnrollment: uniqueIndex('uq_tournament_team').on(t.tournamentId, t.teamId),
-  }),
-)
 
 // ─── Matches ──────────────────────────────────────────────────────────────────
 
@@ -269,11 +254,19 @@ export const matchState = pgTable('match_state', {
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 
-export const teamsRelations = relations(teams, ({ many }) => ({
+export const tournamentsRelations = relations(tournaments, ({ many }) => ({
+  teams: many(teams),
+  matches: many(matches),
+}))
+
+export const teamsRelations = relations(teams, ({ one, many }) => ({
+  tournament: one(tournaments, {
+    fields: [teams.tournamentId],
+    references: [tournaments.id],
+  }),
   players: many(players),
   homeMatches: many(matches, { relationName: 'homeTeam' }),
   awayMatches: many(matches, { relationName: 'awayTeam' }),
-  tournamentTeams: many(tournamentTeams),
 }))
 
 export const playersRelations = relations(players, ({ one }) => ({
@@ -299,22 +292,6 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
   tournament: one(tournaments, {
     fields: [matches.tournamentId],
     references: [tournaments.id],
-  }),
-}))
-
-export const tournamentsRelations = relations(tournaments, ({ many }) => ({
-  tournamentTeams: many(tournamentTeams),
-  matches: many(matches),
-}))
-
-export const tournamentTeamsRelations = relations(tournamentTeams, ({ one }) => ({
-  tournament: one(tournaments, {
-    fields: [tournamentTeams.tournamentId],
-    references: [tournaments.id],
-  }),
-  team: one(teams, {
-    fields: [tournamentTeams.teamId],
-    references: [teams.id],
   }),
 }))
 
@@ -391,5 +368,3 @@ export type MatchState = typeof matchState.$inferSelect
 export type NewMatchState = typeof matchState.$inferInsert
 export type Tournament = typeof tournaments.$inferSelect
 export type NewTournament = typeof tournaments.$inferInsert
-export type TournamentTeam = typeof tournamentTeams.$inferSelect
-export type NewTournamentTeam = typeof tournamentTeams.$inferInsert

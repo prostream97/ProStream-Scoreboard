@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
 import { teams } from '@/lib/db/schema'
+import { eq, asc } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const tournamentId = searchParams.get('tournamentId')
+
   try {
-    const rows = await db.query.teams.findMany({
-      orderBy: (t, { asc }) => [asc(t.name)],
-    })
+    const rows = tournamentId
+      ? await db.select().from(teams).where(eq(teams.tournamentId, parseInt(tournamentId, 10))).orderBy(asc(teams.name))
+      : await db.select().from(teams).orderBy(asc(teams.name))
     return NextResponse.json(rows)
   } catch (err) {
     console.error('Teams fetch error:', err)
@@ -24,16 +28,17 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, shortCode, primaryColor, secondaryColor, logoCloudinaryId } = body
+  const { name, shortCode, primaryColor, secondaryColor, logoCloudinaryId, tournamentId } = body
 
-  if (!name || !shortCode) {
-    return NextResponse.json({ error: 'name and shortCode are required' }, { status: 400 })
+  if (!name || !shortCode || !tournamentId) {
+    return NextResponse.json({ error: 'name, shortCode and tournamentId are required' }, { status: 400 })
   }
 
   try {
     const [team] = await db
       .insert(teams)
       .values({
+        tournamentId,
         name,
         shortCode: shortCode.toUpperCase().slice(0, 3),
         primaryColor: primaryColor ?? '#4F46E5',

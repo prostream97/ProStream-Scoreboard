@@ -7,6 +7,8 @@ import type { Tournament } from '@/types/tournament'
 
 const FORMAT_OVERS: Record<string, number> = { T20: 20, ODI: 50, T10: 10, custom: 20 }
 
+const fmtId = (id: number) => `TRN-${id.toString().padStart(3, '0')}`
+
 const emptyForm = {
   name: '',
   shortName: '',
@@ -174,6 +176,9 @@ export default function TournamentsPage() {
                       <span className="font-stats font-semibold text-white text-lg">{t.name}</span>
                       <span className="font-display text-xs tracking-wider text-gray-500 bg-gray-800 px-2 py-0.5 rounded">
                         {t.shortName}
+                      </span>
+                      <span className="font-stats text-xs text-gray-600 bg-gray-800/60 px-2 py-0.5 rounded font-mono">
+                        {fmtId(t.id)}
                       </span>
                       <span className={`font-stats text-xs px-2 py-0.5 rounded-full uppercase tracking-wider ${statusColors[t.status] ?? statusColors.upcoming}`}>
                         {t.status.replace('_', ' ')}
