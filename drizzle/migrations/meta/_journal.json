@@ -8,6 +8,13 @@
       "when": 1774087644955,
       "tag": "0000_last_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775202124422,
+      "tag": "0001_normal_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

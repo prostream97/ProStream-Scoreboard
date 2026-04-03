@@ -1,6 +1,7 @@
 'use client'
 
 import type { MatchSnapshot } from '@/types/match'
+import { motion } from 'framer-motion'
 
 type Props = { snapshot: MatchSnapshot }
 
@@ -15,10 +16,15 @@ export function PartnershipOverlay({ snapshot }: Props) {
 
   return (
     // 480×100 lower-third panel — OBS browser source
-    <div
-      className="flex items-center w-[480px] h-[100px] font-stats overflow-hidden rounded-r-2xl px-5 gap-6"
-      style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.70) 100%)' }}
+    <motion.div
+      initial={{ x: -480, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: -480, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 150, damping: 20 }}
+      className="relative flex items-center w-[480px] h-[100px] font-stats overflow-hidden rounded-r-2xl px-5 gap-6 border-y border-r border-[#ffffff22] shadow-[0_15px_40px_rgba(0,0,0,0.8)]"
+      style={{ background: 'linear-gradient(135deg, rgba(20,20,20,0.85) 0%, rgba(10,10,10,0.95) 100%)', backdropFilter: 'blur(12px)' }}
     >
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
       {/* Accent */}
       <div className="absolute left-0 top-0 w-1.5 h-full" style={{ backgroundColor: battingTeam.primaryColor }} />
 
@@ -39,6 +45,6 @@ export function PartnershipOverlay({ snapshot }: Props) {
           {b2?.displayName ?? '—'}
         </p>
       </div>
-    </div>
+    </motion.div>
   )
 }

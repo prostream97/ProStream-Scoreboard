@@ -8,6 +8,8 @@ export type Tournament = {
   status: TournamentStatus
   format: string
   totalOvers: number
+  ballsPerOver: number
+  logoCloudinaryId: string | null
   createdAt: string
 }
 

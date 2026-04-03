@@ -30,6 +30,28 @@ export async function getTournamentListWithCounts() {
   }))
 }
 
+export async function getTournamentsWithTeams() {
+  const rows = await db.query.tournaments.findMany({
+    orderBy: [desc(tournaments.createdAt)],
+    with: {
+      teams: true,
+    },
+  })
+  return rows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    format: t.format,
+    totalOvers: t.totalOvers,
+    teams: t.teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      shortCode: team.shortCode,
+      primaryColor: team.primaryColor,
+      logoCloudinaryId: team.logoCloudinaryId,
+    })),
+  }))
+}
+
 export async function getTournamentWithDetails(
   tournamentId: number,
 ): Promise<TournamentWithDetails | null> {

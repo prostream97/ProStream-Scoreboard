@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { motion } from 'framer-motion'
 import type { BatterStats, BowlerStats, PlayerSummary } from '@/types/match'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
@@ -15,10 +16,16 @@ type BatterCardProps = {
 export function BatterCard({ batter, player, isStriker, primaryColor }: BatterCardProps) {
   return (
     // Lower-third: 480×120 — place in OBS at bottom-left
-    <div
-      className="flex items-center w-[480px] h-[120px] font-stats overflow-hidden rounded-r-2xl"
-      style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 100%)' }}
+    <motion.div
+      initial={{ x: -480, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: -480, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 150, damping: 20 }}
+      className="relative flex items-center w-[480px] h-[120px] font-stats overflow-hidden rounded-r-2xl border-y border-r border-[#ffffff22] shadow-[0_15px_40px_rgba(0,0,0,0.8)]"
+      style={{ background: 'linear-gradient(135deg, rgba(20,20,20,0.85) 0%, rgba(10,10,10,0.95) 100%)', backdropFilter: 'blur(12px)' }}
     >
+      {/* Metallic gleam overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
       {/* Accent stripe */}
       <div className="w-1.5 h-full" style={{ backgroundColor: primaryColor }} />
 
@@ -60,7 +67,7 @@ export function BatterCard({ batter, player, isStriker, primaryColor }: BatterCa
           <span className="text-gray-300">SR {batter.strikeRate.toFixed(1)}</span>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -72,10 +79,15 @@ type BowlerCardProps = {
 
 export function BowlerCard({ bowler, player, primaryColor }: BowlerCardProps) {
   return (
-    <div
-      className="flex items-center w-[480px] h-[120px] font-stats overflow-hidden rounded-r-2xl"
-      style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 100%)' }}
+    <motion.div
+      initial={{ x: -480, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: -480, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 150, damping: 20 }}
+      className="relative flex items-center w-[480px] h-[120px] font-stats overflow-hidden rounded-r-2xl border-y border-r border-[#ffffff22] shadow-[0_15px_40px_rgba(0,0,0,0.8)]"
+      style={{ background: 'linear-gradient(135deg, rgba(20,20,20,0.85) 0%, rgba(10,10,10,0.95) 100%)', backdropFilter: 'blur(12px)' }}
     >
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
       <div className="w-1.5 h-full" style={{ backgroundColor: primaryColor }} />
 
       <div className="w-20 h-20 mx-4 rounded-full overflow-hidden flex-shrink-0 bg-gray-800">
@@ -113,6 +125,6 @@ export function BowlerCard({ bowler, player, primaryColor }: BowlerCardProps) {
           <span>Econ {bowler.economy.toFixed(1)}</span>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

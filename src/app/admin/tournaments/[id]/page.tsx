@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
+import { Trophy } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import type { TournamentWithDetails, StandingRow, TournamentMatch, MatchStage } from '@/types/tournament'
 
@@ -168,7 +169,20 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         {/* ── Header ── */}
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="flex items-start gap-4">
+              {/* Tournament logo or fallback */}
+              <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-800 flex items-center justify-center border border-gray-700">
+                {tournament.logoCloudinaryId && CLOUD_NAME ? (
+                  <img
+                    src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_64,h_64,f_webp/${tournament.logoCloudinaryId}`}
+                    alt={tournament.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Trophy className="w-8 h-8 text-primary opacity-60" />
+                )}
+              </div>
+              <div>
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="font-display text-4xl text-primary tracking-wider">{tournament.name}</h1>
                 <span className="font-display text-sm tracking-wider text-gray-500 bg-gray-800 px-2 py-1 rounded">
@@ -180,7 +194,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </div>
               <p className="font-stats text-sm text-gray-400 mt-1">
                 {tournament.format} · {tournament.totalOvers} overs
+                {tournament.ballsPerOver !== 6 && (
+                  <span className="ml-1 text-orange-400">({tournament.ballsPerOver} balls/over)</span>
+                )}
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <span className={`font-stats text-xs px-2.5 py-1 rounded-full uppercase tracking-wider ${statusColors[tournament.status] ?? statusColors.upcoming}`}>

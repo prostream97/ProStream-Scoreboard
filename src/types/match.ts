@@ -121,6 +121,7 @@ export type MatchSnapshot = {
   status: MatchStatus
   venue: string | null
   totalOvers: number
+  ballsPerOver: number
   homeTeam: TeamSummary
   awayTeam: TeamSummary
   tossWinnerId: number | null

@@ -26,6 +26,7 @@ export async function PATCH(
   }
 
   const [updated] = await db.update(teams).set(patch).where(eq(teams.id, id)).returning()
+  if (!updated) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
   return NextResponse.json(updated)
 }
 

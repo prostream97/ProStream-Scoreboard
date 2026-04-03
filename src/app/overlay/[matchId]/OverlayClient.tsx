@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
 import { Scorebug } from '@/components/overlay/Scorebug'
 import { BatterCard, BowlerCard } from '@/components/overlay/PlayerCard'
 import { WicketAlert } from '@/components/overlay/WicketAlert'
 import { PartnershipOverlay } from '@/components/overlay/PartnershipOverlay'
+import { BoundaryAlert } from '@/components/overlay/BoundaryAlert'
 import type { MatchSnapshot, InningsState } from '@/types/match'
 import type {
   DeliveryAddedPayload,
@@ -23,6 +25,7 @@ type Props = {
 function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(initialSnapshot)
   const [lastWicket, setLastWicket] = useState<WicketPayload | null>(null)
+  const [lastBoundary, setLastBoundary] = useState<{ id: number; runs: 4 | 6 } | null>(null)
   const [visible, setVisible] = useState(true)
   const [activePlayerId, setActivePlayerId] = useState<number | null>(null)
 
@@ -35,6 +38,10 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   }, [matchId])
 
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
+    if (data.runs === 4 || data.runs === 6) {
+      setLastBoundary({ id: Date.now(), runs: data.runs as 4 | 6 })
+    }
+
     setSnapshot((s) => {
       const updatedInnings: InningsState[] = s.innings.map((inn) =>
         inn.inningsNumber === s.currentInnings
@@ -42,9 +49,10 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
           : inn,
       )
       const currentInningsState = updatedInnings.find((i) => i.inningsNumber === s.currentInnings) ?? null
-      const totalBalls = (currentInningsState?.overs ?? 0) * 6 + (currentInningsState?.balls ?? 0)
+      const bpo = s.ballsPerOver ?? 6
+      const totalBalls = (currentInningsState?.overs ?? 0) * bpo + (currentInningsState?.balls ?? 0)
       const currentRunRate = totalBalls > 0
-        ? Math.round(((currentInningsState?.totalRuns ?? 0) / (totalBalls / 6)) * 100) / 100
+        ? Math.round(((currentInningsState?.totalRuns ?? 0) / (totalBalls / bpo)) * 100) / 100
         : 0
       return {
         ...s,
@@ -128,8 +136,7 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   }
 
   if (mode === 'card') {
-    if (!visible) return null
-    return resolveCard()
+    return <AnimatePresence>{visible && resolveCard()}</AnimatePresence>
   }
 
   if (mode === 'wicket') {
@@ -137,8 +144,11 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   }
 
   if (mode === 'partnership') {
-    if (!visible) return null
-    return <PartnershipOverlay snapshot={snapshot} />
+    return <AnimatePresence>{visible && <PartnershipOverlay snapshot={snapshot} />}</AnimatePresence>
+  }
+
+  if (mode === 'boundary') {
+    return <BoundaryAlert boundary={lastBoundary} snapshot={snapshot} />
   }
 
   // Default: scorebug

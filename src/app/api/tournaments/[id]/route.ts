@@ -34,7 +34,7 @@ export async function PATCH(
   const tournamentId = parseInt(id, 10)
   const body = await req.json() as Record<string, unknown>
 
-  const allowedKeys = ['name', 'shortName', 'status', 'format', 'totalOvers'] as const
+  const allowedKeys = ['name', 'shortName', 'status', 'format', 'totalOvers', 'ballsPerOver', 'logoCloudinaryId'] as const
   const patch: Record<string, unknown> = {}
   for (const key of allowedKeys) {
     if (key in body) patch[key] = body[key]

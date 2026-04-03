@@ -9,7 +9,7 @@ interface ImageUploadProps {
   value: string | null
   /** Called with the new Cloudinary public_id after a successful upload */
   onChange: (publicId: string) => void
-  folder: 'team-logos' | 'player-headshots'
+  folder: 'team-logos' | 'player-headshots' | 'tournament-logos'
   label?: string
   previewShape?: 'circle' | 'square'
   /** Crop aspect ratio. Defaults to 1 (square). */

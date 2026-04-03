@@ -30,6 +30,7 @@ export async function PATCH(
     .where(eq(players.id, id))
     .returning()
 
+  if (!updated) return NextResponse.json({ error: 'Player not found' }, { status: 404 })
   return NextResponse.json(updated)
 }
 

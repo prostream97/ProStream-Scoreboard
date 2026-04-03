@@ -65,6 +65,40 @@ export function Navbar() {
             </span>
           </div>
         </Link>
+
+        {/* Breadcrumbs */}
+        {pathname !== '/' && !pathname.startsWith('/login') && (
+          <div className="hidden md:flex items-center gap-2 ml-6 px-4 py-1.5 rounded-full bg-gray-900/60 border border-gray-800 shadow-inner">
+            <Link href="/" className="text-gray-400 hover:text-primary transition-colors text-sm font-stats">Dashboard</Link>
+            
+            {pathname.startsWith('/admin/tournaments') && (
+              <>
+                <span className="text-gray-600 text-xs">/</span>
+                <Link href="/admin/tournaments" className="text-gray-300 hover:text-primary transition-colors text-sm font-stats">Tournaments</Link>
+                {pathname.split('/').length > 3 && (
+                  <>
+                    <span className="text-gray-600 text-xs">/</span>
+                    <span className="text-primary text-sm font-stats">Details</span>
+                  </>
+                )}
+              </>
+            )}
+
+            {pathname.startsWith('/match/new') && (
+              <>
+                <span className="text-gray-600 text-xs">/</span>
+                <span className="text-primary text-sm font-stats">New Match</span>
+              </>
+            )}
+            
+            {pathname.startsWith('/match/') && !pathname.startsWith('/match/new') && (
+              <>
+                <span className="text-gray-600 text-xs">/</span>
+                <span className="text-primary text-sm font-stats">Match Control</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right: auth */}

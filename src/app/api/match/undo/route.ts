@@ -28,19 +28,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Delivery not found' }, { status: 404 })
     }
 
-    // Reverse innings totals
+    // Verify this delivery belongs to the given match (prevent cross-match undo)
     const inningsRow = await db.query.innings.findFirst({
       where: eq(innings.id, delivery.inningsId),
     })
 
-    if (inningsRow) {
+    if (!inningsRow || inningsRow.matchId !== matchId) {
+      return NextResponse.json({ error: 'Delivery does not belong to this match' }, { status: 403 })
+    }
+
+    await db.transaction(async (tx) => {
+      // Reverse innings totals
       const reversedRuns = inningsRow.totalRuns - delivery.runs - delivery.extraRuns
       const reversedWickets = inningsRow.wickets - (delivery.isWicket ? 1 : 0)
+      // If undoing a legal ball and it was the first ball of the over (balls=0), borrow from overs
       const reversedBalls = delivery.isLegal ? inningsRow.balls - 1 : inningsRow.balls
       const adjustedBalls = reversedBalls < 0 ? 5 : reversedBalls
       const adjustedOvers = reversedBalls < 0 ? inningsRow.overs - 1 : inningsRow.overs
 
-      await db
+      await tx
         .update(innings)
         .set({
           totalRuns: Math.max(0, reversedRuns),
@@ -49,16 +55,16 @@ export async function POST(req: NextRequest) {
           balls: adjustedBalls,
         })
         .where(eq(innings.id, delivery.inningsId))
-    }
 
-    // Reset match_state timestamp
-    await db
-      .update(matchState)
-      .set({ lastUpdated: new Date() })
-      .where(eq(matchState.matchId, matchId))
+      // Reset match_state timestamp
+      await tx
+        .update(matchState)
+        .set({ lastUpdated: new Date() })
+        .where(eq(matchState.matchId, matchId))
 
-    // Delete the delivery
-    await db.delete(deliveries).where(eq(deliveries.id, deliveryId))
+      // Delete the delivery
+      await tx.delete(deliveries).where(eq(deliveries.id, deliveryId))
+    })
 
     return NextResponse.json({ ok: true })
   } catch (err) {

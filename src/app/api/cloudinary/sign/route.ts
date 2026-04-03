@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
 
   const { paramsToSign } = await req.json() as { paramsToSign: Record<string, string> }
 
-  const apiSecret = process.env.CLOUDINARY_API_SECRET!
+  const apiSecret = process.env.CLOUDINARY_API_SECRET
+  if (!apiSecret) {
+    return NextResponse.json({ error: 'Server misconfigured: missing Cloudinary secret' }, { status: 500 })
+  }
 
   // Build the string to sign: sort params alphabetically, join as key=value pairs
   const stringToSign = Object.keys(paramsToSign)

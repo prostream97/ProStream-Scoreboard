@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useSidebar } from '@/contexts/SidebarContext'
+import { LayoutDashboard, Trophy, ChevronDown, ChevronRight } from 'lucide-react'
 
 type TournamentOption = { id: number; name: string; shortName: string; status: string }
 
@@ -56,17 +57,14 @@ export function Sidebar() {
           <Link
             href="/"
             title={!isOpen ? 'Dashboard' : undefined}
-            className={`group flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-all duration-200 whitespace-nowrap ${
-              isDashboardActive ? 'bg-primary/10 font-semibold' : 'hover:bg-gray-800'
+            className={`group flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-all duration-200 whitespace-nowrap overflow-hidden ${
+              isDashboardActive 
+                ? 'bg-primary/10 font-semibold relative before:absolute before:inset-y-0 before:-left-2 before:w-[3px] before:bg-primary before:shadow-[0_0_12px_var(--tw-colors-primary)]' 
+                : 'hover:bg-gray-800'
             }`}
           >
             <span className={`transition-colors duration-200 shrink-0 ${isDashboardActive ? 'text-primary' : 'text-gray-500 group-hover:text-gray-100'}`}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
+              <LayoutDashboard className="w-5 h-5" />
             </span>
             <span className={`font-stats text-sm transition-[opacity,transform] duration-300 ${
               isDashboardActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-100'
@@ -79,20 +77,14 @@ export function Sidebar() {
           <button
             onClick={() => setTournamentsOpen((v) => !v)}
             title={!isOpen ? 'Tournaments' : undefined}
-            className={`group w-full flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-all duration-200 whitespace-nowrap ${
-              isTournamentsActive ? 'bg-primary/10 font-semibold' : 'hover:bg-gray-800'
+            className={`group w-[calc(100%-1rem)] flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-all duration-200 whitespace-nowrap overflow-hidden ${
+              isTournamentsActive 
+                ? 'bg-primary/10 font-semibold relative before:absolute before:inset-y-0 before:-left-2 before:w-[3px] before:bg-primary before:shadow-[0_0_12px_var(--tw-colors-primary)]' 
+                : 'hover:bg-gray-800'
             }`}
-            style={{ width: 'calc(100% - 1rem)' }}
           >
             <span className={`transition-colors duration-200 shrink-0 ${isTournamentsActive ? 'text-primary' : 'text-gray-500 group-hover:text-gray-100'}`}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                <path d="M6 9H4.5a2.5 2.5 0 010-5H6" />
-                <path d="M18 9h1.5a2.5 2.5 0 000-5H18" />
-                <path d="M4 22h16" />
-                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                <path d="M18 2H6v7a6 6 0 0012 0V2z" />
-              </svg>
+              <Trophy className="w-5 h-5" />
             </span>
             <span className={`flex-1 text-left font-stats text-sm transition-[opacity,transform] duration-300 ${
               isTournamentsActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-100'
@@ -101,9 +93,7 @@ export function Sidebar() {
             </span>
             {isOpen && (
               <span className={`shrink-0 transition-colors duration-200 ${isTournamentsActive ? 'text-primary' : 'text-gray-500 group-hover:text-gray-300'}`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`w-3.5 h-3.5 transition-transform duration-200 ${tournamentsOpen ? 'rotate-180' : ''}`}>
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
+                {tournamentsOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </span>
             )}
           </button>
@@ -121,9 +111,9 @@ export function Sidebar() {
                       <Link
                         key={t.id}
                         href={`/admin/tournaments/${t.id}`}
-                        className={`flex items-center gap-2 pl-4 pr-3 py-2 rounded-lg transition-colors ${
+                        className={`flex items-center gap-2 pl-4 pr-3 py-2 rounded-lg transition-colors overflow-hidden ${
                           isRowActive
-                            ? 'bg-primary/15 text-primary'
+                            ? 'bg-primary/15 text-primary relative before:absolute before:inset-y-0 before:-left-0 before:w-1 before:bg-primary shadow-[inset_2px_0_10px_rgba(79,70,229,0.1)]'
                             : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                         }`}
                       >
@@ -156,15 +146,7 @@ export function Sidebar() {
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors duration-200"
             title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
-            {isOpen ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            )}
+            {isOpen ? <ChevronDown className="w-4 h-4 rotate-90" /> : <ChevronRight className="w-4 h-4" />}
           </button>
         </div>
       </aside>

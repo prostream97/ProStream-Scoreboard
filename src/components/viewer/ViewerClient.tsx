@@ -1,7 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { User, WifiOff } from 'lucide-react'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
+import { getPusherClient } from '@/lib/pusher/client'
+import { MatchGraphs } from '@/components/viewer/MatchGraphs'
 import type { MatchSnapshot, BatterStats, BowlerStats, InningsState } from '@/types/match'
 import type { DeliveryAddedPayload, WicketPayload, InningsChangePayload } from '@/types/pusher'
 
@@ -55,6 +59,7 @@ function applyDeliveryToBowlers(
   bowlers: BowlerStats[],
   data: DeliveryAddedPayload,
   bowlingTeamPlayers: MatchSnapshot['bowlingTeamPlayers'],
+  bpo: number,
 ): BowlerStats[] {
   const existing = bowlers.find((b) => b.playerId === data.bowlerId)
   if (!existing) {
@@ -78,29 +83,65 @@ function applyDeliveryToBowlers(
   return bowlers.map((b) => {
     if (b.playerId !== data.bowlerId) return b
     const newLegal = b.balls + (data.isLegal ? 1 : 0)
-    const completedOvers = b.overs + Math.floor(newLegal / 6)
-    const ballsInOver = newLegal % 6
+    const completedOvers = b.overs + Math.floor(newLegal / bpo)
+    const ballsInOver = newLegal % bpo
     const newRuns = b.runs + data.runs + data.extraRuns
-    const totalLegal = completedOvers * 6 + ballsInOver
+    const totalLegal = completedOvers * bpo + ballsInOver
     return {
       ...b,
       overs: completedOvers,
       balls: ballsInOver,
       runs: newRuns,
       wickets: b.wickets + (data.isWicket ? 1 : 0),
-      economy: totalLegal > 0 ? Math.round((newRuns / (totalLegal / 6)) * 100) / 100 : 0,
+      economy: totalLegal > 0 ? Math.round((newRuns / (totalLegal / bpo)) * 100) / 100 : 0,
     }
   })
 }
 
 function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(initialSnapshot)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [isReconnecting, setIsReconnecting] = useState(false)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
-      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
-      .catch(() => {})
+      .then((fresh: MatchSnapshot) => {
+        if (isMountedRef.current) {
+          setSnapshot(fresh)
+          setFetchError(null)
+        }
+      })
+      .catch(() => {
+        if (isMountedRef.current) setFetchError('Failed to load match data — showing cached state.')
+      })
+  }, [matchId])
+
+  // Pusher connection state — show reconnect banner on disconnect
+  useEffect(() => {
+    const client = getPusherClient()
+    const handler = ({ current }: { current: string }) => {
+      if (!isMountedRef.current) return
+      if (current === 'connected') {
+        setIsReconnecting(false)
+        // Re-fetch state after reconnect to catch up on missed events
+        fetch(`/api/match/${matchId}/state`)
+          .then((r) => r.json())
+          .then((fresh: MatchSnapshot) => {
+            if (isMountedRef.current) setSnapshot(fresh)
+          })
+          .catch(() => {})
+      } else if (current === 'connecting' || current === 'reconnecting') {
+        setIsReconnecting(true)
+      }
+    }
+    client.connection.bind('state_change', handler)
+    return () => { client.connection.unbind('state_change', handler) }
   }, [matchId])
 
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
@@ -111,9 +152,10 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
           : inn,
       )
       const currentInningsState = updatedInnings.find((i) => i.inningsNumber === s.currentInnings) ?? null
-      const totalBalls = (currentInningsState?.overs ?? 0) * 6 + (currentInningsState?.balls ?? 0)
+      const bpo = s.ballsPerOver ?? 6
+      const totalBalls = (currentInningsState?.overs ?? 0) * bpo + (currentInningsState?.balls ?? 0)
       const currentRunRate = totalBalls > 0
-        ? Math.round(((currentInningsState?.totalRuns ?? 0) / (totalBalls / 6)) * 100) / 100
+        ? Math.round(((currentInningsState?.totalRuns ?? 0) / (totalBalls / bpo)) * 100) / 100
         : 0
       return {
         ...s,
@@ -125,13 +167,13 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
         currentBalls: data.inningsBalls,
         currentRunRate,
         batters: applyDeliveryToBatters(s.batters, data, s.battingTeamPlayers),
-        bowlers: applyDeliveryToBowlers(s.bowlers, data, s.bowlingTeamPlayers),
+        bowlers: applyDeliveryToBowlers(s.bowlers, data, s.bowlingTeamPlayers, bpo),
         partnership: s.strikerId && s.nonStrikerId
           ? {
-              runs: (s.partnership?.runs ?? 0) + data.runs + data.extraRuns,
+              runs: (s.partnership?.runs ?? 0) + (data.runs ?? 0) + (data.extraRuns ?? 0),
               balls: (s.partnership?.balls ?? 0) + (data.isLegal ? 1 : 0),
-              batter1Id: data.strikerId,
-              batter2Id: data.nonStrikerId,
+              batter1Id: data.strikerId ?? s.strikerId,
+              batter2Id: data.nonStrikerId ?? s.nonStrikerId,
             }
           : s.partnership,
       }
@@ -141,14 +183,14 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
   useEvent(`match-${matchId}`, 'wicket.fell', (_data: WicketPayload) => {
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
-      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
+      .then((fresh: MatchSnapshot) => { if (isMountedRef.current) setSnapshot(fresh) })
       .catch(() => {})
   })
 
   useEvent(`match-${matchId}`, 'innings.change', (_data: InningsChangePayload) => {
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
-      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
+      .then((fresh: MatchSnapshot) => { if (isMountedRef.current) setSnapshot(fresh) })
       .catch(() => {})
   })
 
@@ -166,8 +208,36 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
   const prevInnings = snapshot.innings.find((i) => i.inningsNumber === 1)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-5">
+    <div className="relative min-h-screen bg-gray-950 text-white p-4 md:p-8 overflow-hidden">
+      {/* Dynamic Background Glow */}
+      <div
+        className="absolute top-0 left-0 w-full h-full opacity-[0.04] pointer-events-none transition-colors duration-1000"
+        style={{ background: `radial-gradient(circle at 50% 0%, ${battingTeam.primaryColor}, transparent 70%)` }}
+      />
+
+      {/* Reconnecting banner */}
+      <AnimatePresence>
+        {isReconnecting && (
+          <motion.div
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
+            className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 bg-yellow-600/90 backdrop-blur-sm py-2 font-stats text-sm text-yellow-100"
+          >
+            <WifiOff className="w-4 h-4" />
+            Reconnecting to live feed…
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Stale-data notice */}
+      {fetchError && (
+        <div className="mb-3 rounded-lg border border-yellow-600/40 bg-yellow-600/10 px-4 py-2 font-stats text-xs text-yellow-400 text-center">
+          {fetchError}
+        </div>
+      )}
+
+      <div className="relative max-w-4xl mx-auto space-y-5">
 
         {/* Header */}
         <div className="text-center">
@@ -216,17 +286,26 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
             </div>
           </div>
 
-          <div className="text-center my-4">
-            <div className="font-display text-8xl text-white tracking-wider leading-none">
-              {inn?.totalRuns ?? 0}/{inn?.wickets ?? 0}
-            </div>
+          <div className="text-center my-4 overflow-hidden relative">
+            <AnimatePresence mode="popLayout">
+              <motion.div
+                key={`${inn?.totalRuns}-${inn?.wickets}`}
+                initial={{ y: -20, opacity: 0, scale: 0.95 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 20, opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="font-display text-8xl text-white tracking-wider leading-none"
+              >
+                {inn?.totalRuns ?? 0}/{inn?.wickets ?? 0}
+              </motion.div>
+            </AnimatePresence>
             <div className="font-stats text-gray-400 mt-2 text-lg">
               {inn?.overs ?? 0}.{inn?.balls ?? 0} overs
               {inn?.target && (
                 <span className="ml-3 text-yellow-400">
                   · Target {inn.target} · Need{' '}
                   {Math.max(0, inn.target - inn.totalRuns)} off{' '}
-                  {Math.max(0, (snapshot.totalOvers - inn.overs) * 6 - inn.balls)} balls
+                  {Math.max(0, (snapshot.totalOvers - inn.overs) * (snapshot.ballsPerOver ?? 6) - inn.balls)} balls
                 </span>
               )}
             </div>
@@ -256,100 +335,123 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
               </div>
             )}
             {snapshot.partnership && (
-              <div className="text-center">
-                <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Partnership</p>
-                <p className="text-white font-semibold text-xl">
-                  {snapshot.partnership.runs}
-                  <span className="text-gray-500 font-normal text-sm ml-1">
-                    ({snapshot.partnership.balls}b)
-                  </span>
-                </p>
+              <div className="text-center flex flex-col items-center">
+                <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">Partnership</p>
+                <div className="relative w-14 h-14 flex items-center justify-center rounded-full border border-gray-700 bg-gray-800">
+                  {/* Subtle indication of partnership scale could be added here */}
+                  <div className="flex flex-col items-center leading-none mt-0.5">
+                    <span className="text-white font-semibold text-lg">{snapshot.partnership.runs}</span>
+                    <span className="text-gray-500 font-stats text-[10px] uppercase">runs</span>
+                  </div>
+                </div>
+                <p className="text-gray-400 font-stats text-xs mt-1">({snapshot.partnership.balls} balls)</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Batting scorecard */}
-        <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
-          <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+        {/* Analytics Graphs */}
+        <MatchGraphs snapshot={snapshot} />
+
+        {/* Batting scorecard - Cards Layout */}
+        <div className="space-y-3">
+          <div className="px-1 flex items-center justify-between">
             <h2 className="font-stats font-semibold text-gray-400 uppercase tracking-wider text-xs">Batting</h2>
             <span className="font-stats text-xs text-gray-500">{battingTeam.shortCode}</span>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="font-stats text-xs text-gray-600 uppercase">
-                <th className="text-left px-4 py-2">Batter</th>
-                <th className="text-right px-3 py-2">R</th>
-                <th className="text-right px-3 py-2">B</th>
-                <th className="text-right px-3 py-2">4s</th>
-                <th className="text-right px-3 py-2">6s</th>
-                <th className="text-right px-4 py-2">SR</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <AnimatePresence>
               {snapshot.batters.map((b) => (
-                <tr
+                <motion.div
                   key={b.playerId}
-                  className={`border-t border-gray-800/60 transition-colors ${
-                    b.playerId === snapshot.strikerId ? 'bg-secondary/5' : b.isOut ? 'opacity-40' : ''
-                  }`}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`bg-gray-900/80 backdrop-blur-sm border ${
+                    b.playerId === snapshot.strikerId ? 'border-secondary/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-gray-800'
+                  } rounded-xl p-4 flex flex-col gap-2 transition-colors ${b.isOut ? 'opacity-50 grayscale' : ''}`}
                 >
-                  <td className="px-4 py-2.5 font-stats text-sm">
-                    {b.playerId === snapshot.strikerId && <span className="text-secondary mr-1 font-bold">*</span>}
-                    {b.playerId === snapshot.nonStrikerId && <span className="text-gray-600 mr-1">†</span>}
-                    {b.displayName}
-                    {b.isOut && <span className="text-gray-600 text-xs ml-1.5">({b.dismissalType})</span>}
-                  </td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm font-bold text-white">{b.runs}</td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm text-gray-400">{b.balls}</td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm text-gray-400">{b.fours}</td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm text-gray-400">{b.sixes}</td>
-                  <td className="text-right px-4 py-2.5 font-stats text-sm text-gray-400">{b.strikeRate.toFixed(1)}</td>
-                </tr>
+                  <div className="flex justify-between items-start">
+                    <div className="font-stats text-sm font-semibold text-gray-200 flex items-center gap-2">
+                      <div className="relative flex items-center justify-center">
+                        <User className="w-5 h-5 text-gray-500 opacity-60" />
+                        {b.playerId === snapshot.strikerId && (
+                          <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-secondary animate-pulse" />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span>{b.displayName} {b.playerId === snapshot.nonStrikerId && <span className="text-gray-500 text-[10px] ml-1">▼</span>}</span>
+                      </div>
+                    </div>
+                    <div className="font-display text-3xl leading-none">{b.runs}</div>
+                  </div>
+                  <div className="flex justify-between items-end mt-1">
+                    <div className="font-stats text-xs text-gray-500 truncate max-w-[120px]">
+                      {b.isOut ? `b. ${b.dismissalType}` : 'Not Out'}
+                    </div>
+                    <div className="flex gap-3 font-stats text-xs text-gray-400">
+                      <span>B: <strong className="text-gray-300">{b.balls}</strong></span>
+                      <span>4s: <strong className="text-gray-300">{b.fours}</strong></span>
+                      <span>6s: <strong className="text-gray-300">{b.sixes}</strong></span>
+                      <span>SR: <strong className="text-gray-300">{b.strikeRate.toFixed(1)}</strong></span>
+                    </div>
+                  </div>
+                </motion.div>
               ))}
-              {snapshot.batters.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center font-stats text-gray-700 text-sm">Innings not started</td></tr>
-              )}
-            </tbody>
-          </table>
+            </AnimatePresence>
+            {snapshot.batters.length === 0 && (
+              <div className="col-span-1 sm:col-span-2 py-8 text-center bg-gray-900/60 border border-gray-800 rounded-xl font-stats text-gray-600 text-sm">
+                Innings not started
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Bowling scorecard */}
-        <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
-          <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+        {/* Bowling scorecard - Cards Layout */}
+        <div className="space-y-3 pb-4">
+          <div className="px-1 flex items-center justify-between">
             <h2 className="font-stats font-semibold text-gray-400 uppercase tracking-wider text-xs">Bowling</h2>
             <span className="font-stats text-xs text-gray-500">{bowlingTeam.shortCode}</span>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="font-stats text-xs text-gray-600 uppercase">
-                <th className="text-left px-4 py-2">Bowler</th>
-                <th className="text-right px-3 py-2">O</th>
-                <th className="text-right px-3 py-2">M</th>
-                <th className="text-right px-3 py-2">R</th>
-                <th className="text-right px-3 py-2">W</th>
-                <th className="text-right px-4 py-2">Econ</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <AnimatePresence>
               {snapshot.bowlers.map((b) => (
-                <tr key={b.playerId} className={`border-t border-gray-800/60 ${b.isCurrent ? 'bg-accent/5' : ''}`}>
-                  <td className="px-4 py-2.5 font-stats text-sm">
-                    {b.isCurrent && <span className="text-accent mr-1.5 text-xs">▶</span>}
-                    {b.displayName}
-                  </td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm text-gray-400">{b.overs}.{b.balls}</td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm text-gray-400">{b.maidens}</td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm text-gray-400">{b.runs}</td>
-                  <td className="text-right px-3 py-2.5 font-stats text-sm font-bold text-white">{b.wickets}</td>
-                  <td className="text-right px-4 py-2.5 font-stats text-sm text-gray-400">{b.economy.toFixed(1)}</td>
-                </tr>
+                <motion.div
+                  key={b.playerId}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`bg-gray-900/80 backdrop-blur-sm border ${
+                    b.isCurrent ? 'border-accent/40 shadow-[0_0_15px_rgba(139,92,246,0.1)]' : 'border-gray-800'
+                  } rounded-xl p-4 flex flex-col gap-2 transition-colors`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="font-stats text-sm font-semibold text-gray-200 flex items-center gap-2">
+                      {b.isCurrent && <span className="text-accent text-[10px]">▶</span>}
+                      {b.displayName}
+                    </div>
+                    <div className="font-display text-3xl leading-none text-gray-300">
+                      {b.wickets}<span className="text-lg text-gray-600 mx-1">-</span>{b.runs}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-end mt-1">
+                    <div className="font-stats text-xs text-gray-500">
+                      {b.overs}.{b.balls} Overs
+                    </div>
+                    <div className="flex gap-4 font-stats text-xs text-gray-400">
+                      <span>M: <strong className="text-gray-300">{b.maidens}</strong></span>
+                      <span>Econ: <strong className="text-gray-300">{b.economy.toFixed(1)}</strong></span>
+                    </div>
+                  </div>
+                </motion.div>
               ))}
-              {snapshot.bowlers.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center font-stats text-gray-700 text-sm">No bowling data yet</td></tr>
-              )}
-            </tbody>
-          </table>
+            </AnimatePresence>
+            {snapshot.bowlers.length === 0 && (
+              <div className="col-span-1 sm:col-span-2 py-8 text-center bg-gray-900/60 border border-gray-800 rounded-xl font-stats text-gray-600 text-sm">
+                No bowling data yet
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Status footer */}

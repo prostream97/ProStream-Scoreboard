@@ -104,6 +104,8 @@ export const tournaments = pgTable('tournaments', {
   status: tournamentStatusEnum('status').notNull().default('upcoming'),
   format: matchFormatEnum('format').notNull().default('T20'),
   totalOvers: integer('total_overs').notNull().default(20),
+  ballsPerOver: integer('balls_per_over').notNull().default(6),
+  logoCloudinaryId: text('logo_cloudinary_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
@@ -147,6 +149,7 @@ export const matches = pgTable('matches', {
   venue: text('venue'),
   date: timestamp('date').defaultNow().notNull(),
   totalOvers: integer('total_overs').notNull().default(20),
+  ballsPerOver: integer('balls_per_over').notNull().default(6),
   homeTeamId: integer('home_team_id')
     .notNull()
     .references(() => teams.id),

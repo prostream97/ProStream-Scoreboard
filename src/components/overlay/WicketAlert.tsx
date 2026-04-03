@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { WicketPayload } from '@/types/pusher'
 import type { MatchSnapshot } from '@/types/match'
 
@@ -33,11 +34,9 @@ export function WicketAlert({ wicket, snapshot }: Props) {
     return () => clearTimeout(t)
   }, [wicket, shown])
 
-  if (!visible || !shown) return null
-
-  const outBatter =
-    snapshot.battingTeamPlayers.find((p) => p.id === shown.batsmanId)
-    ?? snapshot.bowlingTeamPlayers.find((p) => p.id === shown.batsmanId)
+  const outBatter = shown
+    ? snapshot.battingTeamPlayers.find((p) => p.id === shown.batsmanId) ?? snapshot.bowlingTeamPlayers.find((p) => p.id === shown.batsmanId)
+    : null
 
   const battingTeam =
     snapshot.currentInningsState?.battingTeamId === snapshot.homeTeam.id
@@ -45,19 +44,29 @@ export function WicketAlert({ wicket, snapshot }: Props) {
       : snapshot.awayTeam
 
   return (
-    // Full-screen overlay — use entire 1920×1080 browser source in OBS
-    <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
-      {/* Dark backdrop pulse */}
-      <div className="absolute inset-0 bg-black/60 animate-pulse" style={{ animationDuration: '0.5s' }} />
+    <AnimatePresence>
+      {visible && shown && (
+        // Full-screen overlay — use entire 1920×1080 browser source in OBS
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, filter: "blur(20px)", transition: { duration: 0.5 } }}
+          className="fixed inset-0 flex items-center justify-center pointer-events-none"
+        >
+          {/* Dark backdrop pulse */}
+          <div className="absolute inset-0 bg-black/60 animate-pulse" style={{ animationDuration: '0.4s' }} />
 
-      {/* Card */}
-      <div
-        className="relative z-10 text-center px-16 py-10 rounded-3xl"
-        style={{
-          background: `linear-gradient(135deg, ${battingTeam.primaryColor}dd, ${battingTeam.primaryColor}88)`,
-          boxShadow: `0 0 80px ${battingTeam.primaryColor}66`,
-          border: `2px solid ${battingTeam.primaryColor}`,
-        }}
+          {/* Card */}
+          <motion.div
+            initial={{ scale: 0.3, rotate: -10, filter: "blur(10px)" }}
+            animate={{ scale: 1, rotate: 0, filter: "blur(0px)" }}
+            transition={{ type: "spring", stiffness: 180, damping: 12 }}
+            className="relative z-10 text-center px-20 py-12 rounded-3xl"
+            style={{
+              background: `linear-gradient(135deg, ${battingTeam.primaryColor}ee, ${battingTeam.primaryColor}aa)`,
+              boxShadow: `0 0 100px ${battingTeam.primaryColor}88, inset 0 0 30px rgba(255,255,255,0.2)`,
+              border: `2px solid ${battingTeam.primaryColor}`,
+            }}
       >
         {/* WICKET header */}
         <p
@@ -86,7 +95,9 @@ export function WicketAlert({ wicket, snapshot }: Props) {
         <div className="mt-4 font-stats text-white/70 text-lg">
           {shown.inningsWickets} wicket{shown.inningsWickets !== 1 ? 's' : ''} down
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+    )}
+    </AnimatePresence>
   )
 }

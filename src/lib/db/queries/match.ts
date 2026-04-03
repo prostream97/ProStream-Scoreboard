@@ -30,7 +30,7 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
       getTeamPlayers(currentInningsRow?.battingTeamId ?? matchRow.homeTeamId),
       getTeamPlayers(currentInningsRow?.bowlingTeamId ?? matchRow.awayTeamId),
       currentInningsRow ? getBatterStats(currentInningsRow.id, state?.strikerId ?? null) : [],
-      currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null) : [],
+      currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null, matchRow.ballsPerOver ?? 6) : [],
       currentInningsRow
         ? getPartnershipStats(currentInningsRow.id, state?.strikerId ?? null, state?.nonStrikerId ?? null)
         : null,
@@ -52,8 +52,9 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
   const currentInningsState = inningsStates.find((i) => i.inningsNumber === currentInningsNum) ?? null
 
   // Compute run rates
-  const totalBalls = (currentInningsState?.overs ?? 0) * 6 + (currentInningsState?.balls ?? 0)
-  const totalOversDecimal = totalBalls / 6
+  const bpo = matchRow.ballsPerOver ?? 6
+  const totalBalls = (currentInningsState?.overs ?? 0) * bpo + (currentInningsState?.balls ?? 0)
+  const totalOversDecimal = totalBalls / bpo
   const currentRunRate = totalOversDecimal > 0
     ? (currentInningsState?.totalRuns ?? 0) / totalOversDecimal
     : 0
@@ -61,8 +62,8 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
   let requiredRunRate: number | null = null
   if (currentInningsNum === 2 && currentInningsState?.target) {
     const totalMatchOvers = matchRow.totalOvers
-    const remainingBalls = totalMatchOvers * 6 - totalBalls
-    const remainingOvers = remainingBalls / 6
+    const remainingBalls = totalMatchOvers * bpo - totalBalls
+    const remainingOvers = remainingBalls / bpo
     const runsNeeded = currentInningsState.target - (currentInningsState.totalRuns)
     requiredRunRate = remainingOvers > 0 ? runsNeeded / remainingOvers : 0
   }
@@ -91,6 +92,7 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     status: matchRow.status,
     venue: matchRow.venue,
     totalOvers: matchRow.totalOvers,
+    ballsPerOver: matchRow.ballsPerOver ?? 6,
     homeTeam,
     awayTeam,
     tossWinnerId: matchRow.tossWinnerId,
@@ -166,7 +168,7 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
   }))
 }
 
-async function getBowlerStats(inningsId: number, currentBowlerId: number | null): Promise<BowlerStats[]> {
+async function getBowlerStats(inningsId: number, currentBowlerId: number | null, bpo = 6): Promise<BowlerStats[]> {
   const rows = await db
     .select({
       playerId: deliveries.bowlerId,
@@ -183,10 +185,10 @@ async function getBowlerStats(inningsId: number, currentBowlerId: number | null)
 
   return rows.map((r) => {
     const legalBalls = Number(r.legalBalls) || 0
-    const completedOvers = Math.floor(legalBalls / 6)
-    const ballsInOver = legalBalls % 6
+    const completedOvers = Math.floor(legalBalls / bpo)
+    const ballsInOver = legalBalls % bpo
     const runsGiven = Number(r.runs) || 0
-    const oversDecimal = legalBalls / 6
+    const oversDecimal = legalBalls / bpo
 
     return {
       playerId: r.playerId,

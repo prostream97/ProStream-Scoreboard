@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { name, shortName, format = 'T20', totalOvers = 20 } = body
+  const { name, shortName, format = 'T20', totalOvers = 20, ballsPerOver = 6, logoCloudinaryId } = body
 
   if (!name?.trim() || !shortName?.trim()) {
     return NextResponse.json({ error: 'name and shortName are required' }, { status: 400 })
@@ -30,7 +30,15 @@ export async function POST(req: NextRequest) {
   try {
     const [tournament] = await db
       .insert(tournaments)
-      .values({ name: name.trim(), shortName: shortName.trim(), format, totalOvers, status: 'upcoming' })
+      .values({
+        name: name.trim(),
+        shortName: shortName.trim(),
+        format,
+        totalOvers,
+        ballsPerOver,
+        logoCloudinaryId: logoCloudinaryId || null,
+        status: 'upcoming',
+      })
       .returning()
     return NextResponse.json(tournament, { status: 201 })
   } catch (err) {

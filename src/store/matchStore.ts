@@ -52,6 +52,7 @@ function updateBowlersOptimistically(
   bowlerId: number,
   bowlingTeamPlayers: PlayerSummary[],
   input: DeliveryInput,
+  bpo: number,
 ): BowlerStats[] {
   const existing = bowlers.find((b) => b.playerId === bowlerId)
   const player = bowlingTeamPlayers.find((p) => p.id === bowlerId)
@@ -76,11 +77,11 @@ function updateBowlersOptimistically(
   return bowlers.map((b) => {
     if (b.playerId !== bowlerId) return b
     const newLegalBalls = b.balls + (input.isLegal ? 1 : 0)
-    const completedOvers = b.overs + Math.floor(newLegalBalls / 6)
-    const ballsInOver = newLegalBalls % 6
+    const completedOvers = b.overs + Math.floor(newLegalBalls / bpo)
+    const ballsInOver = newLegalBalls % bpo
     const newRuns = b.runs + input.runs + input.extraRuns
-    const totalLegal = completedOvers * 6 + ballsInOver
-    const oversDecimal = totalLegal / 6
+    const totalLegal = completedOvers * bpo + ballsInOver
+    const oversDecimal = totalLegal / bpo
     return {
       ...b,
       overs: completedOvers,
@@ -112,6 +113,9 @@ type MatchStore = {
   // Set when batting team reaches the target mid-delivery (auto-win)
   winDetected: boolean
 
+  // Set when a sync/flush operation fails — cleared by the UI after displaying to the user
+  syncError: string | null
+
   // Actions
   hydrate: (snapshot: MatchSnapshot) => void
   addDelivery: (input: DeliveryInput) => Promise<void>
@@ -124,6 +128,7 @@ type MatchStore = {
   setBowler: (bowlerId: number) => void
   startNextOver: () => void
   clearWinDetected: () => void
+  clearSyncError: () => void
   updateTeamLogo: (teamId: number, logoCloudinaryId: string) => void
   updatePlayerInSquad: (teamId: number, playerId: number, data: Partial<PlayerSummary>) => void
   addPlayerToSquad: (teamId: number, player: PlayerSummary) => void
@@ -166,6 +171,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   flushedBallCount: 0,
   lastFlushedDeliveryIds: [],
   winDetected: false,
+  syncError: null,
 
   hydrate(snapshot) {
     set({ snapshot })
@@ -193,14 +199,20 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     const delivery = buildDeliveryRecord(input, snapshot, overNumber, ballNumber)
 
     const newLegalCount = legalDeliveryCount + (input.isLegal ? 1 : 0)
-    const innings = snapshot.currentInningsState!
+    const innings = snapshot.currentInningsState
+    if (!innings) {
+      console.error('[matchStore] addDelivery called with no active innings state')
+      return
+    }
+
+    const bpo = snapshot.ballsPerOver ?? 6
 
     // Compute updated innings totals
     const newRuns = computeInningsRuns(innings, input.runs, input.extraRuns)
     const newWickets = innings.wickets + (input.isWicket ? 1 : 0)
     const newBalls = input.isLegal ? innings.balls + 1 : innings.balls
-    const newOvers = newBalls >= 6 ? innings.overs + 1 : innings.overs
-    const remainingBalls = newBalls >= 6 ? 0 : newBalls
+    const newOvers = newBalls >= bpo ? innings.overs + 1 : innings.overs
+    const remainingBalls = newBalls >= bpo ? 0 : newBalls
 
     // Rotate strike
     let newStrikerId: number | null = snapshot.strikerId
@@ -223,17 +235,17 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     )
 
     // Recalculate run rates (mirrors getMatchSnapshot formula)
-    const newTotalBalls = newOvers * 6 + remainingBalls
+    const newTotalBalls = newOvers * bpo + remainingBalls
     const newCurrentRunRate = newTotalBalls > 0
-      ? Math.round((newRuns / (newTotalBalls / 6)) * 100) / 100
+      ? Math.round((newRuns / (newTotalBalls / bpo)) * 100) / 100
       : 0
 
     let newRequiredRunRate = snapshot.requiredRunRate
     if (snapshot.currentInnings === 2 && innings.target) {
-      const remainingMatchBalls = snapshot.totalOvers * 6 - newTotalBalls
+      const remainingMatchBalls = snapshot.totalOvers * bpo - newTotalBalls
       const runsNeeded = innings.target - newRuns
       newRequiredRunRate = remainingMatchBalls > 0
-        ? Math.round((runsNeeded / (remainingMatchBalls / 6)) * 100) / 100
+        ? Math.round((runsNeeded / (remainingMatchBalls / bpo)) * 100) / 100
         : 0
     }
 
@@ -249,6 +261,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       snapshot.currentBowlerId,
       snapshot.bowlingTeamPlayers,
       input,
+      bpo,
     )
 
     // Update partnership optimistically; reset to zero on wicket (new pair starts fresh)
@@ -289,20 +302,27 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     if (isMatchWon) {
       // Flush any unflushed deliveries, then mark the match complete
       if (!isFlushing) await get().flushOverToNeon()
-      await fetch(`/api/match/${snapshot.matchId}/innings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'complete' }),
-      })
-      await fetch(`/api/match/${snapshot.matchId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'complete' }),
-      })
-      set((s) => ({
-        winDetected: true,
-        snapshot: s.snapshot ? { ...s.snapshot, status: 'complete' } : null,
-      }))
+      try {
+        const r1 = await fetch(`/api/match/${snapshot.matchId}/innings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'complete' }),
+        })
+        if (!r1.ok) throw new Error('Failed to close innings')
+        const r2 = await fetch(`/api/match/${snapshot.matchId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'complete' }),
+        })
+        if (!r2.ok) throw new Error('Failed to update match status')
+        set((s) => ({
+          winDetected: true,
+          snapshot: s.snapshot ? { ...s.snapshot, status: 'complete' } : null,
+        }))
+      } catch (err) {
+        console.error('[matchStore] Win detection save failed:', err)
+        set({ syncError: 'Failed to save match result. Please end the match manually.' })
+      }
       return
     }
 
@@ -340,7 +360,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
 
     // Flush conditions — guard against double-flush
     if (!isFlushing) {
-      const shouldFlushOver = newLegalCount === 6
+      const shouldFlushOver = newLegalCount === bpo
       const shouldFlushSafety = newLegalCount > 0 && newLegalCount % 3 === 0 && !shouldFlushOver
       const shouldFlushWicket = input.isWicket
 
@@ -392,7 +412,8 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       const newLegalCount = legalDeliveryCount - (removed.isLegal ? 1 : 0)
 
       // Reverse innings totals
-      const innings = snapshot.currentInningsState!
+      const innings = snapshot.currentInningsState
+      if (!innings) return
       const newRuns = innings.totalRuns - removed.runs - removed.extraRuns
       const newWickets = innings.wickets - (removed.isWicket ? 1 : 0)
 
@@ -500,7 +521,14 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     const unflushed = currentOverBalls.slice(flushedBallCount)
     if (!snapshot || unflushed.length === 0 || isFlushing) return
 
-    const isOverEnd = get().legalDeliveryCount === 6
+    const inningsId = snapshot.currentInningsState?.id
+    if (!inningsId) {
+      console.error('[matchStore] flushOverToNeon: no active inningsId — aborting flush')
+      set({ syncError: 'Cannot sync: no active innings. Please refresh.' })
+      return
+    }
+
+    const isOverEnd = get().legalDeliveryCount === (get().snapshot?.ballsPerOver ?? 6)
 
     set({ isFlushing: true })
 
@@ -510,7 +538,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           matchId: snapshot.matchId,
-          inningsId: snapshot.currentInningsState?.id,
+          inningsId,
           deliveries: unflushed,
           overNumber: snapshot.currentOver,
           strikerId: snapshot.strikerId,
@@ -526,10 +554,16 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
           currentOverBalls: isOverEnd ? [] : s.currentOverBalls,
           flushedBallCount: isOverEnd ? 0 : s.currentOverBalls.length,
           lastFlushedDeliveryIds: [...s.lastFlushedDeliveryIds, ...deliveryIds].slice(-10),
+          syncError: null,
         }))
+      } else {
+        const body = await res.json().catch(() => ({}))
+        console.error('[matchStore] Flush rejected by server:', body)
+        set({ syncError: 'Score sync failed. Tap retry or refresh to recover.' })
       }
     } catch (err) {
-      console.error('Flush failed:', err)
+      console.error('[matchStore] Flush network error:', err)
+      set({ syncError: 'Score sync failed (network error). Check connection.' })
     } finally {
       set({ isFlushing: false })
     }
@@ -537,6 +571,10 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
 
   clearWinDetected() {
     set({ winDetected: false })
+  },
+
+  clearSyncError() {
+    set({ syncError: null })
   },
 
   updateTeamLogo(teamId, logoCloudinaryId) {

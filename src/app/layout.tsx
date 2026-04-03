@@ -3,6 +3,7 @@ import { Inter, Bebas_Neue, Rajdhani, Barlow_Condensed } from 'next/font/google'
 import Providers from '@/components/shared/Providers'
 import { SidebarProvider } from '@/contexts/SidebarContext'
 import { AppShell } from '@/components/shared/AppShell'
+import { Toaster } from 'sonner'
 import './globals.css'
 
 const inter = Inter({
@@ -51,6 +52,7 @@ export default function RootLayout({
         <Providers>
           <SidebarProvider>
             <AppShell>{children}</AppShell>
+            <Toaster theme="dark" position="bottom-right" />
           </SidebarProvider>
         </Providers>
       </body>

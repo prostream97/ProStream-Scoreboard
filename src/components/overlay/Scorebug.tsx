@@ -1,6 +1,7 @@
 'use client'
 
 import type { MatchSnapshot } from '@/types/match'
+import { motion, AnimatePresence } from 'framer-motion'
 
 type Props = { snapshot: MatchSnapshot }
 
@@ -15,9 +16,12 @@ export function Scorebug({ snapshot }: Props) {
 
   return (
     // 1920×60 bottom bar — use OBS browser source at 1920×60
-    <div
-      className="flex items-center h-[60px] w-[1920px] font-stats overflow-hidden"
-      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
+    <motion.div
+      initial={{ y: 60, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 100, damping: 15 }}
+      className="flex items-center h-[60px] w-[1920px] font-stats overflow-hidden shadow-[0_-5px_20px_rgba(0,0,0,0.5)] border-t border-gray-800"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
     >
       {/* Left accent bar */}
       <div className="w-1.5 h-full" style={{ backgroundColor: batting.primaryColor }} />
@@ -34,9 +38,20 @@ export function Scorebug({ snapshot }: Props) {
           >
             {batting.shortCode}
           </span>
-          <span className="font-display text-3xl text-white tracking-wider">
-            {inn?.totalRuns ?? 0}/{inn?.wickets ?? 0}
-          </span>
+          <div className="relative flex items-center overflow-hidden h-[40px]">
+            <AnimatePresence mode="popLayout">
+              <motion.span 
+                key={`${inn?.totalRuns}-${inn?.wickets}`}
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 20, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="font-display text-3xl text-white tracking-wider flex items-center leading-none"
+              >
+                {inn?.totalRuns ?? 0}/{inn?.wickets ?? 0}
+              </motion.span>
+            </AnimatePresence>
+          </div>
           <span className="text-gray-300 text-lg">
             ({oversStr})
           </span>
@@ -98,6 +113,6 @@ export function Scorebug({ snapshot }: Props) {
 
       {/* Right accent bar */}
       <div className="w-1.5 h-full" style={{ backgroundColor: bowling.primaryColor }} />
-    </div>
+    </motion.div>
   )
 }

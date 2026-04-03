@@ -25,6 +25,7 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
   const hydrate = useMatchStore((s) => s.hydrate)
   const updateFromPusher = useMatchStore((s) => s.updateFromPusher)
   const legalDeliveryCount = useMatchStore((s) => s.legalDeliveryCount)
+  const ballsPerOver = useMatchStore((s) => s.snapshot?.ballsPerOver ?? 6)
   const winDetected = useMatchStore((s) => s.winDetected)
   const clearWinDetected = useMatchStore((s) => s.clearWinDetected)
   const openBowlerSelect = useUIStore((s) => s.openBowlerSelect)
@@ -39,10 +40,10 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
   // Watch for over completion (6 legal deliveries) — open BowlerSelect
   // isBowlerSelectOpen guard prevents double-opening within same render cycle
   useEffect(() => {
-    if (legalDeliveryCount === 6 && !isBowlerSelectOpen) {
+    if (legalDeliveryCount === ballsPerOver && !isBowlerSelectOpen) {
       openBowlerSelect()
     }
-  }, [legalDeliveryCount, isBowlerSelectOpen, openBowlerSelect])
+  }, [legalDeliveryCount, ballsPerOver, isBowlerSelectOpen, openBowlerSelect])
 
   // Navigate home when batting team wins (target reached mid-delivery)
   useEffect(() => {
