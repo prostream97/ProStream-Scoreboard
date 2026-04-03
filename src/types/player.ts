@@ -23,6 +23,7 @@ export type Player = {
 
 export type Team = {
   id: number
+  tournamentId: number
   name: string
   shortCode: string
   primaryColor: string

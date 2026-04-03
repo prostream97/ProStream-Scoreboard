@@ -9,6 +9,7 @@ import {
   jsonb,
   varchar,
   char,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -93,6 +94,32 @@ export const matchStageEnum = pgEnum('match_stage', [
   'final',
   'third_place',
 ])
+
+export const userRoleEnum = pgEnum('user_role', ['admin', 'operator'])
+
+export const overlayModeEnum = pgEnum('overlay_mode', ['bug', 'card', 'partnership', 'boundary', 'standard'])
+
+export const transactionTypeEnum = pgEnum('transaction_type', ['topup', 'deduction'])
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    username: varchar('username', { length: 50 }).notNull(),
+    passwordHash: text('password_hash').notNull(),
+    displayName: text('display_name').notNull(),
+    role: userRoleEnum('role').notNull().default('operator'),
+    phone: varchar('phone', { length: 20 }),
+    photoCloudinaryId: text('photo_cloudinary_id'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    usernameIdx: uniqueIndex('users_username_idx').on(table.username),
+  }),
+)
 
 // ─── Tournaments ──────────────────────────────────────────────────────────────
 // Defined before teams so teams can reference it
@@ -255,6 +282,84 @@ export const matchState = pgTable('match_state', {
   lastUpdated: timestamp('last_updated').defaultNow().notNull(),
 })
 
+// ─── Overlay Links ────────────────────────────────────────────────────────────
+// Shareable, token-based URLs for OBS overlays. Soft-revocable via isActive.
+
+export const overlayLinks = pgTable('overlay_links', {
+  id: serial('id').primaryKey(),
+  matchId: integer('match_id')
+    .notNull()
+    .references(() => matches.id, { onDelete: 'cascade' }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  token: varchar('token', { length: 64 }).notNull().unique(),
+  mode: overlayModeEnum('mode').notNull().default('bug'),
+  label: text('label'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+// ─── Wallets ──────────────────────────────────────────────────────────────────
+// One wallet per user. Balance stored as integer LKR (no decimals).
+
+export const wallets = pgTable('wallets', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' })
+    .unique(),
+  balance: integer('balance').notNull().default(0),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// ─── Wallet Transactions ──────────────────────────────────────────────────────
+// Immutable audit log. Never UPDATE rows — only INSERT.
+
+export const walletTransactions = pgTable('wallet_transactions', {
+  id: serial('id').primaryKey(),
+  walletId: integer('wallet_id')
+    .notNull()
+    .references(() => wallets.id, { onDelete: 'cascade' }),
+  type: transactionTypeEnum('type').notNull(),
+  amount: integer('amount').notNull(),          // positive for topup, negative for deduction
+  balanceBefore: integer('balance_before').notNull(),
+  balanceAfter: integer('balance_after').notNull(),
+  description: text('description').notNull(),
+  referenceId: integer('reference_id'),         // overlayLinkId for deductions
+  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+// ─── Tournament Access ────────────────────────────────────────────────────────
+// Junction table: which users can access which tournaments (operators only).
+// Admins bypass this entirely — they always see all tournaments.
+
+export const tournamentAccess = pgTable(
+  'tournament_access',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tournamentId: integer('tournament_id').notNull().references(() => tournaments.id, { onDelete: 'cascade' }),
+    grantedAt: timestamp('granted_at').notNull().defaultNow(),
+    grantedBy: integer('granted_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (table) => ({
+    uniqueAccess: uniqueIndex('tournament_access_user_tournament_idx').on(table.userId, table.tournamentId),
+  }),
+)
+
+// ─── Pricing Config ───────────────────────────────────────────────────────────
+// Admin-configurable key→value price table (values in LKR).
+// Default rows seeded: overlay_per_match=100, overlay_per_tournament=500
+
+export const pricingConfig = pgTable('pricing_config', {
+  id: serial('id').primaryKey(),
+  key: varchar('key', { length: 64 }).notNull().unique(),
+  value: integer('value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const tournamentsRelations = relations(tournaments, ({ many }) => ({
@@ -336,6 +441,25 @@ export const matchStateRelations = relations(matchState, ({ one }) => ({
   }),
 }))
 
+export const overlayLinksRelations = relations(overlayLinks, ({ one }) => ({
+  match: one(matches, { fields: [overlayLinks.matchId], references: [matches.id] }),
+  user: one(users, { fields: [overlayLinks.userId], references: [users.id] }),
+}))
+
+export const walletsRelations = relations(wallets, ({ one, many }) => ({
+  user: one(users, { fields: [wallets.userId], references: [users.id] }),
+  transactions: many(walletTransactions),
+}))
+
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(wallets, { fields: [walletTransactions.walletId], references: [wallets.id] }),
+}))
+
+export const tournamentAccessRelations = relations(tournamentAccess, ({ one }) => ({
+  user: one(users, { fields: [tournamentAccess.userId], references: [users.id] }),
+  tournament: one(tournaments, { fields: [tournamentAccess.tournamentId], references: [tournaments.id] }),
+}))
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type DeliveryBuffer = {
@@ -371,3 +495,11 @@ export type MatchState = typeof matchState.$inferSelect
 export type NewMatchState = typeof matchState.$inferInsert
 export type Tournament = typeof tournaments.$inferSelect
 export type NewTournament = typeof tournaments.$inferInsert
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
+export type OverlayLink = typeof overlayLinks.$inferSelect
+export type NewOverlayLink = typeof overlayLinks.$inferInsert
+export type Wallet = typeof wallets.$inferSelect
+export type WalletTransaction = typeof walletTransactions.$inferSelect
+export type PricingConfig = typeof pricingConfig.$inferSelect
+export type TournamentAccess = typeof tournamentAccess.$inferSelect

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
+import { getBattingFirstTeamId } from '@/lib/auth/utils'
+import { canAccessTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
 import { matches, matchState, innings, tournaments, teams } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
@@ -15,6 +17,10 @@ export async function POST(
 
   const { id } = await params
   const tournamentId = parseInt(id, 10)
+
+  if (!await canAccessTournament(session, tournamentId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   // Fetch tournament to inherit format/overs
   const tournament = await db.query.tournaments.findFirst({
@@ -78,7 +84,12 @@ export async function POST(
         })
         .returning()
 
-      const battingTeam = battingFirstTeamId ?? homeTeamId
+      const battingTeam = battingFirstTeamId ?? getBattingFirstTeamId({
+        homeTeamId,
+        awayTeamId,
+        tossWinnerId: tossWinnerId ?? null,
+        tossDecision: tossDecision ?? null,
+      }) ?? homeTeamId
       const bowlingTeam = battingTeam === homeTeamId ? awayTeamId : homeTeamId
 
       const [inningsRow] = await tx

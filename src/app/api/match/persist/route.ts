@@ -62,19 +62,6 @@ export async function POST(req: NextRequest) {
         .returning({ id: deliveries.id })
 
       // Update match_state — clear the over buffer, advance over count, persist player IDs
-      await tx
-        .update(matchState)
-        .set({
-          currentOver: overNumber + 1,
-          currentBalls: 0,
-          currentOverBuffer: [],
-          lastUpdated: new Date(),
-          ...(strikerId !== undefined && { strikerId }),
-          ...(nonStrikerId !== undefined && { nonStrikerId }),
-          ...(currentBowlerId !== undefined && { currentBowlerId }),
-        })
-        .where(eq(matchState.matchId, matchId))
-
       // Update innings running totals
       const currentInnings = await tx.query.innings.findFirst({
         where: eq(innings.id, inningsId),
@@ -85,6 +72,19 @@ export async function POST(req: NextRequest) {
         const newBalls = (currentInnings.balls + legalBalls) % bpo
 
         await tx
+          .update(matchState)
+          .set({
+            currentOver: newOvers,
+            currentBalls: newBalls,
+            currentOverBuffer: [],
+            lastUpdated: new Date(),
+            ...(strikerId !== undefined && { strikerId }),
+            ...(nonStrikerId !== undefined && { nonStrikerId }),
+            ...(currentBowlerId !== undefined && { currentBowlerId }),
+          })
+          .where(eq(matchState.matchId, matchId))
+
+        await tx
           .update(innings)
           .set({
             totalRuns: currentInnings.totalRuns + totalRuns,
@@ -93,6 +93,19 @@ export async function POST(req: NextRequest) {
             balls: newBalls,
           })
           .where(eq(innings.id, inningsId))
+      } else {
+        await tx
+          .update(matchState)
+          .set({
+            currentOver: overNumber,
+            currentBalls: legalBalls,
+            currentOverBuffer: [],
+            lastUpdated: new Date(),
+            ...(strikerId !== undefined && { strikerId }),
+            ...(nonStrikerId !== undefined && { nonStrikerId }),
+            ...(currentBowlerId !== undefined && { currentBowlerId }),
+          })
+          .where(eq(matchState.matchId, matchId))
       }
 
       return rows

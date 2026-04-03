@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
+import { isAdminSession } from '@/lib/auth/utils'
 import { db } from '@/lib/db'
 import { tournaments } from '@/lib/db/schema'
-import { getTournamentList } from '@/lib/db/queries/tournament'
+import { getTournamentList, getAccessibleTournaments } from '@/lib/db/queries/tournament'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
-    const rows = await getTournamentList()
+    if (isAdminSession(session)) {
+      const rows = await getTournamentList()
+      return NextResponse.json(rows)
+    }
+    const userId = parseInt(session.user.id, 10)
+    const rows = await getAccessibleTournaments(userId)
     return NextResponse.json(rows)
   } catch (err) {
     console.error('Tournaments fetch error:', err)
@@ -18,7 +27,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session || !isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
   const { name, shortName, format = 'T20', totalOvers = 20, ballsPerOver = 6, logoCloudinaryId } = body

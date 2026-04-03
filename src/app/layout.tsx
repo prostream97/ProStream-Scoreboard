@@ -36,6 +36,11 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: 'ProStream Scoreboard',
   description: 'Real-time cricket scoring and broadcast overlay system',
+  icons: {
+    icon: 'https://res.cloudinary.com/diitsd6nz/image/upload/v1760794476/ProSteam_logo_h9pb8b.png',
+    shortcut: 'https://res.cloudinary.com/diitsd6nz/image/upload/v1760794476/ProSteam_logo_h9pb8b.png',
+    apple: 'https://res.cloudinary.com/diitsd6nz/image/upload/v1760794476/ProSteam_logo_h9pb8b.png',
+  },
 }
 
 export default function RootLayout({

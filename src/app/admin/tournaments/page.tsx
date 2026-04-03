@@ -30,8 +30,8 @@ const statusColors: Record<string, string> = {
 }
 
 export default function TournamentsPage() {
-  const { status } = useSession()
-  const isAuthed = status === 'authenticated'
+  const { data: session, status } = useSession()
+  const isAdmin = status === 'authenticated' && session?.user?.role === 'admin'
 
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,7 +104,7 @@ export default function TournamentsPage() {
             </div>
             <h1 className="font-display text-4xl text-white tracking-wider">TOURNAMENTS</h1>
           </div>
-          {isAuthed ? (
+          {isAdmin ? (
             <button
               onClick={() => { setShowForm(true); setCreateError('') }}
               className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-stats font-semibold rounded-xl hover:bg-indigo-600 hover:shadow-[0_4px_20px_rgba(79,70,229,0.4)] transition-all duration-300 text-sm"
@@ -124,7 +124,7 @@ export default function TournamentsPage() {
 
         {/* ── Create slide-over form ── */}
         <AnimatePresence>
-          {showForm && isAuthed && (
+          {showForm && isAdmin && (
             <div className="fixed inset-0 z-50 flex justify-end">
               <motion.div 
                 initial={{ opacity: 0 }} 

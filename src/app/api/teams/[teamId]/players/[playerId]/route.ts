@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
+import { isAdminSession } from '@/lib/auth/utils'
 import { db } from '@/lib/db'
 import { players } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
@@ -12,7 +13,7 @@ export async function PATCH(
   { params }: { params: Promise<{ teamId: string; playerId: string }> },
 ) {
   const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session || !isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { playerId } = await params
   const id = parseInt(playerId, 10)
@@ -39,7 +40,7 @@ export async function DELETE(
   { params }: { params: Promise<{ teamId: string; playerId: string }> },
 ) {
   const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session || !isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { playerId } = await params
   await db.delete(players).where(eq(players.id, parseInt(playerId, 10)))

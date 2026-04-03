@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
+import { canAccessTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
 import { teams } from '@/lib/db/schema'
 
@@ -14,6 +15,10 @@ export async function POST(
 
   const { id } = await params
   const tournamentId = parseInt(id, 10)
+
+  if (!await canAccessTournament(session, tournamentId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await req.json()
   const { name, shortCode, primaryColor, secondaryColor, logoCloudinaryId } = body

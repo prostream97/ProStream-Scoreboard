@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
 import { Scorebug } from '@/components/overlay/Scorebug'
+import { StandardScorebug } from '@/components/overlay/StandardScorebug'
 import { BatterCard, BowlerCard } from '@/components/overlay/PlayerCard'
 import { WicketAlert } from '@/components/overlay/WicketAlert'
 import { PartnershipOverlay } from '@/components/overlay/PartnershipOverlay'
@@ -133,6 +134,11 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   if (mode === 'bug') {
     if (!visible) return null
     return <Scorebug snapshot={snapshot} />
+  }
+
+  if (mode === 'standard') {
+    if (!visible) return null
+    return <StandardScorebug snapshot={snapshot} />
   }
 
   if (mode === 'card') {

@@ -6,18 +6,33 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { useSidebar } from '@/contexts/SidebarContext'
 
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const { toggle } = useSidebar()
   const [scrolled, setScrolled] = useState(false)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // Fetch wallet balance for operators only
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.role === 'operator') {
+      fetch('/api/wallet/me')
+        .then((r) => r.json())
+        .then((d) => setWalletBalance(d.balance))
+        .catch(() => {})
+    } else {
+      setWalletBalance(null)
+    }
+  }, [status, session?.user?.role])
 
   async function handleLogout() {
     await signOut({ redirect: false })
@@ -101,15 +116,52 @@ export function Navbar() {
         )}
       </div>
 
-      {/* Right: auth */}
+      {/* Right: user profile + logout */}
       <div className="flex items-center gap-3">
         {session ? (
-          <button
-            onClick={handleLogout}
-            className="px-5 py-2 rounded-full font-stats text-sm font-semibold text-gray-300 bg-gray-800 border border-gray-700 hover:bg-gray-700 hover:text-white transition-all duration-200"
-          >
-            Logout
-          </button>
+          <>
+            {/* User profile pill */}
+            <div className="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-full bg-gray-900 border border-gray-800">
+              {/* Avatar */}
+              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gray-700 border border-gray-600 flex items-center justify-center">
+                {session.user.photoCloudinaryId && CLOUD_NAME ? (
+                  <img
+                    src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_64,h_64,f_webp/${session.user.photoCloudinaryId}`}
+                    alt={session.user.name ?? session.user.username}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="font-stats text-sm font-bold text-gray-300 leading-none">
+                    {(session.user.name ?? session.user.username ?? '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              {/* Name + wallet balance */}
+              <div className="flex flex-col leading-none">
+                <span className="font-stats text-sm text-white font-semibold truncate max-w-[120px]">
+                  {session.user.name ?? session.user.username}
+                </span>
+                {session.user.role === 'operator' && walletBalance !== null && (
+                  <span className="font-stats text-[0.65rem] text-primary mt-0.5">
+                    ◈ {walletBalance} LKR
+                  </span>
+                )}
+                {session.user.role === 'admin' && (
+                  <span className="font-stats text-[0.65rem] text-gray-500 mt-0.5 uppercase tracking-wider">
+                    Admin
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 rounded-full font-stats text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700 transition-all duration-200"
+            >
+              Logout
+            </button>
+          </>
         ) : (
           <Link
             href="/login"

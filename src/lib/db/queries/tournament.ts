@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { tournaments, matches, teams } from '@/lib/db/schema'
+import { tournaments, matches, teams, tournamentAccess } from '@/lib/db/schema'
 import { eq, and, inArray, desc, asc } from 'drizzle-orm'
 import type { TournamentWithDetails, StandingRow } from '@/types/tournament'
 
@@ -9,14 +9,47 @@ export async function getTournamentList() {
   })
 }
 
-export async function getTournamentListWithCounts() {
-  const rows = await db.query.tournaments.findMany({
+// Returns only tournaments the given operator user has been granted access to
+export async function getAccessibleTournaments(userId: number) {
+  const granted = await db
+    .select({ tournamentId: tournamentAccess.tournamentId })
+    .from(tournamentAccess)
+    .where(eq(tournamentAccess.userId, userId))
+  if (granted.length === 0) return []
+  const ids = granted.map((r) => r.tournamentId)
+  return db.query.tournaments.findMany({
+    where: inArray(tournaments.id, ids),
     orderBy: [desc(tournaments.createdAt)],
-    with: {
-      teams: { columns: { id: true } },
-      matches: { columns: { id: true } },
-    },
   })
+}
+
+export async function getTournamentListWithCounts(userId?: number) {
+  // userId provided → filter to operator's accessible tournaments only
+  let rows
+  if (userId !== undefined) {
+    const granted = await db
+      .select({ tournamentId: tournamentAccess.tournamentId })
+      .from(tournamentAccess)
+      .where(eq(tournamentAccess.userId, userId))
+    if (granted.length === 0) return []
+    const ids = granted.map((r) => r.tournamentId)
+    rows = await db.query.tournaments.findMany({
+      where: inArray(tournaments.id, ids),
+      orderBy: [desc(tournaments.createdAt)],
+      with: {
+        teams: { columns: { id: true } },
+        matches: { columns: { id: true } },
+      },
+    })
+  } else {
+    rows = await db.query.tournaments.findMany({
+      orderBy: [desc(tournaments.createdAt)],
+      with: {
+        teams: { columns: { id: true } },
+        matches: { columns: { id: true } },
+      },
+    })
+  }
   return rows.map((t) => ({
     id: t.id,
     name: t.name,
@@ -77,6 +110,8 @@ export async function getTournamentWithDetails(
     status: row.status,
     format: row.format,
     totalOvers: row.totalOvers,
+    ballsPerOver: row.ballsPerOver,
+    logoCloudinaryId: row.logoCloudinaryId ?? null,
     createdAt: row.createdAt.toISOString(),
     teams: row.teams.map((t) => ({
       id: t.id,

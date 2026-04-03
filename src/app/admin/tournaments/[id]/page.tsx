@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { Trophy } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import type { TournamentWithDetails, StandingRow, TournamentMatch, MatchStage } from '@/types/tournament'
+import { getBattingFirstTeamId } from '@/lib/auth/utils'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
@@ -55,8 +56,8 @@ const emptyMatchForm = {
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const tournamentId = parseInt(id, 10)
-  const { status } = useSession()
-  const isAuthed = status === 'authenticated'
+  const { data: session, status } = useSession()
+  const isAdmin = status === 'authenticated' && session?.user?.role === 'admin'
 
   const [tournament, setTournament] = useState<TournamentWithDetails | null>(null)
   const [standings, setStandings] = useState<StandingRow[]>([])
@@ -111,6 +112,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           matchLabel: matchForm.matchLabel || null,
           tossWinnerId: matchForm.tossWinnerId ? parseInt(matchForm.tossWinnerId, 10) : null,
           tossDecision: matchForm.tossDecision || null,
+          battingFirstTeamId: getBattingFirstTeamId({
+            homeTeamId: parseInt(matchForm.homeTeamId, 10),
+            awayTeamId: parseInt(matchForm.awayTeamId, 10),
+            tossWinnerId: matchForm.tossWinnerId ? parseInt(matchForm.tossWinnerId, 10) : null,
+            tossDecision: matchForm.tossDecision || null,
+          }),
         }),
       })
       if (res.ok) {
@@ -204,7 +211,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <span className={`font-stats text-xs px-2.5 py-1 rounded-full uppercase tracking-wider ${statusColors[tournament.status] ?? statusColors.upcoming}`}>
                 {tournament.status.replace('_', ' ')}
               </span>
-              {isAuthed && (
+              {isAdmin && (
                 <select
                   value={tournament.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
@@ -319,7 +326,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
               Matches ({tournament.matches.length})
             </h2>
-            {isAuthed && tournament.teams.length >= 2 && (
+            {isAdmin && tournament.teams.length >= 2 && (
               <button
                 onClick={() => { setShowMatchForm((v) => !v); setMatchError('') }}
                 className="px-3 py-1.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors"
@@ -330,7 +337,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* Add match form */}
-          {showMatchForm && isAuthed && (
+          {showMatchForm && isAdmin && (
             <form
               onSubmit={handleAddMatch}
               className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4 space-y-4"

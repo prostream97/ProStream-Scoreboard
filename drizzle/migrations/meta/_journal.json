@@ -15,6 +15,27 @@
       "when": 1775202124422,
       "tag": "0001_normal_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775204186098,
+      "tag": "0002_sad_iron_fist",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775221447664,
+      "tag": "0003_striped_bill_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775221487484,
+      "tag": "0004_add_standard_overlay_mode",
+      "breakpoints": true
     }
   ]
 }

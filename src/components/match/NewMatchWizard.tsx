@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, Users, LayoutList, ChevronRight, ChevronLeft, MapPin, CalendarClock } from 'lucide-react'
+import { getBattingFirstTeamId } from '@/lib/auth/utils'
 
 type WizardProps = {
   tournaments: {
@@ -81,6 +82,12 @@ export function NewMatchWizard({ tournaments }: WizardProps) {
           matchLabel: form.matchLabel || null,
           tossWinnerId: form.tossWinnerId ? parseInt(form.tossWinnerId, 10) : null,
           tossDecision: form.tossDecision || null,
+          battingFirstTeamId: getBattingFirstTeamId({
+            homeTeamId: parseInt(form.homeTeamId, 10),
+            awayTeamId: parseInt(form.awayTeamId, 10),
+            tossWinnerId: form.tossWinnerId ? parseInt(form.tossWinnerId, 10) : null,
+            tossDecision: form.tossDecision === 'bat' || form.tossDecision === 'field' ? form.tossDecision : null,
+          }),
         }),
       })
 
@@ -88,8 +95,8 @@ export function NewMatchWizard({ tournaments }: WizardProps) {
         throw new Error((await res.json()).error || 'Failed to create match')
       }
 
-      const match = await res.json()
-      router.push(`/match/${match.id}/operator`)
+      const created = await res.json()
+      router.push(`/match/${created.match.id}/operator`)
     } catch (err: any) {
       setError(err.message)
       setLoading(false)

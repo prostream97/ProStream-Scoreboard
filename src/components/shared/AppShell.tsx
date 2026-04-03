@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Navbar } from './Navbar'
 import { Sidebar } from './Sidebar'
 
-const EXCLUDED = ['/login', '/overlay']
+const EXCLUDED = ['/login', '/overlay/']
 
 function isExcluded(pathname: string) {
   return EXCLUDED.some((prefix) => pathname.startsWith(prefix))

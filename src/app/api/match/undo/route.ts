@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
-import { deliveries, innings, matchState } from '@/lib/db/schema'
+import { deliveries, innings, matchState, matches } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
@@ -37,13 +37,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Delivery does not belong to this match' }, { status: 403 })
     }
 
+    const matchRow = await db.query.matches.findFirst({
+      where: eq(matches.id, matchId),
+    })
+    const ballsPerOver = matchRow?.ballsPerOver ?? 6
+
     await db.transaction(async (tx) => {
       // Reverse innings totals
       const reversedRuns = inningsRow.totalRuns - delivery.runs - delivery.extraRuns
       const reversedWickets = inningsRow.wickets - (delivery.isWicket ? 1 : 0)
       // If undoing a legal ball and it was the first ball of the over (balls=0), borrow from overs
       const reversedBalls = delivery.isLegal ? inningsRow.balls - 1 : inningsRow.balls
-      const adjustedBalls = reversedBalls < 0 ? 5 : reversedBalls
+      const adjustedBalls = reversedBalls < 0 ? ballsPerOver - 1 : reversedBalls
       const adjustedOvers = reversedBalls < 0 ? inningsRow.overs - 1 : inningsRow.overs
 
       await tx
@@ -59,7 +64,11 @@ export async function POST(req: NextRequest) {
       // Reset match_state timestamp
       await tx
         .update(matchState)
-        .set({ lastUpdated: new Date() })
+        .set({
+          currentOver: Math.max(0, adjustedOvers),
+          currentBalls: Math.max(0, adjustedBalls),
+          lastUpdated: new Date(),
+        })
         .where(eq(matchState.matchId, matchId))
 
       // Delete the delivery
