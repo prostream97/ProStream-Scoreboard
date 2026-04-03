@@ -73,6 +73,11 @@ const statements = [
    VALUES ('overlay_per_match', 100), ('overlay_per_tournament', 500)
    ON CONFLICT ("key") DO NOTHING`,
 
+  // ── Add standard overlay mode to enum ────────────────────────────────────
+  `DO $$ BEGIN
+    ALTER TYPE "public"."overlay_mode" ADD VALUE IF NOT EXISTS 'standard';
+  EXCEPTION WHEN others THEN null; END $$`,
+
   // ── Tournament Access Control ─────────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS "tournament_access" (
     "id" serial PRIMARY KEY,

@@ -42,38 +42,32 @@ export async function POST(req: NextRequest) {
     })
     const ballsPerOver = matchRow?.ballsPerOver ?? 6
 
-    await db.transaction(async (tx) => {
-      // Reverse innings totals
-      const reversedRuns = inningsRow.totalRuns - delivery.runs - delivery.extraRuns
-      const reversedWickets = inningsRow.wickets - (delivery.isWicket ? 1 : 0)
-      // If undoing a legal ball and it was the first ball of the over (balls=0), borrow from overs
-      const reversedBalls = delivery.isLegal ? inningsRow.balls - 1 : inningsRow.balls
-      const adjustedBalls = reversedBalls < 0 ? ballsPerOver - 1 : reversedBalls
-      const adjustedOvers = reversedBalls < 0 ? inningsRow.overs - 1 : inningsRow.overs
+    const reversedRuns = inningsRow.totalRuns - delivery.runs - delivery.extraRuns
+    const reversedWickets = inningsRow.wickets - (delivery.isWicket ? 1 : 0)
+    const reversedBalls = delivery.isLegal ? inningsRow.balls - 1 : inningsRow.balls
+    const adjustedBalls = reversedBalls < 0 ? ballsPerOver - 1 : reversedBalls
+    const adjustedOvers = reversedBalls < 0 ? inningsRow.overs - 1 : inningsRow.overs
 
-      await tx
-        .update(innings)
-        .set({
-          totalRuns: Math.max(0, reversedRuns),
-          wickets: Math.max(0, reversedWickets),
-          overs: Math.max(0, adjustedOvers),
-          balls: adjustedBalls,
-        })
-        .where(eq(innings.id, delivery.inningsId))
+    await db
+      .update(innings)
+      .set({
+        totalRuns: Math.max(0, reversedRuns),
+        wickets: Math.max(0, reversedWickets),
+        overs: Math.max(0, adjustedOvers),
+        balls: adjustedBalls,
+      })
+      .where(eq(innings.id, delivery.inningsId))
 
-      // Reset match_state timestamp
-      await tx
-        .update(matchState)
-        .set({
-          currentOver: Math.max(0, adjustedOvers),
-          currentBalls: Math.max(0, adjustedBalls),
-          lastUpdated: new Date(),
-        })
-        .where(eq(matchState.matchId, matchId))
+    await db
+      .update(matchState)
+      .set({
+        currentOver: Math.max(0, adjustedOvers),
+        currentBalls: Math.max(0, adjustedBalls),
+        lastUpdated: new Date(),
+      })
+      .where(eq(matchState.matchId, matchId))
 
-      // Delete the delivery
-      await tx.delete(deliveries).where(eq(deliveries.id, deliveryId))
-    })
+    await db.delete(deliveries).where(eq(deliveries.id, deliveryId))
 
     return NextResponse.json({ ok: true })
   } catch (err) {

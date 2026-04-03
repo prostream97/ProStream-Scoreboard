@@ -71,12 +71,16 @@ export async function POST(req: NextRequest) {
   const token = randomBytes(32).toString('hex')
 
   if (isAdmin) {
-    // Admin: no wallet deduction
-    const [link] = await db
-      .insert(overlayLinks)
-      .values({ matchId: matchIdNum, userId, token, mode, label: label || null })
-      .returning()
-    return NextResponse.json({ link, newBalance: null }, { status: 201 })
+    try {
+      const [link] = await db
+        .insert(overlayLinks)
+        .values({ matchId: matchIdNum, userId, token, mode, label: label || null })
+        .returning()
+      return NextResponse.json({ link, newBalance: null }, { status: 201 })
+    } catch (error) {
+      console.error('Overlay link create error (admin):', error)
+      return NextResponse.json({ error: 'Failed to generate overlay URL' }, { status: 500 })
+    }
   }
 
   // Operator: check and deduct wallet
@@ -104,15 +108,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Atomic deduction + link creation
-  const result = await db.transaction(async (tx) => {
-    const [link] = await tx
+  try {
+    const [link] = await db
       .insert(overlayLinks)
       .values({ matchId: matchIdNum, userId, token, mode, label: label || null })
       .returning()
 
     const newBalance = wallet!.balance - price
-    await tx.insert(walletTransactions).values({
+    await db.insert(walletTransactions).values({
       walletId: wallet!.id,
       type: 'deduction',
       amount: -price,
@@ -122,13 +125,11 @@ export async function POST(req: NextRequest) {
       referenceId: link.id,
       createdBy: userId,
     })
-    await tx
-      .update(wallets)
-      .set({ balance: newBalance, updatedAt: new Date() })
-      .where(eq(wallets.id, wallet!.id))
+    await db.update(wallets).set({ balance: newBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet!.id))
 
-    return { link, newBalance }
-  })
-
-  return NextResponse.json(result, { status: 201 })
+    return NextResponse.json({ link, newBalance }, { status: 201 })
+  } catch (error) {
+    console.error('Overlay link create error:', error)
+    return NextResponse.json({ error: 'Failed to generate overlay URL' }, { status: 500 })
+  }
 }

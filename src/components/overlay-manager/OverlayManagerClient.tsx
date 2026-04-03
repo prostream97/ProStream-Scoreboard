@@ -145,18 +145,29 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
           label: panel.label || undefined,
         }),
       })
-      const data = await res.json()
+
+      type ErrorBody = { error?: string; required?: number; balance?: number }
+      type SuccessBody = { link: OverlayLink; newBalance: number | null }
+
+      let body: ErrorBody | SuccessBody = {}
+      try {
+        body = await res.json()
+      } catch {
+        toast.error('Server error — please try again')
+        return
+      }
 
       if (!res.ok) {
+        const err = body as ErrorBody
         if (res.status === 402) {
-          toast.error(`Insufficient credits — need ${data.required} LKR, have ${data.balance} LKR`)
+          toast.error(`Insufficient credits — need ${err.required} LKR, have ${err.balance} LKR`)
         } else {
-          toast.error(data.error ?? 'Failed to generate URL')
+          toast.error(err.error ?? 'Failed to generate URL')
         }
         return
       }
 
-      const { link, newBalance } = data
+      const { link, newBalance } = body as SuccessBody
       updatePanel(matchId, {
         links: [{ ...link }, ...(matchPanels[matchId]?.links ?? [])],
         label: '',

@@ -33,42 +33,37 @@ export async function POST(
 
       const target = innings1.totalRuns + 1
 
-      const result = await db.transaction(async (tx) => {
-        // Complete innings 1
-        await tx
-          .update(innings)
-          .set({ status: 'complete' })
-          .where(and(eq(innings.matchId, id), eq(innings.inningsNumber, 1)))
+      await db
+        .update(innings)
+        .set({ status: 'complete' })
+        .where(and(eq(innings.matchId, id), eq(innings.inningsNumber, 1)))
 
-        // Create innings 2 (teams swap)
-        const [innings2] = await tx
-          .insert(innings)
-          .values({
-            matchId: id,
-            battingTeamId: innings1.bowlingTeamId,
-            bowlingTeamId: innings1.battingTeamId,
-            inningsNumber: 2,
-            target,
-          })
-          .returning()
+      const [innings2] = await db
+        .insert(innings)
+        .values({
+          matchId: id,
+          battingTeamId: innings1.bowlingTeamId,
+          bowlingTeamId: innings1.battingTeamId,
+          inningsNumber: 2,
+          target,
+        })
+        .returning()
 
-        // Update match_state for innings 2
-        await tx
-          .update(matchState)
-          .set({
-            currentInnings: 2,
-            currentOver: 0,
-            currentBalls: 0,
-            currentOverBuffer: [],
-            strikerId: strikerId ?? null,
-            nonStrikerId: nonStrikerId ?? null,
-            currentBowlerId: bowlerId ?? null,
-            lastUpdated: new Date(),
-          })
-          .where(eq(matchState.matchId, id))
+      await db
+        .update(matchState)
+        .set({
+          currentInnings: 2,
+          currentOver: 0,
+          currentBalls: 0,
+          currentOverBuffer: [],
+          strikerId: strikerId ?? null,
+          nonStrikerId: nonStrikerId ?? null,
+          currentBowlerId: bowlerId ?? null,
+          lastUpdated: new Date(),
+        })
+        .where(eq(matchState.matchId, id))
 
-        return { innings2, target }
-      })
+      const result = { innings2, target }
 
       // Notify all viewers
       await pusher.trigger(`match-${id}`, 'innings.change', {

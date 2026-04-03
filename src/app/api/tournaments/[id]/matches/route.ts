@@ -64,48 +64,44 @@ export async function POST(
   }
 
   try {
-    const { match, inningsRow } = await db.transaction(async (tx) => {
-      const [match] = await tx
-        .insert(matches)
-        .values({
-          format: tournament.format,
-          totalOvers: tournament.totalOvers,
-          ballsPerOver: tournament.ballsPerOver,
-          venue: venue ?? null,
-          date: date ? new Date(date) : new Date(),
-          homeTeamId,
-          awayTeamId,
-          tossWinnerId: tossWinnerId ?? null,
-          tossDecision: tossDecision ?? null,
-          status: 'setup',
-          tournamentId,
-          matchStage: matchStage ?? null,
-          matchLabel: matchLabel ?? null,
-        })
-        .returning()
-
-      const battingTeam = battingFirstTeamId ?? getBattingFirstTeamId({
+    const [match] = await db
+      .insert(matches)
+      .values({
+        format: tournament.format,
+        totalOvers: tournament.totalOvers,
+        ballsPerOver: tournament.ballsPerOver,
+        venue: venue ?? null,
+        date: date ? new Date(date) : new Date(),
         homeTeamId,
         awayTeamId,
         tossWinnerId: tossWinnerId ?? null,
         tossDecision: tossDecision ?? null,
-      }) ?? homeTeamId
-      const bowlingTeam = battingTeam === homeTeamId ? awayTeamId : homeTeamId
-
-      const [inningsRow] = await tx
-        .insert(innings)
-        .values({ matchId: match.id, battingTeamId: battingTeam, bowlingTeamId: bowlingTeam, inningsNumber: 1 })
-        .returning()
-
-      await tx.insert(matchState).values({
-        matchId: match.id,
-        currentInnings: 1,
-        currentOver: 0,
-        currentBalls: 0,
-        currentOverBuffer: [],
+        status: 'setup',
+        tournamentId,
+        matchStage: matchStage ?? null,
+        matchLabel: matchLabel ?? null,
       })
+      .returning()
 
-      return { match, inningsRow }
+    const battingTeam = battingFirstTeamId ?? getBattingFirstTeamId({
+      homeTeamId,
+      awayTeamId,
+      tossWinnerId: tossWinnerId ?? null,
+      tossDecision: tossDecision ?? null,
+    }) ?? homeTeamId
+    const bowlingTeam = battingTeam === homeTeamId ? awayTeamId : homeTeamId
+
+    const [inningsRow] = await db
+      .insert(innings)
+      .values({ matchId: match.id, battingTeamId: battingTeam, bowlingTeamId: bowlingTeam, inningsNumber: 1 })
+      .returning()
+
+    await db.insert(matchState).values({
+      matchId: match.id,
+      currentInnings: 1,
+      currentOver: 0,
+      currentBalls: 0,
+      currentOverBuffer: [],
     })
 
     return NextResponse.json({ match, innings: inningsRow }, { status: 201 })

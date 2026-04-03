@@ -28,38 +28,25 @@ export async function POST(req: NextRequest) {
   }
   const amountNum = parseInt(amount, 10)
 
-  const newBalance = await db.transaction(async (tx) => {
-    // Get or create wallet
-    let wallet = await tx.query.wallets.findFirst({
-      where: eq(wallets.userId, userIdNum),
-    })
-    if (!wallet) {
-      const [created] = await tx
-        .insert(wallets)
-        .values({ userId: userIdNum, balance: 0 })
-        .returning()
-      wallet = created
-    }
+  let wallet = await db.query.wallets.findFirst({ where: eq(wallets.userId, userIdNum) })
+  if (!wallet) {
+    const [created] = await db.insert(wallets).values({ userId: userIdNum, balance: 0 }).returning()
+    wallet = created
+  }
 
-    const updatedBalance = wallet.balance + amountNum
+  const updatedBalance = wallet.balance + amountNum
 
-    await tx.insert(walletTransactions).values({
-      walletId: wallet.id,
-      type: 'topup',
-      amount: amountNum,
-      balanceBefore: wallet.balance,
-      balanceAfter: updatedBalance,
-      description: description || `Admin top-up by ${session.user.username}`,
-      createdBy: adminId,
-    })
-
-    await tx
-      .update(wallets)
-      .set({ balance: updatedBalance, updatedAt: new Date() })
-      .where(eq(wallets.id, wallet.id))
-
-    return updatedBalance
+  await db.insert(walletTransactions).values({
+    walletId: wallet.id,
+    type: 'topup',
+    amount: amountNum,
+    balanceBefore: wallet.balance,
+    balanceAfter: updatedBalance,
+    description: description || `Admin top-up by ${session.user.username}`,
+    createdBy: adminId,
   })
 
-  return NextResponse.json({ newBalance }, { status: 201 })
+  await db.update(wallets).set({ balance: updatedBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet.id))
+
+  return NextResponse.json({ newBalance: updatedBalance }, { status: 201 })
 }
