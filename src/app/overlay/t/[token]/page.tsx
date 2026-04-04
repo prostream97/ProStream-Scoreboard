@@ -21,5 +21,5 @@ export default async function TokenOverlayPage({ params }: Props) {
   const snapshot = await getMatchSnapshot(link.matchId)
   if (!snapshot) notFound()
 
-  return <OverlayClient matchId={link.matchId} initialSnapshot={snapshot} mode={link.mode} />
+  return <OverlayClient matchId={link.matchId} initialSnapshot={snapshot} />
 }

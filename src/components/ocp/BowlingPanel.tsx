@@ -33,7 +33,7 @@ export function BowlingPanel() {
     : null
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 h-full flex flex-col gap-4">
+    <div className="bg-gray-900 rounded-xl p-4 flex-1 flex flex-col gap-4 overflow-hidden">
       <h3 className="font-stats text-xs text-gray-400 uppercase tracking-wider">Bowling</h3>
 
       {/* Current bowler */}

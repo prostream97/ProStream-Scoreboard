@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { MatchSnapshot } from '@/types/match'
 
@@ -17,14 +17,16 @@ type Props = {
 export function BoundaryAlert({ boundary, snapshot }: Props) {
   const [visible, setVisible] = useState(false)
   const [shown, setShown] = useState<BoundaryEvent>(null)
+  const shownIdRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!boundary || boundary.id === shown?.id) return
+    if (!boundary || boundary.id === shownIdRef.current) return
+    shownIdRef.current = boundary.id
     setShown(boundary)
     setVisible(true)
     const t = setTimeout(() => setVisible(false), 3500)
     return () => clearTimeout(t)
-  }, [boundary, shown])
+  }, [boundary])
 
   const battingTeam =
     snapshot.currentInningsState?.battingTeamId === snapshot.homeTeam.id
@@ -39,7 +41,7 @@ export function BoundaryAlert({ boundary, snapshot }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)", transition: { duration: 0.4 } }}
-          className="fixed inset-0 flex items-center justify-center pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
           {/* Background blast effect for Six */}
           {shown.runs === 6 && (

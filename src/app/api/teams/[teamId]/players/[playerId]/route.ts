@@ -1,21 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
-import { isAdminSession } from '@/lib/auth/utils'
+import { canAccessTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
-import { players } from '@/lib/db/schema'
+import { players, teams } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import type { InferInsertModel } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
+
+async function checkTeamAccess(session: Awaited<ReturnType<typeof auth>>, teamId: number) {
+  if (!session) return false
+  const team = await db.query.teams.findFirst({ where: eq(teams.id, teamId), columns: { tournamentId: true } })
+  if (!team) return null
+  return canAccessTournament(session, team.tournamentId)
+}
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ teamId: string; playerId: string }> },
 ) {
   const session = await auth()
-  if (!session || !isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { playerId } = await params
+  const { teamId, playerId } = await params
+  const access = await checkTeamAccess(session, parseInt(teamId, 10))
+  if (access === null) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const id = parseInt(playerId, 10)
   const body = await req.json() as Record<string, unknown>
 
@@ -40,9 +51,13 @@ export async function DELETE(
   { params }: { params: Promise<{ teamId: string; playerId: string }> },
 ) {
   const session = await auth()
-  if (!session || !isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { playerId } = await params
+  const { teamId, playerId } = await params
+  const access = await checkTeamAccess(session, parseInt(teamId, 10))
+  if (access === null) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+  if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   await db.delete(players).where(eq(players.id, parseInt(playerId, 10)))
   return NextResponse.json({ ok: true })
 }

@@ -32,7 +32,8 @@ const emptyForm = {
 
 function PlayersContent() {
   const { data: session, status } = useSession()
-  const isAdmin = status === 'authenticated' && session?.user?.role === 'admin'
+  const isAuthenticated = status === 'authenticated'
+  const isAdmin = isAuthenticated && session?.user?.role === 'admin'
   const searchParams = useSearchParams()
   const teamId = searchParams.get('teamId')
   const teamName = searchParams.get('teamName') ?? 'Team'
@@ -262,7 +263,7 @@ function PlayersContent() {
             <p className="font-stats text-gray-400 text-sm mt-1">{teamName} · {players.length} players</p>
           </div>
           <div className="flex gap-2">
-            {isAdmin ? (
+            {isAuthenticated ? (
               <>
                 <button
                   onClick={() => { setCsvMode((v) => !v); setShowForm(false) }}
@@ -291,7 +292,7 @@ function PlayersContent() {
         {addError && <p className="text-red-400 font-stats text-sm mb-4">{addError}</p>}
 
         {/* ── Add Player form ── */}
-        {showForm && isAdmin && (
+        {showForm && isAuthenticated && (
           <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-4">
             <h2 className="font-stats font-semibold text-gray-200">Add Player</h2>
 
@@ -324,7 +325,7 @@ function PlayersContent() {
         )}
 
         {/* ── CSV import ── */}
-        {csvMode && isAdmin && (
+        {csvMode && isAuthenticated && (
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-3">
             <div>
               <h2 className="font-stats font-semibold text-gray-200">CSV Import</h2>
@@ -366,7 +367,7 @@ function PlayersContent() {
                   <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Role</th>
                   <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Batting</th>
                   <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Bowling</th>
-                  {isAdmin && <th className="px-4 py-3"></th>}
+                  {isAuthenticated && <th className="px-4 py-3"></th>}
                 </tr>
               </thead>
               <tbody>
@@ -397,7 +398,7 @@ function PlayersContent() {
                     </td>
                     <td className="px-4 py-3 font-stats text-xs text-gray-400">{p.battingStyle ?? '—'}</td>
                     <td className="px-4 py-3 font-stats text-xs text-gray-400">{p.bowlingStyle ?? '—'}</td>
-                    {isAdmin && (
+                    {isAuthenticated && (
                       <td className="px-4 py-3">
                         <button
                           onClick={() => openEdit(p)}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
-import { isAdminSession } from '@/lib/auth/utils'
+import { canAccessTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
 import { teams } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
@@ -12,7 +12,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; teamId: string }> },
 ) {
   const session = await auth()
-  if (!session || !isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id, teamId } = await params
+  const tournamentId = parseInt(id, 10)
+
+  if (!await canAccessTournament(session, tournamentId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const teamIdNum = parseInt(teamId, 10)
+  await db.delete(teams).where(and(eq(teams.id, teamIdNum), eq(teams.tournamentId, tournamentId)))
+  return NextResponse.json({ ok: true })
+}
 
   const { id, teamId } = await params
   const tournamentId = parseInt(id, 10)

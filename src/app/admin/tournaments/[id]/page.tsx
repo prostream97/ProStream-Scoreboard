@@ -57,7 +57,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const { id } = use(params)
   const tournamentId = parseInt(id, 10)
   const { data: session, status } = useSession()
-  const isAdmin = status === 'authenticated' && session?.user?.role === 'admin'
+  const isAuthenticated = status === 'authenticated'
+  const isAdmin = isAuthenticated && session?.user?.role === 'admin'
 
   const [tournament, setTournament] = useState<TournamentWithDetails | null>(null)
   const [standings, setStandings] = useState<StandingRow[]>([])
@@ -326,7 +327,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
               Matches ({tournament.matches.length})
             </h2>
-            {isAdmin && tournament.teams.length >= 2 && (
+            {isAuthenticated && tournament.teams.length >= 2 && (
               <button
                 onClick={() => { setShowMatchForm((v) => !v); setMatchError('') }}
                 className="px-3 py-1.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors"
@@ -337,7 +338,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* Add match form */}
-          {showMatchForm && isAdmin && (
+          {showMatchForm && isAuthenticated && (
             <form
               onSubmit={handleAddMatch}
               className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4 space-y-4"

@@ -23,7 +23,6 @@ type MatchPanelState = {
   loading: boolean
   generating: boolean
   expanded: boolean
-  selectedMode: OverlayMode
   label: string
 }
 
@@ -89,7 +88,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
     setLoadingTournament(true)
     setMatchPanels({})
     fetch(`/api/tournaments/${selectedTournamentId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d) => setTournamentDetail(d))
       .catch(() => toast.error('Failed to load tournament'))
       .finally(() => setLoadingTournament(false))
@@ -101,7 +100,6 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
       loading: false,
       generating: false,
       expanded: false,
-      selectedMode: 'bug',
       label: '',
     }
   }
@@ -141,7 +139,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           matchId,
-          mode: panel.selectedMode,
+          mode: 'standard',
           label: panel.label || undefined,
         }),
       })
@@ -218,7 +216,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
   }
 
   // Group matches by stage
-  const matchesByStage = tournamentDetail?.matches.reduce<Record<string, TournamentMatch[]>>(
+  const matchesByStage = tournamentDetail?.matches?.reduce<Record<string, TournamentMatch[]>>(
     (acc, m) => {
       const key = m.matchStage ?? 'group'
       ;(acc[key] ??= []).push(m)
@@ -350,26 +348,6 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
                             <div className="border-t border-gray-800 px-5 py-4 space-y-4">
                               {/* Generate form */}
                               <div className="flex items-end gap-3">
-                                <div className="flex-1">
-                                  <label className="block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider">
-                                    Mode
-                                  </label>
-                                  <select
-                                    value={panel.selectedMode}
-                                    onChange={(e) =>
-                                      updatePanel(match.id, {
-                                        selectedMode: e.target.value as OverlayMode,
-                                      })
-                                    }
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-body text-sm focus:outline-none focus:border-primary"
-                                  >
-                                    {(Object.keys(MODE_LABELS) as OverlayMode[]).map((m) => (
-                                      <option key={m} value={m}>
-                                        {MODE_LABELS[m]}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
                                 <div className="flex-1">
                                   <label className="block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider">
                                     Label (optional)

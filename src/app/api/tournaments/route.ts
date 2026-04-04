@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'match_days_from and match_days_to are required' }, { status: 400 })
     }
 
-    const from = new Date(match_days_from)
-    const to = new Date(match_days_to)
+    const from = new Date(match_days_from + 'T00:00:00')
+    const to = new Date(match_days_to + 'T00:00:00')
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 

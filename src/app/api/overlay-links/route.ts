@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const isAdmin = isAdminSession(session)
 
   const body = await req.json()
-  const { matchId, mode = 'bug', label } = body
+  const { matchId, mode = 'standard', label } = body
 
   if (!matchId || isNaN(parseInt(matchId, 10))) {
     return NextResponse.json({ error: 'matchId is required' }, { status: 400 })
@@ -77,8 +77,8 @@ export async function POST(req: NextRequest) {
     if (tournament?.matchDaysFrom && tournament?.matchDaysTo) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      const from = new Date(tournament.matchDaysFrom)
-      const to = new Date(tournament.matchDaysTo)
+      const from = new Date(tournament.matchDaysFrom + 'T00:00:00')
+      const to = new Date(tournament.matchDaysTo + 'T00:00:00')
       to.setHours(23, 59, 59, 999)
       if (today < from || today > to) {
         return NextResponse.json(

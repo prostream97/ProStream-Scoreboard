@@ -8,7 +8,7 @@ import { OCPTopBar } from './OCPTopBar'
 import { BattingPanel } from './BattingPanel'
 import { ScoringControls } from './ScoringControls'
 import { BowlingPanel } from './BowlingPanel'
-import { DisplayControls } from './DisplayControls'
+import { OverlayPanel } from './OverlayPanel'
 import { WicketModal } from './WicketModal'
 import { BowlerSelect } from './BowlerSelect'
 import { SquadPanel } from './SquadPanel'
@@ -72,13 +72,14 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
 
       {/* Middle: three-column OCP */}
       <div className="flex-1 grid grid-cols-3 gap-4 p-4 overflow-hidden">
-        <BattingPanel />
+        {/* Left: Batting + Bowling stacked */}
+        <div className="flex flex-col gap-4 overflow-hidden">
+          <BattingPanel />
+          <BowlingPanel />
+        </div>
         <ScoringControls />
-        <BowlingPanel />
+        <OverlayPanel />
       </div>
-
-      {/* Bottom: display controls */}
-      <DisplayControls />
 
       {/* Modals */}
       <WicketModal />

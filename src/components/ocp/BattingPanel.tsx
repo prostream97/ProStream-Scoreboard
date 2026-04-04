@@ -34,7 +34,7 @@ export function BattingPanel() {
   const nonStriker = resolveOrSynth(nonStrikerId, false)
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 h-full flex flex-col gap-4">
+    <div className="bg-gray-900 rounded-xl p-4 flex flex-col gap-4">
       <h3 className="font-stats text-xs text-gray-400 uppercase tracking-wider">Batting</h3>
 
       {/* Striker */}

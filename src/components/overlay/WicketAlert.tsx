@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { WicketPayload } from '@/types/pusher'
 import type { MatchSnapshot } from '@/types/match'
@@ -25,14 +25,16 @@ const DISMISSAL_LABEL: Record<string, string> = {
 export function WicketAlert({ wicket, snapshot }: Props) {
   const [visible, setVisible] = useState(false)
   const [shown, setShown] = useState<WicketPayload | null>(null)
+  const shownRef = useRef<WicketPayload | null>(null)
 
   useEffect(() => {
-    if (!wicket || wicket === shown) return
+    if (!wicket || wicket === shownRef.current) return
+    shownRef.current = wicket
     setShown(wicket)
     setVisible(true)
     const t = setTimeout(() => setVisible(false), 4000)
     return () => clearTimeout(t)
-  }, [wicket, shown])
+  }, [wicket])
 
   const outBatter = shown
     ? snapshot.battingTeamPlayers.find((p) => p.id === shown.batsmanId) ?? snapshot.bowlingTeamPlayers.find((p) => p.id === shown.batsmanId)
@@ -51,7 +53,7 @@ export function WicketAlert({ wicket, snapshot }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, filter: "blur(20px)", transition: { duration: 0.5 } }}
-          className="fixed inset-0 flex items-center justify-center pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
           {/* Dark backdrop pulse */}
           <div className="absolute inset-0 bg-black/60 animate-pulse" style={{ animationDuration: '0.4s' }} />

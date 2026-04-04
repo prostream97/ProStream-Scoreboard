@@ -1,9 +1,15 @@
-// Overlay layout: transparent background for OBS browser source
-// No html/body wrappers that add backgrounds — just pass children through
-
+// Overlay layout: fixed 1920×1080 transparent canvas for OBS browser source
 export default function OverlayLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-transparent" style={{ background: 'transparent' }}>
+    <div
+      style={{
+        width: 1920,
+        height: 1080,
+        overflow: 'hidden',
+        background: 'transparent',
+        position: 'relative',
+      }}
+    >
       {children}
     </div>
   )

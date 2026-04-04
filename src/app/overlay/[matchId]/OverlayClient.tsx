@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
-import { Scorebug } from '@/components/overlay/Scorebug'
 import { StandardScorebug } from '@/components/overlay/StandardScorebug'
 import { BatterCard, BowlerCard } from '@/components/overlay/PlayerCard'
 import { WicketAlert } from '@/components/overlay/WicketAlert'
@@ -21,15 +20,18 @@ import type {
 type Props = {
   matchId: number
   initialSnapshot: MatchSnapshot
-  mode: string
 }
 
-function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
+function OverlayInner({ matchId, initialSnapshot }: Props) {
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(initialSnapshot)
   const [lastWicket, setLastWicket] = useState<WicketPayload | null>(null)
   const [lastBoundary, setLastBoundary] = useState<{ id: number; runs: 4 | 6 } | null>(null)
-  const [visible, setVisible] = useState(true)
   const [activePlayerId, setActivePlayerId] = useState<number | null>(null)
+
+  // Per-element visibility states
+  const [scorebugVisible, setScorebugVisible] = useState(false)
+  const [cardVisible, setCardVisible] = useState(false)
+  const [partnershipVisible, setPartnershipVisible] = useState(false)
 
   // Reconnect recovery
   useEffect(() => {
@@ -57,12 +59,10 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
         ? Math.round(((currentInningsState?.totalRuns ?? 0) / (totalBalls / bpo)) * 100) / 100
         : 0
 
-      // Over rolled over → reset buffer; otherwise append this delivery
       const overChanged = data.inningsOvers > (s.currentInningsState?.overs ?? 0)
       const newBall = { runs: data.runs, extraRuns: data.extraRuns, isLegal: data.isLegal, extraType: data.extraType, isWicket: data.isWicket }
       const currentOverBalls = overChanged ? [] : [...(s.currentOverBalls ?? []), newBall]
 
-      // Update batter stats + isStriker flags
       const updatedBatters = s.batters.map((b) => {
         if (b.playerId === data.batsmanId) {
           const newRuns = b.runs + data.runs
@@ -78,13 +78,11 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
             isStriker: b.playerId === data.strikerId,
           }
         }
-        // Update isStriker for non-striker too
         if (b.playerId === data.strikerId || b.playerId === data.nonStrikerId) {
           return { ...b, isStriker: b.playerId === data.strikerId }
         }
         return b
       })
-      // Add batter entry on their very first delivery
       const batterExists = s.batters.some((b) => b.playerId === data.batsmanId)
       const finalBatters = batterExists ? updatedBatters : [
         ...updatedBatters,
@@ -103,7 +101,6 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
         },
       ]
 
-      // Update bowler stats
       const updatedBowlers = s.bowlers.map((b) => {
         if (b.playerId !== data.bowlerId) return { ...b, isCurrent: false }
         const newLegalBalls = b.overs * bpo + b.balls + (data.isLegal ? 1 : 0)
@@ -121,7 +118,6 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
           isCurrent: true,
         }
       })
-      // Add bowler entry on their very first delivery
       const bowlerExists = s.bowlers.some((b) => b.playerId === data.bowlerId)
       const finalBowlers = bowlerExists ? updatedBowlers : [
         ...updatedBowlers.map((b) => ({ ...b, isCurrent: false })),
@@ -170,7 +166,6 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
       .then((fresh: MatchSnapshot) => {
         setSnapshot((prev) => ({
           ...fresh,
-          // Preserve in-memory over balls if DB hasn't been flushed yet
           currentOverBalls: fresh.currentOverBalls.length > 0
             ? fresh.currentOverBalls
             : prev.currentOverBalls,
@@ -187,14 +182,12 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   })
 
   useEvent(`match-${matchId}`, 'display.toggle', (data: DisplayTogglePayload) => {
-    // For 'card' mode respond to display.toggle for playerCard
-    if (mode === 'card' && data.element === 'playerCard') {
-      setVisible(data.visible)
+    if (data.element === 'scorebug') setScorebugVisible(data.visible)
+    if (data.element === 'playerCard') {
+      setCardVisible(data.visible)
       if (data.playerId) setActivePlayerId(data.playerId)
     }
-    if (mode === 'bug' && data.element === 'scorebug') setVisible(data.visible)
-    if (mode === 'standard' && data.element === 'scorebug') setVisible(data.visible)
-    if (mode === 'partnership' && data.element === 'partnership') setVisible(data.visible)
+    if (data.element === 'partnership') setPartnershipVisible(data.visible)
   })
 
   useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
@@ -205,10 +198,8 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   const battingTeam = inn?.battingTeamId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam
   const bowlingTeam = inn?.bowlingTeamId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam
 
-  // Resolve active player card
   const resolveCard = () => {
     const pid = activePlayerId ?? snapshot.strikerId
-    // Check batters first
     const batter = snapshot.batters.find((b) => b.playerId === pid)
       ?? (pid && snapshot.battingTeamPlayers.find((p) => p.id === pid)
         ? { playerId: pid, playerName: '', displayName: snapshot.battingTeamPlayers.find((p) => p.id === pid)!.displayName, runs: 0, balls: 0, fours: 0, sixes: 0, strikeRate: 0, isStriker: pid === snapshot.strikerId, isOut: false, dismissalType: null }
@@ -224,7 +215,6 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
         />
       )
     }
-    // Fallback to current bowler
     const bowler = snapshot.bowlers.find((b) => b.isCurrent)
     if (bowler) {
       const player = snapshot.bowlingTeamPlayers.find((p) => p.id === bowler.playerId)
@@ -233,34 +223,36 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
     return null
   }
 
-  if (mode === 'bug') {
-    if (!visible) return null
-    return <Scorebug snapshot={snapshot} />
-  }
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {/* Full-screen alerts — auto-triggered by delivery events */}
+      <BoundaryAlert boundary={lastBoundary} snapshot={snapshot} />
+      <WicketAlert wicket={lastWicket} snapshot={snapshot} />
 
-  if (mode === 'standard') {
-    if (!visible) return null
-    return <StandardScorebug snapshot={snapshot} />
-  }
+      {/* Scorebug — bottom center */}
+      <AnimatePresence>
+        {scorebugVisible && <StandardScorebug snapshot={snapshot} />}
+      </AnimatePresence>
 
-  if (mode === 'card') {
-    return <AnimatePresence>{visible && resolveCard()}</AnimatePresence>
-  }
+      {/* Player card — bottom-left, above scorebug */}
+      <AnimatePresence>
+        {cardVisible && (
+          <div style={{ position: 'absolute', bottom: 180, left: 0 }}>
+            {resolveCard()}
+          </div>
+        )}
+      </AnimatePresence>
 
-  if (mode === 'wicket') {
-    return <WicketAlert wicket={lastWicket} snapshot={snapshot} />
-  }
-
-  if (mode === 'partnership') {
-    return <AnimatePresence>{visible && <PartnershipOverlay snapshot={snapshot} />}</AnimatePresence>
-  }
-
-  if (mode === 'boundary') {
-    return <BoundaryAlert boundary={lastBoundary} snapshot={snapshot} />
-  }
-
-  // Default: scorebug
-  return <Scorebug snapshot={snapshot} />
+      {/* Partnership — bottom-left, above scorebug */}
+      <AnimatePresence>
+        {partnershipVisible && (
+          <div style={{ position: 'absolute', bottom: 180, left: 0 }}>
+            <PartnershipOverlay snapshot={snapshot} />
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
 }
 
 export function OverlayClient(props: Props) {

@@ -21,7 +21,8 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   const { id } = use(params)
   const tournamentId = parseInt(id, 10)
   const { data: session, status } = useSession()
-  const isAdmin = status === 'authenticated' && session?.user?.role === 'admin'
+  const isAuthenticated = status === 'authenticated'
+  const isAdmin = isAuthenticated && session?.user?.role === 'admin'
 
   const [tournamentName, setTournamentName] = useState('')
   const [teams, setTeams] = useState<TournamentTeamSummary[]>([])
@@ -163,7 +164,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
             <h1 className="font-display text-4xl text-primary tracking-wider">TEAMS</h1>
             <p className="font-stats text-gray-400 text-sm mt-1">{tournamentName} · {teams.length} {teams.length === 1 ? 'team' : 'teams'}</p>
           </div>
-          {isAdmin ? (
+          {isAuthenticated ? (
             <button
               onClick={() => { setShowForm((v) => !v); setAddError('') }}
               className="px-4 py-2 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 transition-colors text-sm"
@@ -183,7 +184,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
         {addError && <p className="text-red-400 font-stats text-sm mb-4">{addError}</p>}
 
         {/* ── Add Team Form ── */}
-        {showForm && isAdmin && (
+        {showForm && isAuthenticated && (
           <form onSubmit={handleCreate} className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-4">
             <h2 className="font-stats font-semibold text-gray-200">Add Team</h2>
 
@@ -270,7 +271,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                   >
                     Players
                   </Link>
-                  {isAdmin && (
+                  {isAuthenticated && (
                     <>
                       <button
                         onClick={() => openEdit(team)}
