@@ -55,13 +55,22 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
       const currentRunRate = totalBalls > 0
         ? Math.round(((currentInningsState?.totalRuns ?? 0) / (totalBalls / bpo)) * 100) / 100
         : 0
+
+      // Over rolled over → reset buffer; otherwise append this delivery
+      const overChanged = data.inningsOvers > (s.currentInningsState?.overs ?? 0)
+      const newBall = { runs: data.runs, extraRuns: data.extraRuns, isLegal: data.isLegal, extraType: data.extraType, isWicket: data.isWicket }
+      const currentOverBalls = overChanged ? [] : [...(s.currentOverBalls ?? []), newBall]
+
       return {
         ...s,
         innings: updatedInnings,
         currentInningsState,
         strikerId: data.strikerId,
         nonStrikerId: data.nonStrikerId,
+        currentBalls: data.inningsBalls,
+        currentOver: data.inningsOvers,
         currentRunRate,
+        currentOverBalls,
         partnership: s.strikerId && s.nonStrikerId
           ? {
               runs: (s.partnership?.runs ?? 0) + data.runs + data.extraRuns,
@@ -85,7 +94,7 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
   useEvent(`match-${matchId}`, 'innings.change', (_data: InningsChangePayload) => {
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
-      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
+      .then((fresh: MatchSnapshot) => setSnapshot({ ...fresh, currentOverBalls: [] }))
       .catch(() => {})
   })
 

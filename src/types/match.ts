@@ -151,4 +151,7 @@ export type MatchSnapshot = {
   // Squads (full rosters)
   battingTeamPlayers: PlayerSummary[]
   bowlingTeamPlayers: PlayerSummary[]
+
+  // In-progress over balls (from currentOverBuffer, not yet flushed to deliveries table)
+  currentOverBalls: { runs: number; extraRuns: number; isLegal: boolean; extraType: string | null; isWicket: boolean }[]
 }

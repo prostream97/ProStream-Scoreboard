@@ -112,6 +112,13 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     requiredRunRate: requiredRunRate !== null ? Math.round(requiredRunRate * 100) / 100 : null,
     battingTeamPlayers,
     bowlingTeamPlayers,
+    currentOverBalls: (state?.currentOverBuffer ?? []).map((d) => ({
+      runs: d.runs,
+      extraRuns: d.extraRuns,
+      isLegal: d.isLegal,
+      extraType: d.extraType,
+      isWicket: d.isWicket,
+    })),
   }
 }
 

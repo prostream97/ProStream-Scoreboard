@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { MatchSnapshot } from '@/types/match'
+import type { MatchSnapshot, BatterStats, BowlerStats } from '@/types/match'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 
@@ -14,12 +14,29 @@ export function StandardScorebug({ snapshot }: Props) {
   const batting = inn?.battingTeamId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam
   const bowling = inn?.battingTeamId === snapshot.homeTeam.id ? snapshot.awayTeam : snapshot.homeTeam
 
-  // Get active batters.
-  const activeBatters = snapshot.batters.filter(b => !b.isOut).slice(0, 2)
-  const batter1 = activeBatters[0]
-  const batter2 = activeBatters[1]
+  // Active batters — fall back to strikerId/nonStrikerId if no deliveries yet
+  const activeBatters = snapshot.batters.filter(b => !b.isOut)
+  let batter1: Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'> | undefined = activeBatters.find(b => b.isStriker) ?? activeBatters[0]
+  let batter2: Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'> | undefined = activeBatters.find(b => !b.isStriker && b.playerId !== batter1?.['playerId' as keyof typeof batter1]) ?? activeBatters[1]
 
-  const currentBowler = snapshot.bowlers.find(b => b.isCurrent)
+  if (!batter1 && snapshot.strikerId) {
+    const p = snapshot.battingTeamPlayers.find(pl => pl.id === snapshot.strikerId)
+    if (p) batter1 = { displayName: p.displayName, runs: 0, balls: 0, isStriker: true }
+  }
+  if (!batter2 && snapshot.nonStrikerId) {
+    const p = snapshot.battingTeamPlayers.find(pl => pl.id === snapshot.nonStrikerId)
+    if (p) batter2 = { displayName: p.displayName, runs: 0, balls: 0, isStriker: false }
+  }
+
+  // Current bowler — fall back to currentBowlerId if no deliveries yet
+  let currentBowler: Pick<BowlerStats, 'displayName' | 'wickets' | 'runs' | 'overs' | 'balls'> | undefined = snapshot.bowlers.find(b => b.isCurrent)
+  if (!currentBowler && snapshot.currentBowlerId) {
+    const p = snapshot.bowlingTeamPlayers.find(pl => pl.id === snapshot.currentBowlerId)
+    if (p) currentBowler = { displayName: p.displayName, wickets: 0, runs: 0, overs: 0, balls: 0 }
+  }
+
+  // Current over balls for visualizer
+  const overBalls = snapshot.currentOverBalls ?? []
 
   return (
     <motion.div
@@ -92,7 +109,7 @@ export function StandardScorebug({ snapshot }: Props) {
             </div>
             <div data-layer="Container" className="Container" style={{flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex'}}>
               <div data-layer="OVERS" className="Overs" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14.10, fontFamily: 'Inter', fontWeight: '600', wordWrap: 'break-word'}}>
-                OVERS {inn?.overs ?? 0}.{inn?.balls ?? 0}
+                OVERS {snapshot.currentOver ?? 0}.{snapshot.currentBalls ?? 0}
               </div>
             </div>
           </div>
@@ -126,8 +143,22 @@ export function StandardScorebug({ snapshot }: Props) {
                   <div data-layer="Overs" className="Overs" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>{currentBowler.overs}.{currentBowler.balls} ov</div>
                 </div>
               </div>
-              <div data-layer="Container" className="Container" style={{justifyContent: 'flex-end', alignItems: 'center', gap: 5, display: 'flex'}}>
-                 {/* Empty space filler for bowling balls since recent bowls are not explicitly in MatchSnapshot */}
+              <div data-layer="Container" className="Container" style={{justifyContent: 'flex-end', alignItems: 'center', gap: 4, display: 'flex'}}>
+                {overBalls.map((ball, i) => {
+                  let bg = '#DDDDDD'
+                  let label = '·'
+                  if (ball.isWicket) { bg = '#FF2222'; label = 'W' }
+                  else if (!ball.isLegal && ball.extraType === 'wide') { bg = '#3B82F6'; label = 'Wd' }
+                  else if (!ball.isLegal && ball.extraType === 'noball') { bg = '#F97316'; label = 'Nb' }
+                  else if (ball.runs === 6) { bg = '#FF00E5'; label = '6' }
+                  else if (ball.runs === 4) { bg = '#10B981'; label = '4' }
+                  else if (ball.runs > 0) { bg = '#2A0066'; label = String(ball.runs) }
+                  return (
+                    <div key={i} style={{width: 22, height: 22, borderRadius: 9999, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: 'white', fontFamily: 'Inter'}}>
+                      {label}
+                    </div>
+                  )
+                })}
               </div>
             </>
           ) : (
