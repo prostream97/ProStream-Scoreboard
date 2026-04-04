@@ -2,25 +2,25 @@ import { auth } from '@/lib/auth/config'
 import { NextResponse } from 'next/server'
 
 export default auth((req) => {
-  const isLoggedIn = !!req.auth
-  const isOperatorRoute = req.nextUrl.pathname.includes('/operator')
-  const isApiTriggerRoute = req.nextUrl.pathname.startsWith('/api/pusher/trigger')
-  const isApiPersistRoute = req.nextUrl.pathname.startsWith('/api/match')
+  const { nextUrl } = req
+  const session = req.auth
+  const isLoggedIn = !!session
+  const isAdmin = session?.user?.role === 'admin'
+  const path = nextUrl.pathname
 
-  // Admin pages are public (read-only views) — API routes handle write auth individually
-  const isProtected = isOperatorRoute || isApiTriggerRoute || isApiPersistRoute
+  const publicPrefixes = ['/login', '/overlay/', '/api/', '/_next/', '/favicon']
+  if (publicPrefixes.some((p) => path.startsWith(p))) return NextResponse.next()
 
-  if (isProtected && !isLoggedIn) {
-    const loginUrl = new URL('/login', req.nextUrl.origin)
-    loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname)
-    return NextResponse.redirect(loginUrl)
-  }
+  if (!isLoggedIn)
+    return NextResponse.redirect(new URL('/login', req.url))
+
+  const adminOnlyPaths = ['/admin/users', '/admin/access', '/admin/pricing', '/admin/settings']
+  if (adminOnlyPaths.some((p) => path.startsWith(p)) && !isAdmin)
+    return NextResponse.redirect(new URL('/', req.url))
+
+  return NextResponse.next()
 })
 
 export const config = {
-  matcher: [
-    '/match/:path*/operator',
-    '/api/pusher/trigger',
-    '/api/match/:path*',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }
