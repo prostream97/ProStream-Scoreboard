@@ -15,6 +15,7 @@ import type {
   WicketPayload,
   InningsChangePayload,
   DisplayTogglePayload,
+  OverCompletePayload,
 } from '@/types/pusher'
 
 type Props = {
@@ -61,6 +62,83 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
       const newBall = { runs: data.runs, extraRuns: data.extraRuns, isLegal: data.isLegal, extraType: data.extraType, isWicket: data.isWicket }
       const currentOverBalls = overChanged ? [] : [...(s.currentOverBalls ?? []), newBall]
 
+      // Update batter stats + isStriker flags
+      const updatedBatters = s.batters.map((b) => {
+        if (b.playerId === data.batsmanId) {
+          const newRuns = b.runs + data.runs
+          const newBalls = b.balls + (data.isLegal ? 1 : 0)
+          return {
+            ...b,
+            runs: newRuns,
+            balls: newBalls,
+            fours: b.fours + (data.runs === 4 ? 1 : 0),
+            sixes: b.sixes + (data.runs === 6 ? 1 : 0),
+            strikeRate: newBalls > 0 ? Math.round((newRuns / newBalls) * 10000) / 100 : 0,
+            isOut: b.isOut || data.isWicket,
+            isStriker: b.playerId === data.strikerId,
+          }
+        }
+        // Update isStriker for non-striker too
+        if (b.playerId === data.strikerId || b.playerId === data.nonStrikerId) {
+          return { ...b, isStriker: b.playerId === data.strikerId }
+        }
+        return b
+      })
+      // Add batter entry on their very first delivery
+      const batterExists = s.batters.some((b) => b.playerId === data.batsmanId)
+      const finalBatters = batterExists ? updatedBatters : [
+        ...updatedBatters,
+        {
+          playerId: data.batsmanId,
+          playerName: '',
+          displayName: s.battingTeamPlayers.find((p) => p.id === data.batsmanId)?.displayName ?? '',
+          runs: data.runs,
+          balls: data.isLegal ? 1 : 0,
+          fours: data.runs === 4 ? 1 : 0,
+          sixes: data.runs === 6 ? 1 : 0,
+          strikeRate: 0,
+          isStriker: data.batsmanId === data.strikerId,
+          isOut: data.isWicket,
+          dismissalType: null,
+        },
+      ]
+
+      // Update bowler stats
+      const updatedBowlers = s.bowlers.map((b) => {
+        if (b.playerId !== data.bowlerId) return { ...b, isCurrent: false }
+        const newLegalBalls = b.overs * bpo + b.balls + (data.isLegal ? 1 : 0)
+        const completedOvers = Math.floor(newLegalBalls / bpo)
+        const ballsInOver = newLegalBalls % bpo
+        const newRuns = b.runs + data.runs + data.extraRuns
+        const oversDecimal = newLegalBalls / bpo
+        return {
+          ...b,
+          overs: completedOvers,
+          balls: ballsInOver,
+          runs: newRuns,
+          wickets: b.wickets + (data.isWicket ? 1 : 0),
+          economy: oversDecimal > 0 ? Math.round((newRuns / oversDecimal) * 100) / 100 : 0,
+          isCurrent: true,
+        }
+      })
+      // Add bowler entry on their very first delivery
+      const bowlerExists = s.bowlers.some((b) => b.playerId === data.bowlerId)
+      const finalBowlers = bowlerExists ? updatedBowlers : [
+        ...updatedBowlers.map((b) => ({ ...b, isCurrent: false })),
+        {
+          playerId: data.bowlerId,
+          playerName: '',
+          displayName: s.bowlingTeamPlayers.find((p) => p.id === data.bowlerId)?.displayName ?? '',
+          overs: 0,
+          balls: data.isLegal ? 1 : 0,
+          maidens: 0,
+          runs: data.runs + data.extraRuns,
+          wickets: data.isWicket ? 1 : 0,
+          economy: 0,
+          isCurrent: true,
+        },
+      ]
+
       return {
         ...s,
         innings: updatedInnings,
@@ -71,6 +149,8 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
         currentOver: data.inningsOvers,
         currentRunRate,
         currentOverBalls,
+        batters: finalBatters,
+        bowlers: finalBowlers,
         partnership: s.strikerId && s.nonStrikerId
           ? {
               runs: (s.partnership?.runs ?? 0) + data.runs + data.extraRuns,
@@ -87,7 +167,15 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
     setLastWicket(data)
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
-      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
+      .then((fresh: MatchSnapshot) => {
+        setSnapshot((prev) => ({
+          ...fresh,
+          // Preserve in-memory over balls if DB hasn't been flushed yet
+          currentOverBalls: fresh.currentOverBalls.length > 0
+            ? fresh.currentOverBalls
+            : prev.currentOverBalls,
+        }))
+      })
       .catch(() => {})
   })
 
@@ -105,7 +193,12 @@ function OverlayInner({ matchId, initialSnapshot, mode }: Props) {
       if (data.playerId) setActivePlayerId(data.playerId)
     }
     if (mode === 'bug' && data.element === 'scorebug') setVisible(data.visible)
+    if (mode === 'standard' && data.element === 'scorebug') setVisible(data.visible)
     if (mode === 'partnership' && data.element === 'partnership') setVisible(data.visible)
+  })
+
+  useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
+    setSnapshot((s) => ({ ...s, currentOverBalls: [] }))
   })
 
   const inn = snapshot.currentInningsState

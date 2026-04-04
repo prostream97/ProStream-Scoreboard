@@ -10,6 +10,7 @@ import {
   varchar,
   char,
   uniqueIndex,
+  date,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -133,6 +134,9 @@ export const tournaments = pgTable('tournaments', {
   totalOvers: integer('total_overs').notNull().default(20),
   ballsPerOver: integer('balls_per_over').notNull().default(6),
   logoCloudinaryId: text('logo_cloudinary_id'),
+  createdBy: integer('created_by').references(() => users.id),
+  matchDaysFrom: date('match_days_from'),
+  matchDaysTo: date('match_days_to'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 

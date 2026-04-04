@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth/config'
 import { isAdminSession } from '@/lib/auth/utils'
 import { db } from '@/lib/db'
-import { overlayLinks, matches, wallets, walletTransactions, pricingConfig } from '@/lib/db/schema'
+import { overlayLinks, matches, tournaments, wallets, walletTransactions, pricingConfig } from '@/lib/db/schema'
 
 export const runtime = 'nodejs'
 
@@ -67,6 +67,27 @@ export async function POST(req: NextRequest) {
     with: { homeTeam: true, awayTeam: true },
   })
   if (!match) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+
+  // Non-admins: enforce match days window if set on the tournament
+  if (!isAdmin && match.tournamentId) {
+    const tournament = await db.query.tournaments.findFirst({
+      where: eq(tournaments.id, match.tournamentId),
+      columns: { matchDaysFrom: true, matchDaysTo: true },
+    })
+    if (tournament?.matchDaysFrom && tournament?.matchDaysTo) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const from = new Date(tournament.matchDaysFrom)
+      const to = new Date(tournament.matchDaysTo)
+      to.setHours(23, 59, 59, 999)
+      if (today < from || today > to) {
+        return NextResponse.json(
+          { error: 'Overlay creation is only allowed during the tournament match days window' },
+          { status: 403 },
+        )
+      }
+    }
+  }
 
   const token = randomBytes(32).toString('hex')
 

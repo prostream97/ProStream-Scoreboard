@@ -10,6 +10,9 @@ export type Tournament = {
   totalOvers: number
   ballsPerOver: number
   logoCloudinaryId: string | null
+  createdBy: number | null
+  matchDaysFrom: string | null   // 'YYYY-MM-DD'
+  matchDaysTo: string | null     // 'YYYY-MM-DD'
   createdAt: string
 }
 

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useSession, signIn } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Trophy } from 'lucide-react'
+import { Plus, X, Trophy, Calendar } from 'lucide-react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import type { Tournament } from '@/types/tournament'
 
@@ -13,6 +14,8 @@ const CLOUDINARY_CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
 const fmtId = (id: number) => `TRN-${id.toString().padStart(3, '0')}`
 
+const today = () => new Date().toISOString().split('T')[0]
+
 const emptyForm = {
   name: '',
   shortName: '',
@@ -20,6 +23,8 @@ const emptyForm = {
   totalOvers: 20,
   ballsPerOver: 6,
   logoCloudinaryId: '',
+  match_days_from: '',
+  match_days_to: '',
 }
 
 const statusColors: Record<string, string> = {
@@ -29,9 +34,17 @@ const statusColors: Record<string, string> = {
   complete: 'bg-gray-800/50 text-gray-500 border border-gray-800 shadow-none',
 }
 
+function fmtDate(d: string | null) {
+  if (!d) return null
+  const [y, m, day] = d.split('-')
+  return `${day}/${m}/${y}`
+}
+
 export default function TournamentsPage() {
   const { data: session, status } = useSession()
+  const router = useRouter()
   const isAdmin = status === 'authenticated' && session?.user?.role === 'admin'
+  const isAuthenticated = status === 'authenticated'
 
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,14 +69,37 @@ export default function TournamentsPage() {
       setForm((f) => ({ ...f, totalOvers: parseInt(value, 10) || 0 }))
     } else if (name === 'ballsPerOver') {
       setForm((f) => ({ ...f, ballsPerOver: Math.max(1, parseInt(value, 10) || 6) }))
+    } else if (name === 'match_days_from') {
+      // Reset to_date if it's now before from_date
+      setForm((f) => ({
+        ...f,
+        match_days_from: value,
+        match_days_to: f.match_days_to < value ? '' : f.match_days_to,
+      }))
     } else {
       setForm((f) => ({ ...f, [name]: value }))
     }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setCreateError('')
+
+    // Client-side match days validation for operators
+    if (!isAdmin) {
+      if (!form.match_days_from || !form.match_days_to) {
+        setCreateError('Match days from and to are required')
+        return
+      }
+      const from = new Date(form.match_days_from)
+      const to = new Date(form.match_days_to)
+      const diffDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
+      if (diffDays > 1) {
+        setCreateError('Match days window cannot exceed 2 days')
+        return
+      }
+    }
+
     setCreating(true)
     try {
       const res = await fetch('/api/tournaments', {
@@ -89,7 +125,7 @@ export default function TournamentsPage() {
 
   return (
     <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-6 font-stats text-sm text-gray-500">
           <Link href="/" className="hover:text-gray-300 transition-colors">Dashboard</Link>
@@ -104,7 +140,7 @@ export default function TournamentsPage() {
             </div>
             <h1 className="font-display text-4xl text-white tracking-wider">TOURNAMENTS</h1>
           </div>
-          {isAdmin ? (
+          {isAuthenticated && (
             <button
               onClick={() => { setShowForm(true); setCreateError('') }}
               className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-stats font-semibold rounded-xl hover:bg-indigo-600 hover:shadow-[0_4px_20px_rgba(79,70,229,0.4)] transition-all duration-300 text-sm"
@@ -112,32 +148,25 @@ export default function TournamentsPage() {
               <Plus className="w-4 h-4" />
               Create Tournament
             </button>
-          ) : (
-            <button
-              onClick={() => signIn(undefined, { callbackUrl: '/admin/tournaments' })}
-              className="px-5 py-2.5 bg-gray-800 text-gray-300 font-stats font-semibold rounded-xl hover:bg-gray-700 border border-gray-700 transition-all text-sm"
-            >
-              Sign in to manage
-            </button>
           )}
         </div>
 
         {/* ── Create slide-over form ── */}
         <AnimatePresence>
-          {showForm && isAdmin && (
+          {showForm && isAuthenticated && (
             <div className="fixed inset-0 z-50 flex justify-end">
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-                onClick={() => setShowForm(false)} 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setShowForm(false)}
               />
-              <motion.div 
+              <motion.div
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                 className="relative w-full max-w-md bg-gray-900 border-l border-gray-800 h-full shadow-2xl flex flex-col"
               >
                 <div className="p-6 border-b border-gray-800 flex items-center justify-between">
@@ -146,7 +175,7 @@ export default function TournamentsPage() {
                     <X className="w-6 h-6" />
                   </button>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto p-6">
                   <form id="create-tournament-form" onSubmit={handleCreate} className="space-y-6">
                     {createError && <p className="text-red-400 font-stats text-sm p-3 bg-red-500/10 border border-red-500/20 rounded-lg">{createError}</p>}
@@ -175,18 +204,54 @@ export default function TournamentsPage() {
                       </div>
                       <div>
                         <label className={labelCls}>Balls Per Over</label>
-                        <input
-                          name="ballsPerOver"
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={form.ballsPerOver}
-                          onChange={handleChange}
-                          className={inputCls}
-                          required
-                        />
+                        <input name="ballsPerOver" type="number" min={1} max={10} value={form.ballsPerOver} onChange={handleChange} className={inputCls} required />
                         <p className="mt-1 font-stats text-[10px] text-gray-500">Standard is 6. Use 5 for Super 5s, etc.</p>
                       </div>
+
+                      {/* Match Days Window */}
+                      <div className="pt-2 border-t border-gray-800">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Calendar className="w-4 h-4 text-primary" />
+                          <span className="font-stats text-xs text-gray-300 uppercase tracking-wider">Match Days Window</span>
+                          {isAdmin && <span className="font-stats text-[10px] text-gray-500">(optional for admin)</span>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelCls}>
+                              From {!isAdmin && <span className="text-red-400">*</span>}
+                            </label>
+                            <input
+                              name="match_days_from"
+                              type="date"
+                              value={form.match_days_from}
+                              onChange={handleChange}
+                              min={today()}
+                              className={inputCls}
+                              required={!isAdmin}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              To {!isAdmin && <span className="text-red-400">*</span>}
+                            </label>
+                            <input
+                              name="match_days_to"
+                              type="date"
+                              value={form.match_days_to}
+                              onChange={handleChange}
+                              min={form.match_days_from || today()}
+                              className={inputCls}
+                              required={!isAdmin}
+                            />
+                          </div>
+                        </div>
+                        {!isAdmin && (
+                          <p className="mt-2 font-stats text-[10px] text-amber-400/80">
+                            Max 2-day window. Overlay creation is locked after this period.
+                          </p>
+                        )}
+                      </div>
+
                       <div>
                         <ImageUpload
                           value={form.logoCloudinaryId || null}
@@ -200,7 +265,7 @@ export default function TournamentsPage() {
                     </div>
                   </form>
                 </div>
-                
+
                 <div className="p-6 border-t border-gray-800 bg-gray-900/50 backdrop-blur-md">
                   <button
                     form="create-tournament-form"
@@ -225,60 +290,92 @@ export default function TournamentsPage() {
             <p className="font-stats text-sm">Create your first tournament above.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tournaments.map((t) => (
-              <Link
-                key={t.id}
-                href={`/admin/tournaments/${t.id}`}
-              >
-                <motion.div
-                  whileHover={{ y: -4, scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="bg-gray-900/60 backdrop-blur-sm rounded-2xl p-6 border border-gray-800 hover:border-primary/50 shadow-lg hover:shadow-primary/10 transition-all flex flex-col h-full"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      {/* Tournament logo or Trophy icon fallback */}
-                      <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-gray-800 flex items-center justify-center border border-gray-700">
-                        {t.logoCloudinaryId && CLOUDINARY_CLOUD ? (
-                          <img
-                            src={`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/c_fill,w_48,h_48,f_webp/${t.logoCloudinaryId}`}
-                            alt={t.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Trophy className="w-5 h-5 text-primary opacity-60" />
-                        )}
-                      </div>
-                      <div>
-                        <h2 className="font-display text-2xl text-white tracking-wider mb-1">{t.name}</h2>
-                        <div className="flex items-center gap-2">
-                          <span className="font-display text-xs tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">
+          <div className="overflow-x-auto bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 shadow-xl">
+            <table className="w-full text-left whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500 font-stats text-xs uppercase tracking-wider">
+                  <th className="px-6 py-4 font-semibold w-16">Logo</th>
+                  <th className="px-6 py-4 font-semibold">Tournament</th>
+                  <th className="px-6 py-4 font-semibold">Format</th>
+                  <th className="px-6 py-4 font-semibold">Match Days</th>
+                  <th className="px-6 py-4 font-semibold text-center">Status</th>
+                  <th className="px-6 py-4 font-semibold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/50">
+                {tournaments.map((t) => {
+                  const windowActive = t.matchDaysFrom && t.matchDaysTo
+                    ? (() => {
+                        const now = today()
+                        return now >= t.matchDaysFrom! && now <= t.matchDaysTo!
+                      })()
+                    : null
+                  return (
+                    <tr
+                      key={t.id}
+                      onClick={() => router.push(`/admin/tournaments/${t.id}`)}
+                      className="group hover:bg-gray-800/50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center border border-gray-700">
+                          {t.logoCloudinaryId && CLOUDINARY_CLOUD ? (
+                            <img
+                              src={`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/c_fill,w_40,h_40,f_webp/${t.logoCloudinaryId}`}
+                              alt={t.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Trophy className="w-4 h-4 text-primary opacity-60" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-display text-lg text-white tracking-wider mb-1 group-hover:text-primary transition-colors">{t.name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-display text-[10px] tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">
                             {t.shortName}
                           </span>
-                          <span className="font-stats text-xs text-gray-500 bg-gray-800/80 px-2 py-0.5 rounded font-mono">
+                          <span className="font-stats text-[10px] text-gray-500 bg-gray-800/80 px-2 py-0.5 rounded font-mono">
                             {fmtId(t.id)}
                           </span>
                         </div>
-                      </div>
-                    </div>
-                    <span className={`font-stats text-[0.65rem] px-2.5 py-1 rounded-full uppercase tracking-widest ${statusColors[t.status] ?? statusColors.upcoming}`}>
-                      {t.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-auto pt-4 border-t border-gray-800/50 flex items-center justify-between text-sm">
-                     <p className="font-stats text-gray-400">
-                        {t.format} <span className="mx-1 text-gray-600">•</span> {t.totalOvers} overs
-                        {t.ballsPerOver !== 6 && (
-                          <span className="ml-1 text-orange-400">({t.ballsPerOver} balls/over)</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-stats text-sm text-gray-300">
+                          {t.format} <span className="mx-1 text-gray-600">•</span> {t.totalOvers} overs
+                          {t.ballsPerOver !== 6 && (
+                            <div className="text-[11px] text-orange-400 mt-0.5">({t.ballsPerOver} balls/over)</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {t.matchDaysFrom && t.matchDaysTo ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${windowActive ? 'bg-green-400' : 'bg-gray-600'}`} />
+                            <div className="font-stats text-xs text-gray-400 leading-tight">
+                              <div>{fmtDate(t.matchDaysFrom)}</div>
+                              <div>{fmtDate(t.matchDaysTo)}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="font-stats text-xs text-gray-600">—</span>
                         )}
-                     </p>
-                     <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity">Manage →</span>
-                  </div>
-                </motion.div>
-              </Link>
-            ))}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`font-stats text-[10px] px-2.5 py-1 rounded-full uppercase tracking-widest ${statusColors[t.status] ?? statusColors.upcoming}`}>
+                          {t.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity font-stats text-sm">
+                          Manage &rarr;
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

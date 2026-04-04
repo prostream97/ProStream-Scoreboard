@@ -9,14 +9,14 @@ export async function getTournamentList() {
   })
 }
 
-// Returns only tournaments the given operator user has been granted access to
+// Returns tournaments the user owns OR has been granted access to
 export async function getAccessibleTournaments(userId: number) {
-  const granted = await db
-    .select({ tournamentId: tournamentAccess.tournamentId })
-    .from(tournamentAccess)
-    .where(eq(tournamentAccess.userId, userId))
-  if (granted.length === 0) return []
-  const ids = granted.map((r) => r.tournamentId)
+  const [ownedRows, grantedRows] = await Promise.all([
+    db.select({ tournamentId: tournaments.id }).from(tournaments).where(eq(tournaments.createdBy, userId)),
+    db.select({ tournamentId: tournamentAccess.tournamentId }).from(tournamentAccess).where(eq(tournamentAccess.userId, userId)),
+  ])
+  const ids = [...new Set([...ownedRows.map((r) => r.tournamentId), ...grantedRows.map((r) => r.tournamentId)])]
+  if (ids.length === 0) return []
   return db.query.tournaments.findMany({
     where: inArray(tournaments.id, ids),
     orderBy: [desc(tournaments.createdAt)],
@@ -27,12 +27,12 @@ export async function getTournamentListWithCounts(userId?: number) {
   // userId provided → filter to operator's accessible tournaments only
   let rows
   if (userId !== undefined) {
-    const granted = await db
-      .select({ tournamentId: tournamentAccess.tournamentId })
-      .from(tournamentAccess)
-      .where(eq(tournamentAccess.userId, userId))
-    if (granted.length === 0) return []
-    const ids = granted.map((r) => r.tournamentId)
+    const [ownedRows, grantedRows] = await Promise.all([
+      db.select({ tournamentId: tournaments.id }).from(tournaments).where(eq(tournaments.createdBy, userId)),
+      db.select({ tournamentId: tournamentAccess.tournamentId }).from(tournamentAccess).where(eq(tournamentAccess.userId, userId)),
+    ])
+    const ids = [...new Set([...ownedRows.map((r) => r.tournamentId), ...grantedRows.map((r) => r.tournamentId)])]
+    if (ids.length === 0) return []
     rows = await db.query.tournaments.findMany({
       where: inArray(tournaments.id, ids),
       orderBy: [desc(tournaments.createdAt)],
@@ -112,6 +112,9 @@ export async function getTournamentWithDetails(
     totalOvers: row.totalOvers,
     ballsPerOver: row.ballsPerOver,
     logoCloudinaryId: row.logoCloudinaryId ?? null,
+    createdBy: row.createdBy ?? null,
+    matchDaysFrom: row.matchDaysFrom ?? null,
+    matchDaysTo: row.matchDaysTo ?? null,
     createdAt: row.createdAt.toISOString(),
     teams: row.teams.map((t) => ({
       id: t.id,

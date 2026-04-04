@@ -1,6 +1,5 @@
 'use client'
 
-import React from 'react'
 import type { MatchSnapshot, BatterStats, BowlerStats } from '@/types/match'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
@@ -50,16 +49,20 @@ export function StandardScorebug({ snapshot }: Props) {
       <div data-layer="ScoreBug" className="Scorebug" style={{paddingLeft: 100, paddingRight: 100, paddingTop: 13, paddingBottom: 13, justifyContent: 'flex-start', alignItems: 'center', gap: 13, display: 'inline-flex'}}>
         
         {/* Batting Team Flag */}
-        <div data-layer="Flag Left" className="FlagLeft" style={{width: 200, height: 65, position: 'relative', background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, justifyContent: 'center', alignItems: 'center', gap: 30, display: 'flex'}}>
-          <div data-layer="Gradient" className="Gradient" style={{width: 31, height: 65, left: 200, top: 65, position: 'absolute', transform: 'rotate(180deg)', transformOrigin: 'top left', background: `linear-gradient(90deg, ${batting.primaryColor} 0%, rgba(255, 0, 229, 0) 100%)`, borderTopLeftRadius: 50, borderBottomLeftRadius: 50}} />
-          <div data-layer="Avatar" data-shape="Circle" data-size="Large" data-type="Image" className="Avatar" style={{width: 42, height: 42, position: 'relative', overflow: 'hidden', borderRadius: 9999, outline: '1px #666666 solid', outlineOffset: '-1px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <div data-layer="Flag Left Wrapper" style={{width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center'}}>
+          {/* Pill */}
+          <div data-layer="Flag Left" className="FlagLeft" style={{position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 92, paddingRight: 16}}>
+            <div data-layer="Gradient" style={{position: 'absolute', right: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(270deg, ${batting.primaryColor}55 0%, transparent 100%)`}} />
+            <div data-layer="TeamName" style={{maxWidth: 110, color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1}}>{batting.name}</div>
+          </div>
+          {/* Floating logo */}
+          <div data-layer="Avatar" style={{position: 'absolute', left: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
             {batting.logoCloudinaryId ? (
-                <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_42,h_42,f_webp/${batting.logoCloudinaryId}`} alt={batting.name} width={42} height={42} className="object-cover" />
+              <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_78,h_78,f_webp/${batting.logoCloudinaryId}`} alt={batting.name} width={78} height={78} className="object-cover" />
             ) : (
-                <span className="text-gray-400 font-bold font-display tracking-widest">{batting.shortCode.charAt(0)}</span>
+              <span className="text-gray-400 font-bold font-display tracking-widest text-lg">{batting.shortCode.charAt(0)}</span>
             )}
           </div>
-          <div data-layer="TeamName" className="TeamName" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#666666', fontSize: 15, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.58, wordWrap: 'break-word', zIndex: 10}}>{batting.name.slice(0, 10)}</div>
         </div>
 
         {/* Batters */}
@@ -167,14 +170,18 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Bowling Team Flag */}
-        <div data-layer="Flag Right" className="FlagRight" style={{width: 200, height: 65, position: 'relative', background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, justifyContent: 'center', alignItems: 'center', gap: 30, display: 'flex'}}>
-          <div data-layer="TeamName" className="TeamName" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#666666', fontSize: 15, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.58, wordWrap: 'break-word', zIndex: 10}}>{bowling.name.slice(0, 10)}</div>
-          <div data-layer="Gradient" className="Gradient" style={{width: 28, height: 65, left: 0, top: 0, position: 'absolute', background: `linear-gradient(90deg, ${bowling.primaryColor} 0%, rgba(255, 0, 229, 0) 100%)`, borderTopLeftRadius: 50, borderBottomLeftRadius: 50}} />
-          <div data-layer="Avatar" data-shape="Circle" data-size="Large" data-type="Image" className="Avatar" style={{width: 40, height: 40, position: 'relative', overflow: 'hidden', borderRadius: 9999, outline: '1px #666666 solid', outlineOffset: '-1px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-             {bowling.logoCloudinaryId ? (
-                <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_40,h_40,f_webp/${bowling.logoCloudinaryId}`} alt={bowling.name} width={40} height={40} className="object-cover" />
+        <div data-layer="Flag Right Wrapper" style={{width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center'}}>
+          {/* Pill */}
+          <div data-layer="Flag Right" className="FlagRight" style={{position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 92, justifyContent: 'flex-end'}}>
+            <div data-layer="Gradient" style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(90deg, ${bowling.primaryColor}55 0%, transparent 100%)`}} />
+            <div data-layer="TeamName" style={{maxWidth: 110, textAlign: 'right', color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1}}>{bowling.name}</div>
+          </div>
+          {/* Floating logo */}
+          <div data-layer="Avatar" style={{position: 'absolute', right: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            {bowling.logoCloudinaryId ? (
+              <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_78,h_78,f_webp/${bowling.logoCloudinaryId}`} alt={bowling.name} width={78} height={78} className="object-cover" />
             ) : (
-                <span className="text-gray-400 font-bold font-display tracking-widest">{bowling.shortCode.charAt(0)}</span>
+              <span className="text-gray-400 font-bold font-display tracking-widest text-lg">{bowling.shortCode.charAt(0)}</span>
             )}
           </div>
         </div>
