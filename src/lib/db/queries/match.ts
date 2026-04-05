@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { matches, innings, players, teams, matchState, deliveries } from '@/lib/db/schema'
 import { eq, and, sql, gt, desc } from 'drizzle-orm'
-import type { MatchSnapshot, BatterStats, BowlerStats, PartnershipStats, InningsState, TeamSummary, PlayerSummary } from '@/types/match'
+import type { MatchSnapshot, BatterStats, BowlerStats, PartnershipStats, InningsState, InningsStatus, TeamSummary, PlayerSummary } from '@/types/match'
 
 export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot | null> {
   // Fetch match + teams in one query
