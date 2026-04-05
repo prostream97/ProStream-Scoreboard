@@ -3,12 +3,14 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'header'
 
 const ELEMENTS: { key: Element; label: string }[] = [
+  { key: 'header', label: 'Header' },
   { key: 'scorebug', label: 'Scorebug' },
   { key: 'playerCard', label: 'Player Card' },
   { key: 'partnership', label: 'Partnership' },
+  { key: 'summary', label: 'Innings Summary' },
   { key: 'ticker', label: 'Ticker' },
 ]
 

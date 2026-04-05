@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
 import { StandardScorebug } from '@/components/overlay/StandardScorebug'
@@ -8,7 +8,10 @@ import { BatterCard, BowlerCard } from '@/components/overlay/PlayerCard'
 import { WicketAlert } from '@/components/overlay/WicketAlert'
 import { PartnershipOverlay } from '@/components/overlay/PartnershipOverlay'
 import { BoundaryAlert } from '@/components/overlay/BoundaryAlert'
+import { InningsSummaryOverlay } from '@/components/overlay/InningsSummaryOverlay'
+import { HeaderOverlay } from '@/components/overlay/HeaderOverlay'
 import type { MatchSnapshot, InningsState } from '@/types/match'
+import type { InningsSummaryData } from '@/lib/db/queries/match'
 import type {
   DeliveryAddedPayload,
   WicketPayload,
@@ -30,8 +33,18 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
 
   // Per-element visibility states
   const [scorebugVisible, setScorebugVisible] = useState(false)
+  const [headerVisible, setHeaderVisible] = useState(false)
   const [cardVisible, setCardVisible] = useState(false)
   const [partnershipVisible, setPartnershipVisible] = useState(false)
+  const [summaryVisible, setSummaryVisible] = useState(false)
+  const [inningsSummaries, setInningsSummaries] = useState<InningsSummaryData[]>([])
+
+  const fetchSummaries = useCallback(() => {
+    fetch(`/api/match/${matchId}/innings-summary`)
+      .then((r) => r.json())
+      .then((data: InningsSummaryData[]) => setInningsSummaries(data))
+      .catch(() => {})
+  }, [matchId])
 
   // Reconnect recovery
   useEffect(() => {
@@ -39,7 +52,8 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => setSnapshot(fresh))
       .catch(() => {})
-  }, [matchId])
+    fetchSummaries()
+  }, [matchId, fetchSummaries])
 
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
     if (data.runs === 4 || data.runs === 6) {
@@ -179,15 +193,18 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => setSnapshot({ ...fresh, currentOverBalls: [] }))
       .catch(() => {})
+    fetchSummaries()
   })
 
   useEvent(`match-${matchId}`, 'display.toggle', (data: DisplayTogglePayload) => {
     if (data.element === 'scorebug') setScorebugVisible(data.visible)
+    if (data.element === 'header') setHeaderVisible(data.visible)
     if (data.element === 'playerCard') {
       setCardVisible(data.visible)
       if (data.playerId) setActivePlayerId(data.playerId)
     }
     if (data.element === 'partnership') setPartnershipVisible(data.visible)
+    if (data.element === 'summary') setSummaryVisible(data.visible)
   })
 
   useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
@@ -225,13 +242,25 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* Full-screen alerts — auto-triggered by delivery events */}
+      {/* Innings Summary — centered in canvas, below full-screen alerts */}
+      <AnimatePresence>
+        {summaryVisible && (
+          <InningsSummaryOverlay snapshot={snapshot} inningsSummaries={inningsSummaries} />
+        )}
+      </AnimatePresence>
+
+      {/* Full-screen alerts — auto-triggered by delivery events, on top of summary */}
       <BoundaryAlert boundary={lastBoundary} snapshot={snapshot} />
       <WicketAlert wicket={lastWicket} snapshot={snapshot} />
 
-      {/* Scorebug — bottom center */}
+      {/* Header — top of canvas, mutually exclusive with scorebug */}
       <AnimatePresence>
-        {scorebugVisible && <StandardScorebug snapshot={snapshot} />}
+        {headerVisible && <HeaderOverlay snapshot={snapshot} tournamentName={snapshot.tournamentName ?? ''} />}
+      </AnimatePresence>
+
+      {/* Scorebug — bottom center, hidden when header is active */}
+      <AnimatePresence>
+        {scorebugVisible && !headerVisible && <StandardScorebug snapshot={snapshot} />}
       </AnimatePresence>
 
       {/* Player card — bottom-left, above scorebug */}

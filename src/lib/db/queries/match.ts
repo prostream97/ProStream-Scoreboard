@@ -12,6 +12,7 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
       awayTeam: true,
       state: true,
       innings: true,
+      tournament: true,
     },
   })
 
@@ -91,6 +92,7 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     format: matchRow.format,
     status: matchRow.status,
     venue: matchRow.venue,
+    tournamentName: matchRow.tournament?.name ?? null,
     totalOvers: matchRow.totalOvers,
     ballsPerOver: matchRow.ballsPerOver ?? 6,
     homeTeam,
@@ -250,6 +252,55 @@ async function getPartnershipStats(
     batter1Id: strikerId,
     batter2Id: nonStrikerId,
   }
+}
+
+export type InningsSummaryData = {
+  inningsNumber: 1 | 2
+  battingTeamId: number
+  bowlingTeamId: number
+  totalRuns: number
+  wickets: number
+  overs: number
+  balls: number
+  target: number | null
+  status: InningsStatus
+  topBatters: BatterStats[]
+  topBowlers: BowlerStats[]
+}
+
+export async function getInningsSummaries(matchId: number): Promise<InningsSummaryData[]> {
+  const matchRow = await db.query.matches.findFirst({
+    where: eq(matches.id, matchId),
+    with: { innings: true, state: true },
+  })
+  if (!matchRow) return []
+
+  const bpo = matchRow.ballsPerOver ?? 6
+  const state = matchRow.state
+
+  return Promise.all(
+    matchRow.innings.map(async (inn) => {
+      const [topBatters, topBowlers] = await Promise.all([
+        getBatterStats(inn.id, state?.strikerId ?? null),
+        getBowlerStats(inn.id, state?.currentBowlerId ?? null, bpo),
+      ])
+      return {
+        inningsNumber: inn.inningsNumber as 1 | 2,
+        battingTeamId: inn.battingTeamId,
+        bowlingTeamId: inn.bowlingTeamId,
+        totalRuns: inn.totalRuns,
+        wickets: inn.wickets,
+        overs: inn.overs,
+        balls: inn.balls,
+        target: inn.target,
+        status: inn.status as InningsStatus,
+        topBatters: [...topBatters].sort((a, b) => b.runs - a.runs).slice(0, 5),
+        topBowlers: [...topBowlers]
+          .sort((a, b) => b.wickets - a.wickets || a.economy - b.economy)
+          .slice(0, 4),
+      }
+    }),
+  )
 }
 
 export async function getMatchList() {

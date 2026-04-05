@@ -6,6 +6,8 @@ type DisplayElements = {
   wicketAlert: boolean
   partnership: boolean
   ticker: boolean
+  summary: boolean
+  header: boolean
 }
 
 // null teamId = add-new mode not yet targeted; set teamId before opening
@@ -43,6 +45,8 @@ export const useUIStore = create<UIStore>((set) => ({
     wicketAlert: false,
     partnership: false,
     ticker: false,
+    summary: false,
+    header: false,
   },
   activePlayerId: null,
   isWicketModalOpen: false,

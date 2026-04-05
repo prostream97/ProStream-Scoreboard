@@ -25,14 +25,3 @@ export async function DELETE(
   await db.delete(teams).where(and(eq(teams.id, teamIdNum), eq(teams.tournamentId, tournamentId)))
   return NextResponse.json({ ok: true })
 }
-
-  const { id, teamId } = await params
-  const tournamentId = parseInt(id, 10)
-  const teamIdNum = parseInt(teamId, 10)
-
-  await db
-    .delete(teams)
-    .where(and(eq(teams.id, teamIdNum), eq(teams.tournamentId, tournamentId)))
-
-  return NextResponse.json({ ok: true })
-}

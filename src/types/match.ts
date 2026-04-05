@@ -120,6 +120,7 @@ export type MatchSnapshot = {
   format: MatchFormat
   status: MatchStatus
   venue: string | null
+  tournamentName: string | null
   totalOvers: number
   ballsPerOver: number
   homeTeam: TeamSummary

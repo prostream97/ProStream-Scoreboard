@@ -50,7 +50,7 @@ export type InningsChangePayload = {
 }
 
 export type DisplayTogglePayload = {
-  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker'
+  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'header'
   visible: boolean
   playerId?: number
 }
