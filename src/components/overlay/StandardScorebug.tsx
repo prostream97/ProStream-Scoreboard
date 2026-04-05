@@ -18,17 +18,24 @@ export function StandardScorebug({ snapshot }: Props) {
   const activeBatters = snapshot.batters.filter(b => !b.isOut)
   type BatterDisplay = Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'>
 
-  // Striker: prefer the one flagged isStriker in the live array; fall back to strikerId squad lookup
+  // Helper: returns true if a playerId is already recorded as dismissed.
+  // Used to guard strikerId/nonStrikerId fallbacks — after a wicket delivery
+  // data.strikerId still points to the dismissed batter, making snapshot.strikerId stale.
+  const isDismissed = (id: number | null) =>
+    id !== null && snapshot.batters.some(b => b.playerId === id && b.isOut)
+
+  // Striker: prefer the one flagged isStriker in the live array; fall back to strikerId squad
+  // lookup only if that player is not already dismissed.
   let batter1: BatterDisplay | undefined = activeBatters.find(b => b.isStriker)
-  if (!batter1 && snapshot.strikerId) {
+  if (!batter1 && snapshot.strikerId && !isDismissed(snapshot.strikerId)) {
     const p = snapshot.battingTeamPlayers.find(pl => pl.id === snapshot.strikerId)
     if (p) batter1 = { displayName: p.displayName, runs: 0, balls: 0, isStriker: true }
   }
 
-  // Non-striker: must be a different player from batter1
+  // Non-striker: must be a different player from the striker and not dismissed.
   const strikerPlayerId = activeBatters.find(b => b.isStriker)?.playerId ?? snapshot.strikerId
-  let batter2: BatterDisplay | undefined = activeBatters.find(b => !b.isOut && b.playerId !== strikerPlayerId)
-  if (!batter2 && snapshot.nonStrikerId && snapshot.nonStrikerId !== strikerPlayerId) {
+  let batter2: BatterDisplay | undefined = activeBatters.find(b => b.playerId !== strikerPlayerId)
+  if (!batter2 && snapshot.nonStrikerId && snapshot.nonStrikerId !== strikerPlayerId && !isDismissed(snapshot.nonStrikerId)) {
     const p = snapshot.battingTeamPlayers.find(pl => pl.id === snapshot.nonStrikerId)
     if (p) batter2 = { displayName: p.displayName, runs: 0, balls: 0, isStriker: false }
   }
