@@ -175,6 +175,7 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
 
   useEvent(`match-${matchId}`, 'wicket.fell', (data: WicketPayload) => {
     setLastWicket(data)
+    setActivePlayerId(null)
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => {
@@ -228,14 +229,14 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
           batter={batter}
           player={player}
           isStriker={pid === snapshot.strikerId}
-          primaryColor={battingTeam.primaryColor}
+          team={battingTeam}
         />
       )
     }
     const bowler = snapshot.bowlers.find((b) => b.isCurrent)
     if (bowler) {
       const player = snapshot.bowlingTeamPlayers.find((p) => p.id === bowler.playerId)
-      return <BowlerCard bowler={bowler} player={player} primaryColor={bowlingTeam.primaryColor} />
+      return <BowlerCard bowler={bowler} player={player} team={bowlingTeam} />
     }
     return null
   }
@@ -263,19 +264,19 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
         {scorebugVisible && !headerVisible && <StandardScorebug snapshot={snapshot} />}
       </AnimatePresence>
 
-      {/* Player card — bottom-left, above scorebug */}
+      {/* Player card — center screen */}
       <AnimatePresence>
         {cardVisible && (
-          <div style={{ position: 'absolute', bottom: 180, left: 0 }}>
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
             {resolveCard()}
           </div>
         )}
       </AnimatePresence>
 
-      {/* Partnership — bottom-left, above scorebug */}
+      {/* Partnership — center screen */}
       <AnimatePresence>
         {partnershipVisible && (
-          <div style={{ position: 'absolute', bottom: 180, left: 0 }}>
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
             <PartnershipOverlay snapshot={snapshot} />
           </div>
         )}

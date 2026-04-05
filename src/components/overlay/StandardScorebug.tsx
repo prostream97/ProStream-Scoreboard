@@ -13,16 +13,22 @@ export function StandardScorebug({ snapshot }: Props) {
   const batting = inn?.battingTeamId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam
   const bowling = inn?.battingTeamId === snapshot.homeTeam.id ? snapshot.awayTeam : snapshot.homeTeam
 
-  // Active batters — fall back to strikerId/nonStrikerId if no deliveries yet
+  // Active batters — resolve striker and non-striker independently so a new
+  // batter (0 balls, not yet in snapshot.batters) is shown immediately.
   const activeBatters = snapshot.batters.filter(b => !b.isOut)
-  let batter1: Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'> | undefined = activeBatters.find(b => b.isStriker) ?? activeBatters[0]
-  let batter2: Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'> | undefined = activeBatters.find(b => !b.isStriker && b.playerId !== batter1?.['playerId' as keyof typeof batter1]) ?? activeBatters[1]
+  type BatterDisplay = Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'>
 
+  // Striker: prefer the one flagged isStriker in the live array; fall back to strikerId squad lookup
+  let batter1: BatterDisplay | undefined = activeBatters.find(b => b.isStriker)
   if (!batter1 && snapshot.strikerId) {
     const p = snapshot.battingTeamPlayers.find(pl => pl.id === snapshot.strikerId)
     if (p) batter1 = { displayName: p.displayName, runs: 0, balls: 0, isStriker: true }
   }
-  if (!batter2 && snapshot.nonStrikerId) {
+
+  // Non-striker: must be a different player from batter1
+  const strikerPlayerId = activeBatters.find(b => b.isStriker)?.playerId ?? snapshot.strikerId
+  let batter2: BatterDisplay | undefined = activeBatters.find(b => !b.isOut && b.playerId !== strikerPlayerId)
+  if (!batter2 && snapshot.nonStrikerId && snapshot.nonStrikerId !== strikerPlayerId) {
     const p = snapshot.battingTeamPlayers.find(pl => pl.id === snapshot.nonStrikerId)
     if (p) batter2 = { displayName: p.displayName, runs: 0, balls: 0, isStriker: false }
   }
@@ -46,17 +52,17 @@ export function StandardScorebug({ snapshot }: Props) {
       // the container has absolute bottom positioning for standard OBS use
       className="absolute bottom-[60px] left-0 w-full flex justify-center"
     >
-      <div data-layer="ScoreBug" className="Scorebug" style={{paddingLeft: 100, paddingRight: 100, paddingTop: 13, paddingBottom: 13, justifyContent: 'flex-start', alignItems: 'center', gap: 13, display: 'inline-flex'}}>
-        
+      <div data-layer="ScoreBug" className="Scorebug" style={{ paddingLeft: 100, paddingRight: 100, paddingTop: 13, paddingBottom: 13, justifyContent: 'flex-start', alignItems: 'center', gap: 13, display: 'inline-flex' }}>
+
         {/* Batting Team Flag */}
-        <div data-layer="Flag Left Wrapper" style={{width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center'}}>
+        <div data-layer="Flag Left Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           {/* Pill */}
-          <div data-layer="Flag Left" className="FlagLeft" style={{position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 92, paddingRight: 16}}>
-            <div data-layer="Gradient" style={{position: 'absolute', right: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(270deg, ${batting.primaryColor}55 0%, transparent 100%)`}} />
-            <div data-layer="TeamName" style={{maxWidth: 110, color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1}}>{batting.name}</div>
+          <div data-layer="Flag Left" className="FlagLeft" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 92, paddingRight: 16 }}>
+            <div data-layer="Gradient" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(270deg, ${batting.primaryColor}55 0%, transparent 100%)` }} />
+            <div data-layer="TeamName" style={{ maxWidth: 110, color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{batting.name}</div>
           </div>
           {/* Floating logo */}
-          <div data-layer="Avatar" style={{position: 'absolute', left: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          <div data-layer="Avatar" style={{ position: 'absolute', left: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {batting.logoCloudinaryId ? (
               <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_78,h_78,f_webp/${batting.logoCloudinaryId}`} alt={batting.name} width={78} height={78} className="object-cover" />
             ) : (
@@ -66,87 +72,90 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Batters */}
-        <div data-layer="Batters" className="Batters" style={{width: 450, height: 65, paddingLeft: 24, paddingRight: 24, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 3, display: 'inline-flex'}}>
+        <div data-layer="Batters" className="Batters" style={{ width: 450, height: 65, paddingLeft: 24, paddingRight: 24, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 3, display: 'inline-flex' }}>
           {batter1 ? (
-              <div data-layer="Container" className="Container" style={{width: 175, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex'}}>
-                <div data-layer="Container" className="Container" style={{justifyContent: 'flex-start', alignItems: 'center', gap: 5, display: 'flex'}}>
-                  <div data-layer="Container" className="Container" style={{width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter1.isStriker ? 1 : 0}}>
-                    <div data-layer="▶" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word'}}>▶</div>
-                  </div>
-                  <div data-layer="BatterName" className="BatterName" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word'}}>{batter1.displayName}</div>
+            <div data-layer="Container" className="Container" style={{ width: 175, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }}>
+              <div data-layer="Container" className="Container" style={{ justifyContent: 'flex-start', alignItems: 'center', gap: 5, display: 'flex' }}>
+                <div data-layer="Container" className="Container" style={{ width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter1.isStriker ? 1 : 0 }}>
+                  <div data-layer="▶" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>▶</div>
                 </div>
-                <div data-layer="Paragraph" className="Paragraph" style={{justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex'}}>
-                  <div data-layer="Runs" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>{batter1.runs} </div>
-                  <div data-layer="Balls" className="Balls" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>({batter1.balls})</div>
-                </div>
+                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>{batter1.displayName}</div>
               </div>
+              <div data-layer="Paragraph" className="Paragraph" style={{ justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex' }}>
+                <div data-layer="Runs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{batter1.runs} </div>
+                <div data-layer="Balls" className="Balls" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>({batter1.balls})</div>
+              </div>
+            </div>
           ) : (
-            <div data-layer="Container" className="Container" style={{width: 175, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex'}} />
+            <div data-layer="Container" className="Container" style={{ width: 175, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }} />
           )}
 
           {batter2 ? (
-              <div data-layer="HorizontalBorder" className="Horizontalborder" style={{width: 175, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex'}}>
-                <div data-layer="Container" className="Container" style={{justifyContent: 'flex-start', alignItems: 'center', gap: 5, display: 'flex'}}>
-                  <div data-layer="Container" className="Container" style={{width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter2.isStriker ? 1 : 0}}>
-                    <div data-layer="▶" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word'}}>▶</div>
-                  </div>
-                  <div data-layer="BatterName" className="BatterName" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word'}}>{batter2.displayName}</div>
+            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{ width: 175, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }}>
+              <div data-layer="Container" className="Container" style={{ justifyContent: 'flex-start', alignItems: 'center', gap: 5, display: 'flex' }}>
+                <div data-layer="Container" className="Container" style={{ width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter2.isStriker ? 1 : 0 }}>
+                  <div data-layer="▶" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>▶</div>
                 </div>
-                <div data-layer="Paragraph" className="Paragraph" style={{justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex'}}>
-                  <div data-layer="Runs" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>{batter2.runs} </div>
-                  <div data-layer="Balls" className="Balls" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>({batter2.balls})</div>
-                </div>
+                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>{batter2.displayName}</div>
               </div>
+              <div data-layer="Paragraph" className="Paragraph" style={{ justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex' }}>
+                <div data-layer="Runs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{batter2.runs} </div>
+                <div data-layer="Balls" className="Balls" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>({batter2.balls})</div>
+              </div>
+            </div>
           ) : (
-            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{width: 175, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex'}} />
+            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{ width: 175, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }} />
           )}
         </div>
 
         {/* Center Score */}
-        <div data-layer="Center Score" className="CenterScore" style={{width: 350, height: 70, position: 'relative', background: 'linear-gradient(169deg, #2A0066 0%, #4B0082 100%)', boxShadow: '0px 0px 20px rgba(255, 0, 229, 0.30)', overflow: 'hidden', borderRadius: 50, outline: '2px #FF00E5 solid', outlineOffset: '-2px'}}>
-          <div data-layer="Container" className="Container" style={{width: 250, height: 42, left: 50, top: 6, position: 'absolute', justifyContent: 'center', alignItems: 'center', gap: 10, display: 'inline-flex'}}>
-            <div data-layer="Background" className="Background" style={{paddingLeft: 14, paddingRight: 14, paddingTop: 1, paddingBottom: 1, background: '#FF00E5', borderRadius: 20, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex'}}>
-              <div data-layer="Score" className="Score" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 24, fontFamily: 'Inter', fontWeight: '900', wordWrap: 'break-word'}}>
-                 {inn?.totalRuns ?? 0}-{inn?.wickets ?? 0}
+        <div data-layer="Center Score" className="CenterScore" style={{ width: 350, height: 70, background: 'linear-gradient(169deg, #2A0066 0%, #4B0082 100%)', boxShadow: '0px 0px 20px rgba(255, 0, 229, 0.30)', overflow: 'hidden', borderRadius: 50, outline: '2px #FF00E5 solid', outlineOffset: '-2px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+          {/* Score row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <div style={{ color: 'white', fontSize: 15, fontFamily: 'Inter', fontWeight: '600' }}>
+              {snapshot.currentInnings === 1 ? '1st Inn' : '2nd Inn'}
+            </div>
+            <div data-layer="Background" className="Background" style={{ paddingLeft: 14, paddingRight: 14, paddingTop: 1, paddingBottom: 1, background: '#FF00E5', borderRadius: 20, display: 'inline-flex', alignItems: 'center' }}>
+              <div data-layer="Score" className="Score" style={{ color: 'white', fontSize: 24, fontFamily: 'Inter', fontWeight: '900' }}>
+                {inn?.totalRuns ?? 0}-{inn?.wickets ?? 0}
               </div>
             </div>
-            <div data-layer="Container" className="Container" style={{flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex'}}>
-              <div data-layer="OVERS" className="Overs" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 14.10, fontFamily: 'Inter', fontWeight: '600', wordWrap: 'break-word'}}>
-                OVERS {snapshot.currentOver ?? 0}.{snapshot.currentBalls ?? 0}
-              </div>
+            <div data-layer="OVERS" className="Overs" style={{ color: 'white', fontSize: 15, fontFamily: 'Inter', fontWeight: '600' }}>
+              OVERS {snapshot.currentOver ?? 0}.{snapshot.currentBalls ?? 0}
             </div>
           </div>
-          <div data-layer="Container" className="Container" style={{left: 0, right: 0, top: 48, position: 'absolute', opacity: 0.85, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, display: 'flex'}}>
-            <div data-layer="RUN RATE" className="RunRate" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 9.90, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, wordWrap: 'break-word'}}>
+          {/* Run rate row */}
+          <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, opacity: 0.85 }}>
+            <div data-layer="RUN RATE" className="RunRate" style={{ color: 'white', fontSize: 9.90, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50 }}>
               RUN RATE {snapshot.currentRunRate.toFixed(2)}
             </div>
             {snapshot.currentInnings === 2 && snapshot.requiredRunRate !== null && (
-              <div data-layer="REQUIRED RATE" className="RequiredRate" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 9.90, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, wordWrap: 'break-word'}}>
-                  REQ RATE {snapshot.requiredRunRate.toFixed(2)}
+              <div data-layer="REQUIRED RATE" className="RequiredRate" style={{ color: 'white', fontSize: 9.90, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50 }}>
+                REQ RATE {snapshot.requiredRunRate.toFixed(2)}
               </div>
             )}
             {snapshot.currentInnings === 2 && inn?.target !== null && (
-               <div data-layer="TARGET" className="Target" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: 'white', fontSize: 9.90, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, wordWrap: 'break-word'}}>
-                  TARGET {inn?.target}
+              <div data-layer="TARGET" className="Target" style={{ color: 'white', fontSize: 9.90, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50 }}>
+                TARGET {inn?.target}
               </div>
             )}
           </div>
         </div>
 
         {/* Bowler */}
-        <div data-layer="Bowler" className="Bowler" style={{width: 450, height: 65, paddingLeft: 22, paddingRight: 22, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, justifyContent: 'space-between', alignItems: 'center', display: 'flex'}}>
+        <div data-layer="Bowler" className="Bowler" style={{ width: 450, height: 65, paddingLeft: 22, paddingRight: 22, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, justifyContent: 'space-between', alignItems: 'center', display: 'flex' }}>
           {currentBowler ? (
             <>
-              <div data-layer="Container" className="Container" style={{flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 1, display: 'inline-flex'}}>
-                <div data-layer="Container" className="Container" style={{alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex'}}>
-                  <div data-layer="BowlerName" className="BowlerName" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word'}}>{currentBowler.displayName}</div>
+              <div data-layer="Container" className="Container" style={{ flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 1, display: 'inline-flex' }}>
+                <div data-layer="Container" className="Container" style={{ alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex' }}>
+                  <div data-layer="BowlerName" className="BowlerName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>{currentBowler.displayName}</div>
                 </div>
-                <div data-layer="Paragraph" className="Paragraph" style={{alignSelf: 'stretch', justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'inline-flex'}}>
-                  <div data-layer="WicketsRuns" className="WicketsRuns" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>{currentBowler.wickets}-{currentBowler.runs}  </div>
-                  <div data-layer="Overs" className="Overs" style={{justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word'}}>{currentBowler.overs}.{currentBowler.balls} ov</div>
+                <div data-layer="Paragraph" className="Paragraph" style={{ alignSelf: 'stretch', justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'inline-flex' }}>
+                  <div data-layer="WicketsRuns" className="WicketsRuns" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{currentBowler.wickets}-{currentBowler.runs}  </div>
+                  <div data-layer="Overs" className="Overs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#888888', fontSize: 11.50, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{currentBowler.overs}.{currentBowler.balls} ov</div>
                 </div>
               </div>
-              <div data-layer="Container" className="Container" style={{justifyContent: 'flex-end', alignItems: 'center', gap: 4, display: 'flex'}}>
+              <div data-layer="Container" className="Container" style={{ justifyContent: 'flex-end', alignItems: 'center', gap: 4, display: 'flex' }}>
                 {overBalls.map((ball, i) => {
                   let bg = '#DDDDDD'
                   let label = '·'
@@ -157,7 +166,7 @@ export function StandardScorebug({ snapshot }: Props) {
                   else if (ball.runs === 4) { bg = '#10B981'; label = '4' }
                   else if (ball.runs > 0) { bg = '#2A0066'; label = String(ball.runs) }
                   return (
-                    <div key={i} style={{width: 22, height: 22, borderRadius: 9999, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: 'white', fontFamily: 'Inter'}}>
+                    <div key={i} style={{ width: 22, height: 22, borderRadius: 9999, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: 'white', fontFamily: 'Inter' }}>
                       {label}
                     </div>
                   )
@@ -170,14 +179,14 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Bowling Team Flag */}
-        <div data-layer="Flag Right Wrapper" style={{width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center'}}>
+        <div data-layer="Flag Right Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
           {/* Pill */}
-          <div data-layer="Flag Right" className="FlagRight" style={{position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 92, justifyContent: 'flex-end'}}>
-            <div data-layer="Gradient" style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(90deg, ${bowling.primaryColor}55 0%, transparent 100%)`}} />
-            <div data-layer="TeamName" style={{maxWidth: 110, textAlign: 'right', color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1}}>{bowling.name}</div>
+          <div data-layer="Flag Right" className="FlagRight" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 92, justifyContent: 'flex-end' }}>
+            <div data-layer="Gradient" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(90deg, ${bowling.primaryColor}55 0%, transparent 100%)` }} />
+            <div data-layer="TeamName" style={{ maxWidth: 110, textAlign: 'right', color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{bowling.name}</div>
           </div>
           {/* Floating logo */}
-          <div data-layer="Avatar" style={{position: 'absolute', right: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          <div data-layer="Avatar" style={{ position: 'absolute', right: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {bowling.logoCloudinaryId ? (
               <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_78,h_78,f_webp/${bowling.logoCloudinaryId}`} alt={bowling.name} width={78} height={78} className="object-cover" />
             ) : (

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { Session } from 'next-auth'
 import { auth } from '@/lib/auth/config'
 import { canAccessTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
@@ -7,7 +8,7 @@ import { eq } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
 
-async function resolveAccess(session: Awaited<ReturnType<typeof auth>>, teamId: number) {
+async function resolveAccess(session: Session | null, teamId: number) {
   if (!session) return false
   const team = await db.query.teams.findFirst({ where: eq(teams.id, teamId), columns: { tournamentId: true } })
   if (!team) return null // team not found
