@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth/config'
 import { isAdminSession } from '@/lib/auth/utils'
 import { db } from '@/lib/db'
-import { tournamentAccess } from '@/lib/db/schema'
+import { tournamentAccess, tournaments } from '@/lib/db/schema'
 
 export const runtime = 'nodejs'
 
@@ -23,6 +23,14 @@ export async function DELETE(
 
   if (Number.isNaN(userId) || Number.isNaN(tournamentId)) {
     return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
+  }
+
+  const tournament = await db.query.tournaments.findFirst({
+    where: eq(tournaments.id, tournamentId),
+    columns: { createdBy: true },
+  })
+  if (tournament?.createdBy === userId) {
+    return NextResponse.json({ error: 'Tournament owner cannot be revoked' }, { status: 400 })
   }
 
   await db

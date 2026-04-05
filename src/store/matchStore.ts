@@ -293,6 +293,15 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       },
     })
 
+    await syncLiveMatchState(snapshot.matchId, {
+      strikerId: newStrikerId,
+      nonStrikerId: newNonStrikerId,
+      currentBowlerId: snapshot.currentBowlerId,
+      currentOver: newOvers,
+      currentBalls: remainingBalls,
+      currentOverBuffer: currentOverBalls.slice(get().flushedBallCount).concat(delivery),
+    })
+
     // ── Win detection: batting team reaches target in 2nd innings ──────────────
     const isMatchWon =
       snapshot.currentInnings === 2 &&
@@ -441,6 +450,12 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
             i.inningsNumber === snapshot.currentInnings ? updatedInnings : i
           ),
         },
+      })
+
+      await syncLiveMatchState(snapshot.matchId, {
+        currentOver: updatedInnings.overs,
+        currentBalls: updatedInnings.balls,
+        currentOverBuffer: newBalls.slice(get().flushedBallCount),
       })
     } else if (lastFlushedDeliveryIds.length > 0) {
       // Undo a flushed delivery — requires DB delete
@@ -659,5 +674,27 @@ async function triggerPusherEvent(
     })
   } catch (err) {
     console.error(`Pusher trigger failed for ${event}:`, err)
+  }
+}
+
+async function syncLiveMatchState(
+  matchId: number,
+  payload: {
+    strikerId?: number | null
+    nonStrikerId?: number | null
+    currentBowlerId?: number | null
+    currentOver?: number
+    currentBalls?: number
+    currentOverBuffer?: DeliveryRecord[]
+  },
+) {
+  try {
+    await fetch(`/api/match/${matchId}/state`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  } catch (err) {
+    console.error('Live match state sync failed:', err)
   }
 }

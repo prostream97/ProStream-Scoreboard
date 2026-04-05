@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
-import { isAdminSession } from '@/lib/auth/utils'
-import { canAccessTournament } from '@/lib/auth/access'
+import { canAccessTournament, getTournamentPermissionContext } from '@/lib/auth/access'
 import { db } from '@/lib/db'
 import { tournaments } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
@@ -40,20 +39,13 @@ export async function PATCH(
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const isAdmin = isAdminSession(session)
-  const userId = parseInt(session.user.id, 10)
   const { id } = await params
   const tournamentId = parseInt(id, 10)
 
-  // Non-admins can only update tournaments they own
-  if (!isAdmin) {
-    const existing = await db.query.tournaments.findFirst({
-      where: eq(tournaments.id, tournamentId),
-      columns: { createdBy: true },
-    })
-    if (!existing || existing.createdBy !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+  const ctx = await getTournamentPermissionContext(session, tournamentId)
+  if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!ctx.canEditTournament) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await req.json() as Record<string, unknown>

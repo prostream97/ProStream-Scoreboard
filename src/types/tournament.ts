@@ -1,5 +1,22 @@
 export type TournamentStatus = 'upcoming' | 'group_stage' | 'knockout' | 'complete'
 export type MatchStage = 'group' | 'quarter_final' | 'semi_final' | 'final' | 'third_place'
+export type TournamentStagePath = 'semis_only' | 'with_quarters' | null
+
+export type TournamentStageCounts = Record<MatchStage, number>
+
+export type TournamentStageStructure = {
+  path: TournamentStagePath
+  counts: TournamentStageCounts
+  allowedStages: MatchStage[]
+  reasonsByStage: Partial<Record<MatchStage, string>>
+}
+
+export type TournamentUserSummary = {
+  id: number
+  username: string
+  displayName: string
+  photoCloudinaryId: string | null
+}
 
 export type Tournament = {
   id: number
@@ -40,6 +57,9 @@ export type TournamentMatch = {
 }
 
 export type TournamentWithDetails = Tournament & {
+  owner: TournamentUserSummary | null
+  operators: TournamentUserSummary[]
+  stageStructure: TournamentStageStructure
   teams: TournamentTeamSummary[]
   matches: TournamentMatch[]
 }

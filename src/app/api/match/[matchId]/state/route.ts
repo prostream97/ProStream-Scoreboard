@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { matchState } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getMatchSnapshot } from '@/lib/db/queries/match'
+import type { DeliveryBuffer } from '@/lib/db/schema'
 
 export const runtime = 'nodejs'
 
@@ -46,12 +47,18 @@ export async function PATCH(
     strikerId?: number | null
     nonStrikerId?: number | null
     currentBowlerId?: number | null
+    currentOver?: number
+    currentBalls?: number
+    currentOverBuffer?: DeliveryBuffer[]
   }
 
   const patch: Partial<typeof matchState.$inferInsert> = {}
   if ('strikerId' in body) patch.strikerId = body.strikerId ?? null
   if ('nonStrikerId' in body) patch.nonStrikerId = body.nonStrikerId ?? null
   if ('currentBowlerId' in body) patch.currentBowlerId = body.currentBowlerId ?? null
+  if ('currentOver' in body && typeof body.currentOver === 'number') patch.currentOver = body.currentOver
+  if ('currentBalls' in body && typeof body.currentBalls === 'number') patch.currentBalls = body.currentBalls
+  if ('currentOverBuffer' in body) patch.currentOverBuffer = body.currentOverBuffer ?? []
 
   await db.update(matchState).set({ ...patch, lastUpdated: new Date() }).where(eq(matchState.matchId, id))
   return NextResponse.json({ ok: true })

@@ -3,12 +3,13 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'mostWickets'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'scorebug', label: 'Scorebug' },
   { key: 'playerCard', label: 'Player Card' },
   { key: 'partnership', label: 'Partnership' },
+  { key: 'mostWickets', label: 'Most Wickets' },
   { key: 'ticker', label: 'Ticker' },
 ]
 
@@ -55,13 +56,16 @@ export function DisplayControls() {
     ?? snapshot.battingTeamPlayers.find((p) => p.id === snapshot.nonStrikerId)
   const currentBowler = snapshot.bowlers.find((b) => b.isCurrent)
     ?? snapshot.bowlingTeamPlayers.find((p) => p.id === snapshot.currentBowlerId)
+  const visibleElements = snapshot.tournamentId
+    ? ELEMENTS
+    : ELEMENTS.filter(({ key }) => key !== 'mostWickets')
 
   return (
     <div className="bg-gray-900 border-t border-gray-800 px-6 py-3">
       <p className="font-stats text-xs text-gray-500 uppercase tracking-wider mb-3">Overlays</p>
       <div className="flex flex-wrap gap-2">
         {/* Toggle buttons */}
-        {ELEMENTS.map(({ key, label }) => (
+        {visibleElements.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => toggle(key)}

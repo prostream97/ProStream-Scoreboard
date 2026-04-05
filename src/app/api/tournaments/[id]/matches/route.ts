@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { getBattingFirstTeamId } from '@/lib/auth/utils'
-import { canAccessTournament } from '@/lib/auth/access'
+import { canEditTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
 import { matches, matchState, innings, tournaments, teams } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import type { MatchStage } from '@/types/tournament'
+import { buildTournamentStageStructure, MATCH_STAGE_ORDER } from '@/lib/tournament/stageRules'
 
 export const runtime = 'nodejs'
+
+function isMatchStage(value: unknown): value is MatchStage {
+  return typeof value === 'string' && MATCH_STAGE_ORDER.includes(value as MatchStage)
+}
 
 export async function POST(
   req: NextRequest,
@@ -18,7 +24,7 @@ export async function POST(
   const { id } = await params
   const tournamentId = parseInt(id, 10)
 
-  if (!await canAccessTournament(session, tournamentId)) {
+  if (!await canEditTournament(session, tournamentId)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -40,6 +46,10 @@ export async function POST(
     matchStage = 'group',
     matchLabel,
   } = body
+
+  if (!isMatchStage(matchStage)) {
+    return NextResponse.json({ error: 'Invalid match stage' }, { status: 400 })
+  }
 
   if (!homeTeamId || !awayTeamId) {
     return NextResponse.json({ error: 'homeTeamId and awayTeamId are required' }, { status: 400 })
@@ -63,6 +73,22 @@ export async function POST(
     )
   }
 
+  const existingMatches = await db.query.matches.findMany({
+    where: eq(matches.tournamentId, tournamentId),
+    columns: {
+      matchStage: true,
+      status: true,
+    },
+  })
+
+  const stageStructure = buildTournamentStageStructure(existingMatches)
+  if (!stageStructure.allowedStages.includes(matchStage)) {
+    return NextResponse.json(
+      { error: stageStructure.reasonsByStage[matchStage] ?? 'This match stage is not available right now.' },
+      { status: 400 },
+    )
+  }
+
   try {
     const [match] = await db
       .insert(matches)
@@ -78,7 +104,7 @@ export async function POST(
         tossDecision: tossDecision ?? null,
         status: 'setup',
         tournamentId,
-        matchStage: matchStage ?? null,
+        matchStage,
         matchLabel: matchLabel ?? null,
       })
       .returning()

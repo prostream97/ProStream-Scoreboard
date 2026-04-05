@@ -76,19 +76,17 @@ export async function POST(req: NextRequest) {
         ballsPerOver,
         logoCloudinaryId: logoCloudinaryId || null,
         status: 'upcoming',
-        createdBy: isAdmin ? null : userId,
+        createdBy: userId,
         matchDaysFrom: !isAdmin ? body.match_days_from : (body.match_days_from ?? null),
         matchDaysTo: !isAdmin ? body.match_days_to : (body.match_days_to ?? null),
       })
       .returning()
 
     // Auto-insert tournament_access so existing grant-based checks also pass
-    if (!isAdmin) {
-      await db
-        .insert(tournamentAccess)
-        .values({ userId, tournamentId: tournament.id, grantedBy: null })
-        .onConflictDoNothing()
-    }
+    await db
+      .insert(tournamentAccess)
+      .values({ userId, tournamentId: tournament.id, grantedBy: null })
+      .onConflictDoNothing()
 
     return NextResponse.json(tournament, { status: 201 })
   } catch (err) {

@@ -1,7 +1,58 @@
 import { db } from '@/lib/db'
-import { tournaments, matches, teams, tournamentAccess } from '@/lib/db/schema'
+import { tournaments, matches, teams, tournamentAccess, users } from '@/lib/db/schema'
 import { eq, and, inArray, desc, asc } from 'drizzle-orm'
-import type { TournamentWithDetails, StandingRow } from '@/types/tournament'
+import type { TournamentWithDetails, StandingRow, TournamentUserSummary } from '@/types/tournament'
+import { buildTournamentStageStructure } from '@/lib/tournament/stageRules'
+
+type TournamentAccessData = {
+  owner: TournamentUserSummary | null
+  operators: TournamentUserSummary[]
+}
+
+export async function getTournamentAccessData(
+  tournamentId: number,
+): Promise<TournamentAccessData | null> {
+  const tournamentRow = await db.query.tournaments.findFirst({
+    where: eq(tournaments.id, tournamentId),
+    columns: { createdBy: true },
+  })
+
+  if (!tournamentRow) return null
+
+  const [ownerRow, accessRows] = await Promise.all([
+    tournamentRow.createdBy
+      ? db.query.users.findFirst({
+          where: eq(users.id, tournamentRow.createdBy),
+          columns: {
+            id: true,
+            username: true,
+            displayName: true,
+            photoCloudinaryId: true,
+          },
+        })
+      : null,
+    db
+      .select({
+        id: users.id,
+        username: users.username,
+        displayName: users.displayName,
+        photoCloudinaryId: users.photoCloudinaryId,
+      })
+      .from(tournamentAccess)
+      .innerJoin(users, eq(users.id, tournamentAccess.userId))
+      .where(eq(tournamentAccess.tournamentId, tournamentId)),
+  ])
+
+  const owner = ownerRow ?? null
+  const operators = accessRows
+    .filter((row) => row.id !== owner?.id)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+
+  return {
+    owner,
+    operators,
+  }
+}
 
 export async function getTournamentList() {
   return db.query.tournaments.findMany({
@@ -24,7 +75,7 @@ export async function getAccessibleTournaments(userId: number) {
 }
 
 export async function getTournamentListWithCounts(userId?: number) {
-  // userId provided → filter to operator's accessible tournaments only
+  // userId provided -> filter to operator's accessible tournaments only
   let rows
   if (userId !== undefined) {
     const [ownedRows, grantedRows] = await Promise.all([
@@ -103,6 +154,30 @@ export async function getTournamentWithDetails(
 
   if (!row) return null
 
+  const accessData = await getTournamentAccessData(tournamentId)
+  const tournamentMatches = row.matches.map((m) => ({
+    id: m.id,
+    format: m.format,
+    status: m.status,
+    venue: m.venue ?? null,
+    date: m.date.toISOString(),
+    totalOvers: m.totalOvers,
+    matchStage: m.matchStage ?? null,
+    matchLabel: m.matchLabel ?? null,
+    homeTeam: {
+      id: m.homeTeam.id,
+      name: m.homeTeam.name,
+      shortCode: m.homeTeam.shortCode,
+      primaryColor: m.homeTeam.primaryColor,
+    },
+    awayTeam: {
+      id: m.awayTeam.id,
+      name: m.awayTeam.name,
+      shortCode: m.awayTeam.shortCode,
+      primaryColor: m.awayTeam.primaryColor,
+    },
+  }))
+
   return {
     id: row.id,
     name: row.name,
@@ -116,6 +191,14 @@ export async function getTournamentWithDetails(
     matchDaysFrom: row.matchDaysFrom ?? null,
     matchDaysTo: row.matchDaysTo ?? null,
     createdAt: row.createdAt.toISOString(),
+    owner: accessData?.owner ?? null,
+    operators: accessData?.operators ?? [],
+    stageStructure: buildTournamentStageStructure(
+      tournamentMatches.map((match) => ({
+        matchStage: match.matchStage,
+        status: match.status,
+      })),
+    ),
     teams: row.teams.map((t) => ({
       id: t.id,
       tournamentId: t.tournamentId,
@@ -125,28 +208,7 @@ export async function getTournamentWithDetails(
       secondaryColor: t.secondaryColor,
       logoCloudinaryId: t.logoCloudinaryId ?? null,
     })),
-    matches: row.matches.map((m) => ({
-      id: m.id,
-      format: m.format,
-      status: m.status,
-      venue: m.venue ?? null,
-      date: m.date.toISOString(),
-      totalOvers: m.totalOvers,
-      matchStage: m.matchStage ?? null,
-      matchLabel: m.matchLabel ?? null,
-      homeTeam: {
-        id: m.homeTeam.id,
-        name: m.homeTeam.name,
-        shortCode: m.homeTeam.shortCode,
-        primaryColor: m.homeTeam.primaryColor,
-      },
-      awayTeam: {
-        id: m.awayTeam.id,
-        name: m.awayTeam.name,
-        shortCode: m.awayTeam.shortCode,
-        primaryColor: m.awayTeam.primaryColor,
-      },
-    })),
+    matches: tournamentMatches,
   }
 }
 

@@ -3,7 +3,7 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'header'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'header' | 'mostWickets'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'header', label: 'Header' },
@@ -11,6 +11,7 @@ const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'playerCard', label: 'Player Card' },
   { key: 'partnership', label: 'Partnership' },
   { key: 'summary', label: 'Innings Summary' },
+  { key: 'mostWickets', label: 'Most Wickets' },
   { key: 'ticker', label: 'Ticker' },
 ]
 
@@ -57,6 +58,9 @@ export function OverlayPanel() {
     ?? snapshot.battingTeamPlayers.find((p) => p.id === snapshot.nonStrikerId)
   const currentBowler = snapshot.bowlers.find((b) => b.isCurrent)
     ?? snapshot.bowlingTeamPlayers.find((p) => p.id === snapshot.currentBowlerId)
+  const visibleElements = snapshot.tournamentId
+    ? ELEMENTS
+    : ELEMENTS.filter(({ key }) => key !== 'mostWickets')
 
   return (
     <div className="bg-gray-900 rounded-xl p-4 h-full flex flex-col gap-4 overflow-hidden">
@@ -64,7 +68,7 @@ export function OverlayPanel() {
 
       {/* Toggle buttons */}
       <div className="flex flex-col gap-2">
-        {ELEMENTS.map(({ key, label }) => (
+        {visibleElements.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => toggle(key)}

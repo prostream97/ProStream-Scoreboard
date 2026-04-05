@@ -8,6 +8,7 @@ type DisplayElements = {
   ticker: boolean
   summary: boolean
   header: boolean
+  mostWickets: boolean
 }
 
 // null teamId = add-new mode not yet targeted; set teamId before opening
@@ -47,6 +48,7 @@ export const useUIStore = create<UIStore>((set) => ({
     ticker: false,
     summary: false,
     header: false,
+    mostWickets: false,
   },
   activePlayerId: null,
   isWicketModalOpen: false,

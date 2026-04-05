@@ -10,8 +10,9 @@ import { PartnershipOverlay } from '@/components/overlay/PartnershipOverlay'
 import { BoundaryAlert } from '@/components/overlay/BoundaryAlert'
 import { InningsSummaryOverlay } from '@/components/overlay/InningsSummaryOverlay'
 import { HeaderOverlay } from '@/components/overlay/HeaderOverlay'
+import { MostWicketsOverlay } from '@/components/overlay/MostWicketsOverlay'
 import type { MatchSnapshot, InningsState } from '@/types/match'
-import type { InningsSummaryData } from '@/lib/db/queries/match'
+import type { InningsSummaryData, TournamentMostWicketsData } from '@/lib/db/queries/match'
 import type {
   DeliveryAddedPayload,
   WicketPayload,
@@ -23,9 +24,10 @@ import type {
 type Props = {
   matchId: number
   initialSnapshot: MatchSnapshot
+  initialMostWickets: TournamentMostWicketsData | null
 }
 
-function OverlayInner({ matchId, initialSnapshot }: Props) {
+function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(initialSnapshot)
   const [lastWicket, setLastWicket] = useState<WicketPayload | null>(null)
   const [lastBoundary, setLastBoundary] = useState<{ id: number; runs: 4 | 6 } | null>(null)
@@ -37,7 +39,9 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
   const [cardVisible, setCardVisible] = useState(false)
   const [partnershipVisible, setPartnershipVisible] = useState(false)
   const [summaryVisible, setSummaryVisible] = useState(false)
+  const [mostWicketsVisible, setMostWicketsVisible] = useState(false)
   const [inningsSummaries, setInningsSummaries] = useState<InningsSummaryData[]>([])
+  const [mostWicketsData, setMostWicketsData] = useState<TournamentMostWicketsData | null>(initialMostWickets)
 
   const fetchSummaries = useCallback(() => {
     fetch(`/api/match/${matchId}/innings-summary`)
@@ -46,6 +50,21 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
       .catch(() => {})
   }, [matchId])
 
+  const fetchMostWickets = useCallback(() => {
+    if (!snapshot.tournamentId) {
+      setMostWicketsData(null)
+      return
+    }
+
+    fetch(`/api/match/${matchId}/tournament-most-wickets`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Failed to fetch most wickets')
+        return r.json()
+      })
+      .then((data: TournamentMostWicketsData) => setMostWicketsData(data))
+      .catch(() => {})
+  }, [matchId, snapshot.tournamentId])
+
   // Reconnect recovery
   useEffect(() => {
     fetch(`/api/match/${matchId}/state`)
@@ -53,12 +72,18 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
       .then((fresh: MatchSnapshot) => setSnapshot(fresh))
       .catch(() => {})
     fetchSummaries()
-  }, [matchId, fetchSummaries])
+    fetchMostWickets()
+  }, [matchId, fetchSummaries, fetchMostWickets])
+
+  useEffect(() => {
+    if (mostWicketsVisible) fetchMostWickets()
+  }, [mostWicketsVisible, fetchMostWickets])
 
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
     if (data.runs === 4 || data.runs === 6) {
       setLastBoundary({ id: Date.now(), runs: data.runs as 4 | 6 })
     }
+    if (mostWicketsVisible) fetchMostWickets()
 
     setSnapshot((s) => {
       const updatedInnings: InningsState[] = s.innings.map((inn) =>
@@ -176,6 +201,7 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
   useEvent(`match-${matchId}`, 'wicket.fell', (data: WicketPayload) => {
     setLastWicket(data)
     setActivePlayerId(null)
+    if (mostWicketsVisible) fetchMostWickets()
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => {
@@ -195,6 +221,7 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
       .then((fresh: MatchSnapshot) => setSnapshot({ ...fresh, currentOverBalls: [] }))
       .catch(() => {})
     fetchSummaries()
+    if (mostWicketsVisible) fetchMostWickets()
   })
 
   useEvent(`match-${matchId}`, 'display.toggle', (data: DisplayTogglePayload) => {
@@ -206,6 +233,7 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
     }
     if (data.element === 'partnership') setPartnershipVisible(data.visible)
     if (data.element === 'summary') setSummaryVisible(data.visible)
+    if (data.element === 'mostWickets') setMostWicketsVisible(data.visible)
   })
 
   useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
@@ -247,6 +275,12 @@ function OverlayInner({ matchId, initialSnapshot }: Props) {
       <AnimatePresence>
         {summaryVisible && (
           <InningsSummaryOverlay snapshot={snapshot} inningsSummaries={inningsSummaries} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mostWicketsVisible && mostWicketsData && (
+          <MostWicketsOverlay data={mostWicketsData} />
         )}
       </AnimatePresence>
 

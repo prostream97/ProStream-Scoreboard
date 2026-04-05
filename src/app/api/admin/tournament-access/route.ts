@@ -48,6 +48,13 @@ export async function POST(req: NextRequest) {
   }
 
   const adminId = parseInt(session.user.id, 10)
+  const targetUser = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { id: true, role: true },
+  })
+  if (!targetUser || targetUser.role !== 'operator') {
+    return NextResponse.json({ error: 'Only operator accounts can be granted tournament access' }, { status: 400 })
+  }
 
   try {
     const [row] = await db

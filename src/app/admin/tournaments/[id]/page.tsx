@@ -1,12 +1,20 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Trophy } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
-import type { TournamentWithDetails, StandingRow, TournamentMatch, MatchStage } from '@/types/tournament'
+import { TournamentAccessSection } from '@/components/tournament/TournamentAccessSection'
+import type {
+  MatchStage,
+  StandingRow,
+  TournamentMatch,
+  TournamentStageStructure,
+  TournamentWithDetails,
+} from '@/types/tournament'
 import { getBattingFirstTeamId } from '@/lib/auth/utils'
+import { MATCH_STAGE_LABELS, MATCH_STAGE_ORDER } from '@/lib/tournament/stageRules'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
@@ -17,7 +25,7 @@ const statusColors: Record<string, string> = {
   complete: 'bg-gray-700 text-gray-400',
 }
 
-const matchStageBadge: Record<string, string> = {
+const matchStageBadge: Record<MatchStage, string> = {
   group: 'bg-gray-700 text-gray-400',
   quarter_final: 'bg-purple-500/20 text-purple-400',
   semi_final: 'bg-blue-500/20 text-blue-400',
@@ -33,15 +41,6 @@ const matchStatusColors: Record<string, string> = {
   break: 'bg-orange-500/20 text-orange-400',
 }
 
-const MATCH_STAGES: { value: MatchStage; label: string }[] = [
-  { value: 'group', label: 'Group Stage' },
-  { value: 'quarter_final', label: 'Quarter Final' },
-  { value: 'semi_final', label: 'Semi Final' },
-  { value: 'final', label: 'Final' },
-  { value: 'third_place', label: 'Third Place' },
-]
-
-
 const emptyMatchForm = {
   homeTeamId: '',
   awayTeamId: '',
@@ -51,6 +50,19 @@ const emptyMatchForm = {
   matchLabel: '',
   tossWinnerId: '',
   tossDecision: '' as 'bat' | 'field' | '',
+}
+
+function createEmptyMatchForm(stageStructure?: TournamentStageStructure | null) {
+  return {
+    ...emptyMatchForm,
+    matchStage: stageStructure?.allowedStages[0] ?? emptyMatchForm.matchStage,
+  }
+}
+
+function getStagePathLabel(stageStructure: TournamentStageStructure) {
+  if (stageStructure.path === 'with_quarters') return 'Quarter-finals path'
+  if (stageStructure.path === 'semis_only') return 'Semi-finals path'
+  return 'Open bracket'
 }
 
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -63,10 +75,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [tournament, setTournament] = useState<TournamentWithDetails | null>(null)
   const [standings, setStandings] = useState<StandingRow[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Add match form
   const [showMatchForm, setShowMatchForm] = useState(false)
-  const [matchForm, setMatchForm] = useState(emptyMatchForm)
+  const [matchForm, setMatchForm] = useState(() => createEmptyMatchForm())
   const [addingMatch, setAddingMatch] = useState(false)
   const [matchError, setMatchError] = useState('')
 
@@ -75,12 +85,38 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       fetch(`/api/tournaments/${tournamentId}`),
       fetch(`/api/tournaments/${tournamentId}/standings`),
     ])
-    if (tRes.ok) setTournament(await tRes.json())
-    if (sRes.ok) setStandings(await sRes.json())
+
+    if (tRes.ok) {
+      const tournamentData = await tRes.json() as TournamentWithDetails
+      setTournament(tournamentData)
+    }
+
+    if (sRes.ok) {
+      setStandings(await sRes.json())
+    }
+
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [tournamentId])
+  useEffect(() => {
+    void load()
+  }, [tournamentId])
+
+  useEffect(() => {
+    if (!tournament) return
+
+    if (tournament.stageStructure.allowedStages.length === 0) {
+      setShowMatchForm(false)
+      return
+    }
+
+    if (!tournament.stageStructure.allowedStages.includes(matchForm.matchStage)) {
+      setMatchForm((form) => ({
+        ...form,
+        matchStage: tournament.stageStructure.allowedStages[0],
+      }))
+    }
+  }, [tournament, matchForm.matchStage])
 
   async function handleStatusChange(newStatus: string) {
     const res = await fetch(`/api/tournaments/${tournamentId}`, {
@@ -88,18 +124,35 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
-    if (res.ok) setTournament((t) => t ? { ...t, status: newStatus as TournamentWithDetails['status'] } : t)
+
+    if (res.ok) {
+      setTournament((current) => (
+        current ? { ...current, status: newStatus as TournamentWithDetails['status'] } : current
+      ))
+    }
   }
 
   function handleMatchFormChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
-    setMatchForm((f) => ({ ...f, [name]: value }))
+    setMatchForm((form) => ({ ...form, [name]: value }))
+  }
+
+  function handleToggleMatchForm() {
+    setMatchError('')
+    setShowMatchForm((visible) => {
+      const nextVisible = !visible
+      if (nextVisible && tournament) {
+        setMatchForm(createEmptyMatchForm(tournament.stageStructure))
+      }
+      return nextVisible
+    })
   }
 
   async function handleAddMatch(e: React.FormEvent) {
     e.preventDefault()
     setMatchError('')
     setAddingMatch(true)
+
     try {
       const res = await fetch(`/api/tournaments/${tournamentId}/matches`, {
         method: 'POST',
@@ -121,8 +174,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           }),
         }),
       })
+
       if (res.ok) {
-        setMatchForm(emptyMatchForm)
+        setMatchForm(createEmptyMatchForm(tournament?.stageStructure))
         setShowMatchForm(false)
         await load()
       } else {
@@ -146,15 +200,34 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     return (
       <main className="min-h-screen bg-gray-950 p-8">
         <p className="font-stats text-gray-400">Tournament not found.</p>
-        <Link href="/admin/tournaments" className="text-primary hover:underline font-stats text-sm mt-2 inline-block">← Back</Link>
+        <Link href="/admin/tournaments" className="text-primary hover:underline font-stats text-sm mt-2 inline-block">
+          Back
+        </Link>
       </main>
     )
   }
 
   const tossTeams = [
-    ...(matchForm.homeTeamId ? tournament.teams.filter((t) => t.id === parseInt(matchForm.homeTeamId, 10)) : []),
-    ...(matchForm.awayTeamId ? tournament.teams.filter((t) => t.id === parseInt(matchForm.awayTeamId, 10)) : []),
+    ...(matchForm.homeTeamId ? tournament.teams.filter((team) => team.id === parseInt(matchForm.homeTeamId, 10)) : []),
+    ...(matchForm.awayTeamId ? tournament.teams.filter((team) => team.id === parseInt(matchForm.awayTeamId, 10)) : []),
   ]
+
+  const sessionUserId = isAuthenticated ? parseInt(session.user.id, 10) : null
+  const canManageTournament = isAuthenticated && (
+    isAdmin ||
+    tournament.owner?.id === sessionUserId ||
+    tournament.operators.some((operator) => operator.id === sessionUserId)
+  )
+
+  const stageStructure = tournament.stageStructure
+  const canAddMoreMatches = stageStructure.allowedStages.length > 0
+  const groupedMatches = MATCH_STAGE_ORDER
+    .map((stage) => ({
+      stage,
+      label: MATCH_STAGE_LABELS[stage],
+      matches: tournament.matches.filter((match) => (match.matchStage ?? 'group') === stage),
+    }))
+    .filter((group) => group.matches.length > 0)
 
   const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
   const labelCls = 'block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider'
@@ -162,7 +235,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   return (
     <main className="min-h-screen bg-gray-950 p-8">
       <div className="max-w-3xl mx-auto space-y-8">
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 font-stats text-sm text-gray-500">
           <Link href="/" className="hover:text-gray-300 transition-colors">Dashboard</Link>
           <span>/</span>
@@ -171,14 +243,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           <span className="text-gray-300">{tournament.name}</span>
         </div>
 
-        {/* ── Tab nav ── */}
         <TournamentNav tournamentId={tournamentId} />
 
-        {/* ── Header ── */}
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
-              {/* Tournament logo or fallback */}
               <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-800 flex items-center justify-center border border-gray-700">
                 {tournament.logoCloudinaryId && CLOUD_NAME ? (
                   <img
@@ -191,28 +260,28 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 )}
               </div>
               <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="font-display text-4xl text-primary tracking-wider">{tournament.name}</h1>
-                <span className="font-display text-sm tracking-wider text-gray-500 bg-gray-800 px-2 py-1 rounded">
-                  {tournament.shortName}
-                </span>
-                <span className="font-stats text-xs text-gray-600 bg-gray-800/60 px-2 py-1 rounded font-mono">
-                  TRN-{tournament.id.toString().padStart(3, '0')}
-                </span>
-              </div>
-              <p className="font-stats text-sm text-gray-400 mt-1">
-                {tournament.format} · {tournament.totalOvers} overs
-                {tournament.ballsPerOver !== 6 && (
-                  <span className="ml-1 text-orange-400">({tournament.ballsPerOver} balls/over)</span>
-                )}
-              </p>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="font-display text-4xl text-primary tracking-wider">{tournament.name}</h1>
+                  <span className="font-display text-sm tracking-wider text-gray-500 bg-gray-800 px-2 py-1 rounded">
+                    {tournament.shortName}
+                  </span>
+                  <span className="font-stats text-xs text-gray-600 bg-gray-800/60 px-2 py-1 rounded font-mono">
+                    TRN-{tournament.id.toString().padStart(3, '0')}
+                  </span>
+                </div>
+                <p className="font-stats text-sm text-gray-400 mt-1">
+                  {tournament.format} - {tournament.totalOvers} overs
+                  {tournament.ballsPerOver !== 6 && (
+                    <span className="ml-1 text-orange-400">({tournament.ballsPerOver} balls/over)</span>
+                  )}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <span className={`font-stats text-xs px-2.5 py-1 rounded-full uppercase tracking-wider ${statusColors[tournament.status] ?? statusColors.upcoming}`}>
                 {tournament.status.replace('_', ' ')}
               </span>
-              {isAdmin && (
+              {canManageTournament && (
                 <select
                   value={tournament.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
@@ -228,27 +297,41 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
 
-        {/* ── Teams ── */}
+        <TournamentAccessSection
+          tournamentId={tournamentId}
+          initialOwner={tournament.owner}
+          initialOperators={tournament.operators}
+          canManage={canManageTournament}
+        />
+
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
               Teams ({tournament.teams.length})
             </h2>
-            <Link
-              href={`/admin/tournaments/${tournamentId}/teams`}
-              className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Manage Teams →
-            </Link>
+            {canManageTournament && (
+              <Link
+                href={`/admin/tournaments/${tournamentId}/teams`}
+                className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Manage Teams
+              </Link>
+            )}
           </div>
 
           {tournament.teams.length === 0 ? (
             <p className="font-stats text-xs text-gray-600">
               No teams yet.{' '}
-              <Link href={`/admin/tournaments/${tournamentId}/teams`} className="text-primary hover:underline">
-                Add teams
-              </Link>{' '}
-              to get started.
+              {canManageTournament ? (
+                <>
+                  <Link href={`/admin/tournaments/${tournamentId}/teams`} className="text-primary hover:underline">
+                    Add teams
+                  </Link>{' '}
+                  to get started.
+                </>
+              ) : (
+                'Teams can be added by the owner or tournament operators.'
+              )}
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -263,7 +346,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   ) : (
                     <div className="w-6 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: team.primaryColor }} />
                   )}
-                  <span className="font-display text-sm tracking-wider" style={{ color: team.primaryColor }}>{team.shortCode}</span>
+                  <span className="font-display text-sm tracking-wider" style={{ color: team.primaryColor }}>
+                    {team.shortCode}
+                  </span>
                   <span className="font-stats text-xs text-gray-300">{team.name}</span>
                 </div>
               ))}
@@ -271,7 +356,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           )}
         </section>
 
-        {/* ── Standings ── */}
         {tournament.status !== 'upcoming' && (
           <section>
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider mb-3">
@@ -295,9 +379,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     </tr>
                   </thead>
                   <tbody>
-                    {standings.map((row, i) => (
+                    {standings.map((row, index) => (
                       <tr key={row.teamId} className="border-t border-gray-800">
-                        <td className="px-4 py-3 font-stats text-xs text-gray-500">{i + 1}</td>
+                        <td className="px-4 py-3 font-stats text-xs text-gray-500">{index + 1}</td>
                         <td className="px-4 py-3">
                           <span className="font-stats font-semibold text-sm" style={{ color: row.primaryColor }}>
                             {row.teamShortCode}
@@ -310,7 +394,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         <td className="px-3 py-3 text-center font-stats text-sm text-gray-400">{row.tied}</td>
                         <td className="px-3 py-3 text-center font-stats font-semibold text-sm text-white">{row.points}</td>
                         <td className={`px-4 py-3 text-right font-stats text-sm ${row.nrr >= 0 ? 'text-secondary' : 'text-red-400'}`}>
-                          {row.nrr >= 0 ? '+' : ''}{row.nrr.toFixed(3)}
+                          {row.nrr >= 0 ? '+' : ''}
+                          {row.nrr.toFixed(3)}
                         </td>
                       </tr>
                     ))}
@@ -321,30 +406,65 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </section>
         )}
 
-        {/* ── Matches ── */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
               Matches ({tournament.matches.length})
             </h2>
-            {isAuthenticated && tournament.teams.length >= 2 && (
+            {canManageTournament && tournament.teams.length >= 2 && (
               <button
-                onClick={() => { setShowMatchForm((v) => !v); setMatchError('') }}
-                className="px-3 py-1.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors"
+                onClick={handleToggleMatchForm}
+                disabled={!canAddMoreMatches}
+                className="px-3 py-1.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {showMatchForm ? 'Cancel' : '+ Add Match'}
               </button>
             )}
           </div>
 
-          {/* Add match form */}
-          {showMatchForm && isAuthenticated && (
+          {canManageTournament && tournament.teams.length >= 2 && !canAddMoreMatches && (
+            <p className="mb-3 font-stats text-xs text-gray-500">
+              No further match stages are available. The current tournament structure is complete.
+            </p>
+          )}
+
+          {showMatchForm && canManageTournament && (
             <form
               onSubmit={handleAddMatch}
               className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4 space-y-4"
             >
               <div className="text-xs font-stats text-gray-500 bg-gray-800 rounded-lg px-3 py-2">
-                Inheriting <span className="text-gray-300">{tournament.format} · {tournament.totalOvers} overs</span> from tournament
+                Inheriting <span className="text-gray-300">{tournament.format} - {tournament.totalOvers} overs</span> from tournament
+              </div>
+
+              <div className="bg-gray-950/50 border border-gray-800 rounded-lg px-4 py-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-stats text-[11px] uppercase tracking-wider text-gray-500">Bracket Path</span>
+                  <span className="font-stats text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-300">
+                    {getStagePathLabel(stageStructure)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {MATCH_STAGE_ORDER.map((stage) => (
+                    <span
+                      key={stage}
+                      className="font-stats text-[11px] px-2 py-1 rounded-full bg-gray-800 text-gray-400 uppercase tracking-wider"
+                    >
+                      {MATCH_STAGE_LABELS[stage]}: {stageStructure.counts[stage]}
+                    </span>
+                  ))}
+                </div>
+                {MATCH_STAGE_ORDER.some((stage) => Boolean(stageStructure.reasonsByStage[stage])) && (
+                  <div className="space-y-1">
+                    {MATCH_STAGE_ORDER
+                      .filter((stage) => stageStructure.reasonsByStage[stage])
+                      .map((stage) => (
+                        <p key={stage} className="font-stats text-[11px] text-gray-500">
+                          {MATCH_STAGE_LABELS[stage]}: {stageStructure.reasonsByStage[stage]}
+                        </p>
+                      ))}
+                  </div>
+                )}
               </div>
 
               {matchError && <p className="text-red-400 font-stats text-sm">{matchError}</p>}
@@ -355,11 +475,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <select name="homeTeamId" value={matchForm.homeTeamId} onChange={handleMatchFormChange} className={inputCls} required>
                     <option value="">Select team</option>
                     {tournament.teams
-                      .filter((t) => t.id !== parseInt(matchForm.awayTeamId, 10))
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
-                      ))
-                    }
+                      .filter((team) => team.id !== parseInt(matchForm.awayTeamId, 10))
+                      .map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} ({team.shortCode})
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
@@ -367,11 +488,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <select name="awayTeamId" value={matchForm.awayTeamId} onChange={handleMatchFormChange} className={inputCls} required>
                     <option value="">Select team</option>
                     {tournament.teams
-                      .filter((t) => t.id !== parseInt(matchForm.homeTeamId, 10))
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
-                      ))
-                    }
+                      .filter((team) => team.id !== parseInt(matchForm.homeTeamId, 10))
+                      .map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} ({team.shortCode})
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
@@ -380,8 +502,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <div>
                   <label className={labelCls}>Match Stage</label>
                   <select name="matchStage" value={matchForm.matchStage} onChange={handleMatchFormChange} className={inputCls}>
-                    {MATCH_STAGES.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
+                    {MATCH_STAGE_ORDER.map((stage) => (
+                      <option key={stage} value={stage} disabled={!stageStructure.allowedStages.includes(stage)}>
+                        {MATCH_STAGE_LABELS[stage]}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -407,16 +531,18 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <div>
                     <label className={labelCls}>Toss Winner (optional)</label>
                     <select name="tossWinnerId" value={matchForm.tossWinnerId} onChange={handleMatchFormChange} className={inputCls}>
-                      <option value="">— TBD</option>
-                      {tossTeams.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
+                      <option value="">- TBD</option>
+                      {tossTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className={labelCls}>Elected To</label>
                     <select name="tossDecision" value={matchForm.tossDecision} onChange={handleMatchFormChange} className={inputCls}>
-                      <option value="">— TBD</option>
+                      <option value="">- TBD</option>
                       <option value="bat">Bat</option>
                       <option value="field">Field</option>
                     </select>
@@ -426,7 +552,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
               <button
                 type="submit"
-                disabled={addingMatch}
+                disabled={addingMatch || !canAddMoreMatches}
                 className="w-full py-2.5 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 disabled:opacity-40 transition-colors text-sm"
               >
                 {addingMatch ? 'Creating...' : 'Create Match'}
@@ -437,9 +563,23 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           {tournament.matches.length === 0 ? (
             <p className="font-stats text-xs text-gray-600">No matches scheduled yet.</p>
           ) : (
-            <div className="space-y-2">
-              {tournament.matches.map((m) => (
-                <MatchCard key={m.id} match={m} />
+            <div className="space-y-4">
+              {groupedMatches.map((group) => (
+                <div key={group.stage} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-stats text-xs uppercase tracking-wider text-gray-400">
+                      {group.label}
+                    </h3>
+                    <span className="font-stats text-[11px] text-gray-600">
+                      {group.matches.length} match{group.matches.length === 1 ? '' : 'es'}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.matches.map((match) => (
+                      <MatchCard key={match.id} match={match} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -449,21 +589,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   )
 }
 
-
 function MatchCard({ match }: { match: TournamentMatch }) {
-  const stageLabel = match.matchStage
-    ? MATCH_STAGES.find((s) => s.value === match.matchStage)?.label ?? match.matchStage
-    : null
+  const stage = match.matchStage ?? 'group'
+  const stageLabel = MATCH_STAGE_LABELS[stage]
 
   return (
     <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          {match.matchStage && (
-            <span className={`font-stats text-xs px-2 py-0.5 rounded-full uppercase tracking-wider ${matchStageBadge[match.matchStage] ?? matchStageBadge.group}`}>
-              {stageLabel}
-            </span>
-          )}
+          <span className={`font-stats text-xs px-2 py-0.5 rounded-full uppercase tracking-wider ${matchStageBadge[stage]}`}>
+            {stageLabel}
+          </span>
           {match.matchLabel && (
             <span className="font-stats text-xs text-gray-500">{match.matchLabel}</span>
           )}
@@ -477,7 +613,7 @@ function MatchCard({ match }: { match: TournamentMatch }) {
           <span style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
         </p>
         <p className="font-stats text-xs text-gray-500 mt-0.5">
-          {match.venue ?? 'Venue TBD'} · {new Date(match.date).toLocaleDateString()}
+          {match.venue ?? 'Venue TBD'} - {new Date(match.date).toLocaleDateString()}
         </p>
       </div>
       <div className="flex gap-2">

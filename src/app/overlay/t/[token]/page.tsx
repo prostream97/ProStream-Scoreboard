@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { overlayLinks } from '@/lib/db/schema'
-import { getMatchSnapshot } from '@/lib/db/queries/match'
+import { getMatchSnapshot, getTournamentMostWickets } from '@/lib/db/queries/match'
 import { OverlayClient } from '@/app/overlay/[matchId]/OverlayClient'
 
 type Props = {
@@ -18,8 +18,11 @@ export default async function TokenOverlayPage({ params }: Props) {
 
   if (!link) notFound()
 
-  const snapshot = await getMatchSnapshot(link.matchId)
+  const [snapshot, initialMostWickets] = await Promise.all([
+    getMatchSnapshot(link.matchId),
+    getTournamentMostWickets(link.matchId),
+  ])
   if (!snapshot) notFound()
 
-  return <OverlayClient matchId={link.matchId} initialSnapshot={snapshot} />
+  return <OverlayClient matchId={link.matchId} initialSnapshot={snapshot} initialMostWickets={initialMostWickets} />
 }

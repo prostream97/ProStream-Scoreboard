@@ -1,7 +1,9 @@
 import { db } from '@/lib/db'
-import { matches, innings, players, teams, matchState, deliveries } from '@/lib/db/schema'
-import { eq, and, sql, gt, desc } from 'drizzle-orm'
+import { matches, innings, players, teams, matchState, deliveries, users } from '@/lib/db/schema'
+import { eq, and, sql, gt, desc, inArray } from 'drizzle-orm'
 import type { MatchSnapshot, BatterStats, BowlerStats, PartnershipStats, InningsState, InningsStatus, TeamSummary, PlayerSummary } from '@/types/match'
+
+const NON_BOWLER_WICKET_TYPES = new Set(['runout', 'obstructingfield', 'handledball'])
 
 export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot | null> {
   // Fetch match + teams in one query
@@ -92,7 +94,9 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     format: matchRow.format,
     status: matchRow.status,
     venue: matchRow.venue,
+    tournamentId: matchRow.tournament?.id ?? null,
     tournamentName: matchRow.tournament?.name ?? null,
+    tournamentLogoCloudinaryId: matchRow.tournament?.logoCloudinaryId ?? null,
     totalOvers: matchRow.totalOvers,
     ballsPerOver: matchRow.ballsPerOver ?? 6,
     homeTeam,
@@ -266,6 +270,177 @@ export type InningsSummaryData = {
   status: InningsStatus
   topBatters: BatterStats[]
   topBowlers: BowlerStats[]
+}
+
+export type TournamentMostWicketsRow = {
+  rank: number
+  bowlerId: number
+  bowlerName: string
+  teamName: string
+  innings: number
+  balls: number
+  wickets: number
+}
+
+export type TournamentMostWicketsData = {
+  tournament: {
+    id: number
+    name: string
+    shortName: string
+    logoCloudinaryId: string | null
+  }
+  owner: {
+    id: number
+    displayName: string
+    photoCloudinaryId: string | null
+  } | null
+  rows: TournamentMostWicketsRow[]
+}
+
+type MutableMostWicketsRow = Omit<TournamentMostWicketsRow, 'rank'>
+
+function isBowlerCreditedDismissal(dismissalType: string | null | undefined): boolean {
+  return !!dismissalType && !NON_BOWLER_WICKET_TYPES.has(dismissalType)
+}
+
+function sortMostWicketsRows(a: MutableMostWicketsRow, b: MutableMostWicketsRow): number {
+  return (
+    b.wickets - a.wickets ||
+    a.balls - b.balls ||
+    a.innings - b.innings ||
+    a.bowlerName.localeCompare(b.bowlerName)
+  )
+}
+
+export async function getTournamentMostWickets(matchId: number): Promise<TournamentMostWicketsData | null> {
+  const matchRow = await db.query.matches.findFirst({
+    where: eq(matches.id, matchId),
+    with: {
+      tournament: true,
+      state: true,
+      innings: true,
+    },
+  })
+
+  if (!matchRow?.tournamentId || !matchRow.tournament) return null
+
+  const owner = matchRow.tournament.createdBy
+    ? await db.query.users.findFirst({
+        where: eq(users.id, matchRow.tournament.createdBy),
+        columns: {
+          id: true,
+          displayName: true,
+          photoCloudinaryId: true,
+        },
+      })
+    : null
+
+  const persistedRows = await db
+    .select({
+      bowlerId: deliveries.bowlerId,
+      bowlerName: players.displayName,
+      teamName: teams.name,
+      innings: sql<number>`COUNT(DISTINCT ${deliveries.inningsId})`.as('innings'),
+      balls: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isLegal} = true)`.as('balls'),
+      wickets: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isWicket} = true AND ${deliveries.dismissalType} NOT IN ('runout', 'obstructingfield', 'handledball'))`.as('wickets'),
+    })
+    .from(deliveries)
+    .innerJoin(innings, eq(deliveries.inningsId, innings.id))
+    .innerJoin(matches, eq(innings.matchId, matches.id))
+    .innerJoin(players, eq(deliveries.bowlerId, players.id))
+    .innerJoin(teams, eq(players.teamId, teams.id))
+    .where(eq(matches.tournamentId, matchRow.tournamentId))
+    .groupBy(deliveries.bowlerId, players.displayName, teams.name)
+
+  const rowsByBowler = new Map<number, MutableMostWicketsRow>(
+    persistedRows.map((row) => [
+      row.bowlerId,
+      {
+        bowlerId: row.bowlerId,
+        bowlerName: row.bowlerName,
+        teamName: row.teamName,
+        innings: Number(row.innings) || 0,
+        balls: Number(row.balls) || 0,
+        wickets: Number(row.wickets) || 0,
+      },
+    ]),
+  )
+
+  const currentInningsRow = matchRow.innings.find(
+    (inn) => inn.inningsNumber === (matchRow.state?.currentInnings ?? 1),
+  )
+  const liveBuffer = matchRow.state?.currentOverBuffer ?? []
+
+  if (currentInningsRow && liveBuffer.length > 0) {
+    const [bufferMetaRows, currentInningsBowlerRows] = await Promise.all([
+      db
+        .select({
+          id: players.id,
+          bowlerName: players.displayName,
+          teamName: teams.name,
+        })
+        .from(players)
+        .innerJoin(teams, eq(players.teamId, teams.id))
+        .where(inArray(players.id, [...new Set(liveBuffer.map((delivery) => delivery.bowlerId))])),
+      db
+        .select({ bowlerId: deliveries.bowlerId })
+        .from(deliveries)
+        .where(eq(deliveries.inningsId, currentInningsRow.id))
+        .groupBy(deliveries.bowlerId),
+    ])
+
+    const bufferMetaByBowler = new Map(
+      bufferMetaRows.map((row) => [row.id, row]),
+    )
+    const currentInningsBowlers = new Set(
+      currentInningsBowlerRows.map((row) => row.bowlerId),
+    )
+    const liveAdditions = new Map<number, { balls: number; wickets: number }>()
+
+    for (const delivery of liveBuffer) {
+      const agg = liveAdditions.get(delivery.bowlerId) ?? { balls: 0, wickets: 0 }
+      if (delivery.isLegal) agg.balls += 1
+      if (delivery.isWicket && isBowlerCreditedDismissal(delivery.dismissalType)) {
+        agg.wickets += 1
+      }
+      liveAdditions.set(delivery.bowlerId, agg)
+    }
+
+    for (const [bowlerId, addition] of liveAdditions) {
+      const existing = rowsByBowler.get(bowlerId)
+      const meta = existing ? null : bufferMetaByBowler.get(bowlerId)
+      if (!existing && !meta) continue
+
+      rowsByBowler.set(bowlerId, {
+        bowlerId,
+        bowlerName: existing?.bowlerName ?? meta!.bowlerName,
+        teamName: existing?.teamName ?? meta!.teamName,
+        innings: (existing?.innings ?? 0) + (currentInningsBowlers.has(bowlerId) ? 0 : 1),
+        balls: (existing?.balls ?? 0) + addition.balls,
+        wickets: (existing?.wickets ?? 0) + addition.wickets,
+      })
+    }
+  }
+
+  const rows = [...rowsByBowler.values()]
+    .filter((row) => row.wickets > 0)
+    .sort(sortMostWicketsRows)
+    .slice(0, 10)
+    .map((row, index) => ({
+      rank: index + 1,
+      ...row,
+    }))
+
+  return {
+    tournament: {
+      id: matchRow.tournament.id,
+      name: matchRow.tournament.name,
+      shortName: matchRow.tournament.shortName,
+      logoCloudinaryId: matchRow.tournament.logoCloudinaryId ?? null,
+    },
+    owner: owner ?? null,
+    rows,
+  }
 }
 
 export async function getInningsSummaries(matchId: number): Promise<InningsSummaryData[]> {
