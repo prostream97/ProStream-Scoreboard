@@ -5,16 +5,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 import { toast } from 'sonner'
+import { AppBadge } from '@/components/shared/AppPrimitives'
 import type { ExtraType, DeliveryRecord } from '@/types/match'
 
 function ballDotColor(ball: DeliveryRecord): string {
-  if (ball.isWicket) return 'bg-red-500 text-white'
-  if (ball.extraType === 'wide') return 'bg-yellow-500 text-black'
-  if (ball.extraType === 'noball') return 'bg-orange-500 text-black'
-  if (ball.runs === 6) return 'bg-primary text-white'
-  if (ball.runs === 4) return 'bg-secondary text-black'
-  if (ball.runs === 0) return 'bg-gray-700 text-gray-400'
-  return 'bg-gray-600 text-white'
+  if (ball.isWicket) return 'bg-[#ffeceb] text-[#c54e4c]'
+  if (ball.extraType === 'wide') return 'bg-[#fff5e7] text-[#c98010]'
+  if (ball.extraType === 'noball') return 'bg-[#fff1ec] text-[#d07b2b]'
+  if (ball.runs === 6) return 'bg-[#ebf5ff] text-[#2d6fb0]'
+  if (ball.runs === 4) return 'bg-[#e8f7ee] text-[#10994c]'
+  if (ball.runs === 0) return 'bg-[#f4f7f2] text-slate-500'
+  return 'bg-white text-slate-900'
 }
 
 function ballDotLabel(ball: DeliveryRecord): string {
@@ -55,11 +56,11 @@ export function ScoringControls() {
       fielder1Id: null,
       fielder2Id: null,
     })
-    
+
     if (runs === 4 || runs === 6) {
-      toast.success(`${runs} RUNS!`, { description: 'Boundary scored', icon: '🔥' })
+      toast.success(`${runs} RUNS!`, { description: 'Boundary scored' })
     } else {
-      toast(`+${runs} runs scored`, { className: 'bg-gray-800 text-white border-gray-700' })
+      toast(`+${runs} runs scored`)
     }
   }
 
@@ -76,11 +77,9 @@ export function ScoringControls() {
       fielder1Id: null,
       fielder2Id: null,
     })
-    
-    toast(`+${extraRuns} ${type.toUpperCase()}`, { className: 'bg-gray-800 text-gray-300 border-gray-700' })
+    toast(`+${extraRuns} ${type.toUpperCase()}`)
   }
 
-  // Confirm a wide delivery: extraRuns = 1 (penalty) + additional runs
   function confirmWide(additionalRuns: number) {
     if (!isActive) return
     addDelivery({
@@ -94,10 +93,9 @@ export function ScoringControls() {
       fielder2Id: null,
     })
     setPendingExtra(null)
-    toast.warning(`WIDE + ${additionalRuns} runs`, { icon: '⚠️' })
+    toast.warning(`WIDE + ${additionalRuns} runs`)
   }
 
-  // Confirm a no-ball delivery: runs = bat runs, extraRuns = 1 (penalty always)
   function confirmNoBall(batRuns: number) {
     if (!isActive) return
     addDelivery({
@@ -111,10 +109,9 @@ export function ScoringControls() {
       fielder2Id: null,
     })
     setPendingExtra(null)
-    toast.error(`NO BALL + ${batRuns} runs off bat`, { icon: '🚨' })
+    toast.error(`NO BALL + ${batRuns} runs off bat`)
   }
 
-  // Show a toast whenever a sync error is set, with a dismiss+clear action
   useEffect(() => {
     if (!syncError) return
     toast.error(syncError, {
@@ -125,7 +122,6 @@ export function ScoringControls() {
 
   const pendingBalls = currentOverBalls.length - flushedBallCount
 
-  // Keyboard shortcuts — disabled when a pending extra is waiting for confirmation
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return
@@ -141,11 +137,11 @@ export function ScoringControls() {
         case '4': scoreRuns(4); break
         case '6': scoreRuns(6); break
         case 'w':
-        case 'W': 
+        case 'W':
           openWicketModal()
           break
         case 'u':
-        case 'U': 
+        case 'U':
           undoDelivery()
           toast.info('Delivery Undone', { description: 'Last action reverted.' })
           break
@@ -153,86 +149,72 @@ export function ScoringControls() {
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [isActive, pendingExtra, addDelivery, undoDelivery, openWicketModal])
+  }, [pendingExtra, undoDelivery, openWicketModal])
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 flex flex-col gap-3">
-      {/* Header + sync status */}
-      <div className="flex items-center justify-between">
-        <h3 className="font-stats text-xs text-gray-400 uppercase tracking-wider">Scoring</h3>
-        <span className={`font-stats text-[10px] flex items-center gap-1 ${
-          syncError ? 'text-red-400' : isFlushing ? 'text-yellow-400' : pendingBalls > 0 ? 'text-orange-400' : 'text-emerald-500'
-        }`}>
-          {syncError
-            ? '✗ Sync error'
-            : isFlushing
-            ? '⟳ Syncing…'
-            : pendingBalls > 0
-            ? `⚠ ${pendingBalls} unsaved`
-            : '● Synced'}
-        </span>
+    <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="app-kicker">Scoring controls</p>
+          <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Live input pad</h3>
+        </div>
+        <AppBadge tone={syncError ? 'red' : isFlushing ? 'amber' : pendingBalls > 0 ? 'amber' : 'green'}>
+          {syncError ? 'Sync error' : isFlushing ? 'Syncing' : pendingBalls > 0 ? `${pendingBalls} pending` : 'Synced'}
+        </AppBadge>
       </div>
 
-      {/* Over visualizer — current over ball dots */}
-      {currentOverBalls.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
+      {currentOverBalls.length > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
           {currentOverBalls.map((ball, i) => (
             <span
               key={i}
-              className={`inline-flex items-center justify-center rounded-full w-7 h-7 font-stats text-[10px] font-bold ${ballDotColor(ball)} ${i >= flushedBallCount ? 'ring-1 ring-white/20' : 'opacity-60'}`}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold ${ballDotColor(ball)} ${i >= flushedBallCount ? 'ring-2 ring-black/5' : 'opacity-60'}`}
             >
               {ballDotLabel(ball)}
             </span>
           ))}
         </div>
-      )}
+      ) : null}
 
-      {/* Run buttons */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {[0, 1, 2, 3, 4, 6].map((runs) => (
           <motion.button
-            whileTap={isActive && !pendingExtra ? { scale: 0.92 } : undefined}
+            whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
             key={runs}
             onClick={() => scoreRuns(runs)}
             disabled={!isActive || !!pendingExtra}
-            className={`
-              h-14 rounded-lg font-display text-2xl tracking-wider transition-colors shadow-sm
-              disabled:opacity-40 disabled:cursor-not-allowed disabled:saturate-50
-              ${runs === 4
-                ? 'bg-secondary/20 border-2 border-secondary text-secondary hover:bg-secondary/40'
+            className={`h-16 rounded-[1.2rem] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40 ${
+              runs === 4
+                ? 'bg-[#e8f7ee] text-[#10994c]'
                 : runs === 6
-                ? 'bg-primary/20 border-2 border-primary text-primary hover:bg-primary/40'
-                : 'bg-gray-800 border-b-2 border-gray-700 text-white hover:bg-gray-700'
-              }
-            `}
+                  ? 'bg-[#ebf5ff] text-[#2d6fb0]'
+                  : 'bg-[#f4f7f2] text-slate-900'
+            }`}
           >
             {runs}
           </motion.button>
         ))}
       </div>
 
-      {/* ── Extras row OR pending-extra sub-panel ── */}
       <AnimatePresence mode="popLayout">
         {pendingExtra === null ? (
-          /* Normal extras row */
           <motion.div
             key="extras-row"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="grid grid-cols-4 gap-2"
+            className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
           >
             {(
               [
-                { label: 'WD', type: 'wide' as ExtraType, color: 'yellow' },
-                { label: 'NB', type: 'noball' as ExtraType, color: 'orange' },
-                { label: 'BYE', type: 'bye' as ExtraType, color: 'gray' },
-                { label: 'LB', type: 'legbye' as ExtraType, color: 'gray' },
+                { label: 'WD', type: 'wide' as ExtraType, className: 'bg-[#fff5e7] text-[#c98010]' },
+                { label: 'NB', type: 'noball' as ExtraType, className: 'bg-[#fff1ec] text-[#d07b2b]' },
+                { label: 'BYE', type: 'bye' as ExtraType, className: 'bg-[#f4f7f2] text-slate-700' },
+                { label: 'LB', type: 'legbye' as ExtraType, className: 'bg-[#f4f7f2] text-slate-700' },
               ] as const
-            ).map(({ label, type, color }) => (
-              <motion.button
-                whileTap={isActive ? { scale: 0.92 } : undefined}
+            ).map(({ label, type, className }) => (
+              <button
                 key={type}
                 onClick={() => {
                   if (type === 'wide' || type === 'noball') {
@@ -242,136 +224,92 @@ export function ScoringControls() {
                   }
                 }}
                 disabled={!isActive}
-                className={`
-                  h-10 rounded-lg font-stats text-sm font-semibold transition-colors shadow-sm
-                  disabled:opacity-40 disabled:cursor-not-allowed disabled:saturate-50
-                  ${color === 'yellow'
-                    ? 'bg-yellow-600/20 border border-yellow-600 text-yellow-400 hover:bg-yellow-600/40'
-                    : color === 'orange'
-                    ? 'bg-orange-600/20 border border-orange-600 text-orange-400 hover:bg-orange-600/40'
-                    : 'bg-gray-800 border-b-2 border-gray-700 text-gray-300 hover:bg-gray-700'
-                  }
-                `}
+                className={`h-12 rounded-[1.2rem] text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
               >
                 {label}
-              </motion.button>
+              </button>
             ))}
           </motion.div>
         ) : pendingExtra === 'wide' ? (
-          /* Wide sub-panel */
-          <motion.div
-            key="wide-panel"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
-            className="rounded-lg border border-yellow-600/60 bg-yellow-600/20 p-3 flex flex-col gap-2 shadow-[0_0_15px_rgba(202,138,4,0.15)]"
-          >
-            <p className="font-stats text-xs text-yellow-500 uppercase tracking-wider font-semibold">
-              Wide · Additional runs (1 penalty auto-added)
-            </p>
-          <div className="grid grid-cols-5 gap-2">
-            {[0, 1, 2, 3, 4].map((n) => (
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                key={n}
-                onClick={() => confirmWide(n)}
-                className="h-10 rounded-lg font-display text-xl bg-yellow-600/20 border border-yellow-600 text-yellow-300 hover:bg-yellow-600/40 transition-colors shadow-sm"
-              >
-                {n}
-              </motion.button>
-            ))}
-          </div>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setPendingExtra(null)}
-            className="w-full h-8 rounded-lg font-stats text-xs text-yellow-600/70 hover:text-yellow-500 bg-black/20 hover:bg-black/40 transition-colors"
-          >
-            Cancel [Esc]
-          </motion.button>
-        </motion.div>
-      ) : (
-        /* No Ball sub-panel */
-        <motion.div
-          key="noball-panel"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-lg border border-orange-600/60 bg-orange-600/20 p-3 flex flex-col gap-2 shadow-[0_0_15px_rgba(234,88,12,0.15)]"
-        >
-          <p className="font-stats text-xs text-orange-500 uppercase tracking-wider font-semibold">
-            No Ball · Runs off the bat (1 NB penalty auto-added)
-          </p>
-          <div className="grid grid-cols-6 gap-2">
-            {[0, 1, 2, 3, 4, 6].map((n) => (
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                key={n}
-                onClick={() => confirmNoBall(n)}
-                className={`
-                  h-10 rounded-lg font-display text-xl border transition-colors shadow-sm
-                  ${n === 4
-                    ? 'bg-orange-600/20 border-2 border-orange-400 text-orange-300 hover:bg-orange-600/40'
-                    : n === 6
-                    ? 'bg-orange-700/30 border-2 border-orange-300 text-orange-200 hover:bg-orange-600/40'
-                    : 'bg-orange-600/20 border border-orange-600 text-orange-300 hover:bg-orange-600/40'
-                  }
-                `}
-              >
-                {n}
-              </motion.button>
-            ))}
-          </div>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setPendingExtra(null)}
-            className="w-full h-8 rounded-lg font-stats text-xs text-orange-600/70 hover:text-orange-500 bg-black/20 hover:bg-black/40 transition-colors"
-          >
-            Cancel [Esc]
-          </motion.button>
-        </motion.div>
-      )}
+          <ExtraChooser
+            title="Wide - additional runs"
+            toneClass="bg-[#fff5e7] text-[#c98010]"
+            values={[0, 1, 2, 3, 4]}
+            onSelect={confirmWide}
+            onCancel={() => setPendingExtra(null)}
+          />
+        ) : (
+          <ExtraChooser
+            title="No ball - runs off the bat"
+            toneClass="bg-[#fff1ec] text-[#d07b2b]"
+            values={[0, 1, 2, 3, 4, 6]}
+            onSelect={confirmNoBall}
+            onCancel={() => setPendingExtra(null)}
+          />
+        )}
       </AnimatePresence>
 
-      {/* Wicket + Undo */}
-      <div className="grid grid-cols-2 gap-2 mt-1">
-        <motion.button
-          whileTap={isActive && !pendingExtra ? { scale: 0.95 } : undefined}
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <button
           onClick={openWicketModal}
           disabled={!isActive || !!pendingExtra}
-          className="h-12 rounded-lg bg-red-600/20 border-b-4 border-t border-l border-r border-red-600 text-red-500 font-stats font-bold text-lg hover:bg-red-600/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:saturate-50 shadow-sm"
+          className="h-14 rounded-[1.2rem] bg-[#ffeceb] text-sm font-semibold uppercase tracking-[0.18em] text-[#c54e4c] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
-          WICKET
-          <span className="text-xs ml-1.5 opacity-70 font-mono tracking-tighter shadow-inner px-1.5 py-0.5 rounded bg-black/20">W</span>
-        </motion.button>
-        <motion.button
-          whileHover={!pendingExtra ? { x: -2 } : undefined}
-          whileTap={!pendingExtra ? { scale: 0.95 } : undefined}
+          Wicket
+        </button>
+        <button
           onClick={() => { setPendingExtra(null); undoDelivery(); toast.info('Delivery Undone', { description: 'Last action reverted.' }) }}
           disabled={!!pendingExtra}
-          className="h-12 rounded-lg bg-gray-800 border-b-2 border-l border-r border-t border-gray-700 text-gray-300 font-stats font-semibold hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:saturate-50 relative overflow-hidden flex items-center justify-center gap-1.5 shadow-sm"
+          className="h-14 rounded-[1.2rem] bg-[#f4f7f2] text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {/* Subtle icon/text positioning */}
-          UNDO
-          <span className="text-xs opacity-60 font-mono tracking-tighter px-1.5 py-0.5 shadow-inner rounded bg-black/30">U</span>
-        </motion.button>
+          Undo
+        </button>
       </div>
 
-      {/* Keyboard hint */}
-      <p className="font-stats text-xs text-gray-500 text-center flex items-center justify-center gap-2 mt-2">
-        {pendingExtra ? (
-          <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">Esc to cancel</span>
-        ) : (
-          <>
-            <span>Keys: <kbd className="bg-gray-800 px-1 py-0.5 rounded border-b-2 border-gray-700 ml-1">0</kbd> – <kbd className="bg-gray-800 px-1 py-0.5 rounded border-b-2 border-gray-700 leading-none">6</kbd></span>
-            <span className="text-gray-700">•</span>
-            <span><kbd className="bg-red-900/40 text-red-400 px-1 py-0.5 rounded border-b-2 border-red-900/60 leading-none">W</kbd> Wicket</span>
-            <span className="text-gray-700">•</span>
-            <span><kbd className="bg-gray-800 px-1 py-0.5 rounded border-b-2 border-gray-700 leading-none">U</kbd> Undo</span>
-          </>
-        )}
+      <p className="mt-4 text-center text-xs text-slate-500">
+        Shortcuts: 0-6 to score, W for wicket, U to undo, Esc to cancel extra mode.
       </p>
-    </div>
+    </section>
+  )
+}
+
+function ExtraChooser({
+  title,
+  toneClass,
+  values,
+  onSelect,
+  onCancel,
+}: {
+  title: string
+  toneClass: string
+  values: number[]
+  onSelect: (value: number) => void
+  onCancel: () => void
+}) {
+  return (
+    <motion.div
+      key={title}
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.15 }}
+      className={`mt-4 rounded-[1.4rem] p-4 ${toneClass}`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.22em]">{title}</p>
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {values.map((n) => (
+          <button
+            key={n}
+            onClick={() => onSelect(n)}
+            className="h-12 rounded-[1rem] bg-white text-lg font-semibold text-slate-900"
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <button onClick={onCancel} className="mt-3 text-sm font-medium underline">
+        Cancel
+      </button>
+    </motion.div>
   )
 }

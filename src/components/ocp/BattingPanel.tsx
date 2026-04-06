@@ -14,7 +14,6 @@ export function BattingPanel() {
   const { batters, strikerId, nonStrikerId, partnership, battingTeamPlayers, currentInningsState } = snapshot
   const battingTeamId = currentInningsState?.battingTeamId
 
-  // Fall back to squad list when player hasn't faced a ball yet (empty deliveries)
   function resolveOrSynth(playerId: number | null, isStriker: boolean) {
     if (!playerId) return undefined
     const fromStats = batters.find((b) => b.playerId === playerId)
@@ -34,105 +33,90 @@ export function BattingPanel() {
   const nonStriker = resolveOrSynth(nonStrikerId, false)
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 flex flex-col gap-4">
-      <h3 className="font-stats text-xs text-gray-400 uppercase tracking-wider">Batting</h3>
-
-      {/* Striker */}
-      <BatterRow
-        batter={striker}
-        isStriker
-        label="*"
-        headshotId={strikerId ? battingTeamPlayers.find(p => p.id === strikerId)?.headshotCloudinaryId ?? null : null}
-        onEdit={strikerId && battingTeamId ? () => openPlayerEdit(strikerId, battingTeamId) : undefined}
-      />
-
-      {/* Non-striker */}
-      <BatterRow
-        batter={nonStriker}
-        isStriker={false}
-        label=""
-        headshotId={nonStrikerId ? battingTeamPlayers.find(p => p.id === nonStrikerId)?.headshotCloudinaryId ?? null : null}
-        onEdit={nonStrikerId && battingTeamId ? () => openPlayerEdit(nonStrikerId, battingTeamId) : undefined}
-      />
-
-      {/* Partnership */}
-      {partnership && (
-        <div className="mt-auto pt-3 border-t border-gray-800">
-          <p className="font-stats text-xs text-gray-400 uppercase tracking-wider mb-1">Partnership</p>
-          <p className="font-stats text-lg font-semibold text-white">
-            {partnership.runs}
-            <span className="text-gray-400 text-sm font-normal ml-1">
-              ({partnership.balls} balls)
-            </span>
-          </p>
+    <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="app-kicker">Batting</p>
+          <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Current pair</h3>
         </div>
-      )}
-    </div>
+        {partnership ? <span className="text-sm font-medium text-[#10994c]">{partnership.runs} in {partnership.balls}</span> : null}
+      </div>
+
+      <div className="space-y-3">
+        <BatterRow
+          batter={striker}
+          isStriker
+          headshotId={strikerId ? battingTeamPlayers.find((p) => p.id === strikerId)?.headshotCloudinaryId ?? null : null}
+          onEdit={strikerId && battingTeamId ? () => openPlayerEdit(strikerId, battingTeamId) : undefined}
+        />
+        <BatterRow
+          batter={nonStriker}
+          isStriker={false}
+          headshotId={nonStrikerId ? battingTeamPlayers.find((p) => p.id === nonStrikerId)?.headshotCloudinaryId ?? null : null}
+          onEdit={nonStrikerId && battingTeamId ? () => openPlayerEdit(nonStrikerId, battingTeamId) : undefined}
+        />
+      </div>
+    </section>
   )
 }
 
 function BatterRow({
   batter,
   isStriker,
-  label,
   headshotId,
   onEdit,
 }: {
   batter: ReturnType<typeof useMatchStore.getState>['snapshot'] extends null ? undefined : NonNullable<ReturnType<typeof useMatchStore.getState>['snapshot']>['batters'][number] | undefined
   isStriker: boolean
-  label: string
   headshotId: string | null
   onEdit?: () => void
 }) {
   if (!batter) {
     return (
-      <div className="flex items-center gap-2 opacity-30">
-        <div className="w-2 text-primary font-bold">{label}</div>
-        <p className="font-stats text-gray-500">—</p>
+      <div className="rounded-[1.4rem] border border-dashed border-[#d7ddd6] px-4 py-6 text-sm text-slate-500">
+        Waiting for batter selection
       </div>
     )
   }
 
   return (
-    <div
-      className={`relative group rounded-lg p-3 ${isStriker ? 'bg-gray-800 border border-primary/30' : 'bg-gray-850'}`}
-    >
-      <div className="flex items-center gap-3 mb-1">
-        {/* Headshot */}
-        {headshotId
-          ? <img
-              src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_36,h_36,f_webp/${headshotId}`}
-              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-              alt=""
-            />
-          : <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center font-stats text-sm text-gray-300 flex-shrink-0">
-              {batter.displayName[0]?.toUpperCase()}
-            </div>
-        }
-        <div className="flex-1 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-stats font-semibold text-white">
-              {isStriker && <span className="text-primary mr-1">*</span>}
-              {batter.displayName}
-            </span>
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                className="text-red-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10"
-                title="Edit player"
-              >
-                <EditIcon className="w-4 h-4" />
-              </button>
-            )}
+    <div className={`rounded-[1.4rem] border px-4 py-4 ${isStriker ? 'border-[#cce8d4] bg-[#eef8f1]' : 'border-[#e1e7df] bg-[#f8faf7]'}`}>
+      <div className="flex items-start gap-3">
+        {headshotId ? (
+          <img
+            src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_40,h_40,f_webp/${headshotId}`}
+            className="h-10 w-10 rounded-full object-cover"
+            alt=""
+          />
+        ) : (
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-semibold text-slate-500">
+            {batter.displayName[0]?.toUpperCase()}
           </div>
-          <span className="font-display text-2xl text-white">{batter.runs}</span>
+        )}
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-950">
+                {isStriker ? '* ' : ''}{batter.displayName}
+              </p>
+              <p className="text-sm text-slate-500">{batter.isOut ? `b. ${batter.dismissalType}` : 'Not out'}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {onEdit ? (
+                <button onClick={onEdit} className="rounded-full bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]" title="Edit player">
+                  <EditIcon className="h-4 w-4" />
+                </button>
+              ) : null}
+              <p className="text-3xl font-semibold tracking-[-0.05em] text-slate-950">{batter.runs}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
+            <span>{batter.balls}b</span>
+            <span>{batter.fours}x4</span>
+            <span>{batter.sixes}x6</span>
+            <span>SR {batter.strikeRate.toFixed(1)}</span>
+          </div>
         </div>
-      </div>
-      <div className="flex gap-4 font-stats text-xs text-gray-400 pl-12">
-        <span>{batter.balls}b</span>
-        <span>{batter.fours}×4</span>
-        <span>{batter.sixes}×6</span>
-        <span className="ml-auto">SR {batter.strikeRate.toFixed(1)}</span>
       </div>
     </div>
   )

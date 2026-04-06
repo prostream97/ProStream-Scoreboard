@@ -59,6 +59,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'matchId is required' }, { status: 400 })
   }
 
+  const VALID_MODES = ['bug', 'card', 'partnership', 'boundary', 'standard', 'icc2023'] as const
+  if (mode && !VALID_MODES.includes(mode)) {
+    return NextResponse.json({ error: 'Invalid overlay mode' }, { status: 400 })
+  }
+
   const matchIdNum = parseInt(matchId, 10)
 
   // Verify match exists
@@ -130,25 +135,30 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const [link] = await db
-      .insert(overlayLinks)
-      .values({ matchId: matchIdNum, userId, token, mode, label: label || null })
-      .returning()
+    let link: typeof overlayLinks.$inferSelect
+    const newBalance = wallet.balance - price
 
-    const newBalance = wallet!.balance - price
-    await db.insert(walletTransactions).values({
-      walletId: wallet!.id,
-      type: 'deduction',
-      amount: -price,
-      balanceBefore: wallet!.balance,
-      balanceAfter: newBalance,
-      description: `Overlay: ${match.homeTeam.shortCode} vs ${match.awayTeam.shortCode} (${mode})`,
-      referenceId: link.id,
-      createdBy: userId,
+    await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(overlayLinks)
+        .values({ matchId: matchIdNum, userId, token, mode, label: label || null })
+        .returning()
+      link = created
+
+      await tx.insert(walletTransactions).values({
+        walletId: wallet.id,
+        type: 'deduction',
+        amount: -price,
+        balanceBefore: wallet.balance,
+        balanceAfter: newBalance,
+        description: `Overlay: ${match.homeTeam.shortCode} vs ${match.awayTeam.shortCode} (${mode})`,
+        referenceId: created.id,
+        createdBy: userId,
+      })
+      await tx.update(wallets).set({ balance: newBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet.id))
     })
-    await db.update(wallets).set({ balance: newBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet!.id))
 
-    return NextResponse.json({ link, newBalance }, { status: 201 })
+    return NextResponse.json({ link: link!, newBalance }, { status: 201 })
   } catch (error) {
     console.error('Overlay link create error:', error)
     return NextResponse.json({ error: 'Failed to generate overlay URL' }, { status: 500 })

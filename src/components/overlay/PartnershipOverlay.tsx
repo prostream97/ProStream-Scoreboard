@@ -205,11 +205,11 @@ export function PartnershipOverlay({ snapshot }: Props) {
 
           {/* Batter names */}
           <div style={{ position: 'relative', width: '100%', textAlign: 'center' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '0.95rem', fontWeight: 700, color: BLUE, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '0.95rem', fontWeight: 700, color: BLUE, textTransform: 'uppercase', letterSpacing: '0.07em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
               <span style={{ color: RED }}>★ </span>
               {b1?.displayName ?? '—'}
             </p>
-            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 400, color: `${BLUE}88`, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 400, color: `${BLUE}88`, textTransform: 'uppercase', letterSpacing: '0.07em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
               {b2?.displayName ?? '—'}
             </p>
           </div>

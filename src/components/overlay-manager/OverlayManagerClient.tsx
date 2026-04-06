@@ -1,11 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Monitor, Copy, Check, X, ChevronDown, ChevronRight, Loader2, Link2 } from 'lucide-react'
 import type { Tournament, TournamentWithDetails, TournamentMatch } from '@/types/tournament'
+import {
+  AppBadge,
+  AppButton,
+  AppPage,
+  EmptyState,
+  PageHeader,
+  SurfaceCard,
+  appInputClass,
+  appLabelClass,
+} from '@/components/shared/AppPrimitives'
 
-type OverlayMode = 'bug' | 'card' | 'partnership' | 'boundary' | 'standard'
+type OverlayMode = 'bug' | 'card' | 'partnership' | 'boundary' | 'standard' | 'icc2023'
 
 type OverlayLink = {
   id: number
@@ -24,6 +34,7 @@ type MatchPanelState = {
   generating: boolean
   expanded: boolean
   label: string
+  selectedMode: OverlayMode
 }
 
 type Props = {
@@ -37,14 +48,7 @@ const MODE_LABELS: Record<OverlayMode, string> = {
   partnership: 'Partnership',
   boundary: 'Boundary Alert',
   standard: 'Standard',
-}
-
-const matchStatusColors: Record<string, string> = {
-  setup: 'bg-gray-700 text-gray-300',
-  active: 'bg-secondary/20 text-secondary border border-secondary/50',
-  paused: 'bg-yellow-500/20 text-yellow-400',
-  complete: 'bg-gray-700 text-gray-400',
-  break: 'bg-orange-500/20 text-orange-400',
+  icc2023: 'ICC World Cup 2023',
 }
 
 const stageLabels: Record<string, string> = {
@@ -67,7 +71,6 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
   const [matchPanels, setMatchPanels] = useState<Record<number, MatchPanelState>>({})
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
 
-  // Fetch wallet balance (operators only)
   useEffect(() => {
     if (!isAdmin) {
       fetch('/api/wallet/me')
@@ -75,14 +78,12 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
         .then((d) => setBalance(d.balance))
         .catch(() => {})
     }
-    // Fetch pricing for cost display
     fetch('/api/admin/pricing')
       .then((r) => r.json())
       .then((d) => setPricing(d))
       .catch(() => {})
   }, [isAdmin])
 
-  // Load tournament detail on selection change
   useEffect(() => {
     if (!selectedTournamentId) return
     setLoadingTournament(true)
@@ -101,6 +102,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
       generating: false,
       expanded: false,
       label: '',
+      selectedMode: 'standard',
     }
   }
 
@@ -139,7 +141,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           matchId,
-          mode: 'standard',
+          mode: panel.selectedMode ?? 'standard',
           label: panel.label || undefined,
         }),
       })
@@ -151,14 +153,14 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
       try {
         body = await res.json()
       } catch {
-        toast.error('Server error — please try again')
+        toast.error('Server error - please try again')
         return
       }
 
       if (!res.ok) {
         const err = body as ErrorBody
         if (res.status === 402) {
-          toast.error(`Insufficient credits — need ${err.required} LKR, have ${err.balance} LKR`)
+          toast.error(`Insufficient credits - need ${err.required} LKR, have ${err.balance} LKR`)
         } else {
           toast.error(err.error ?? 'Failed to generate URL')
         }
@@ -173,7 +175,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
 
       if (newBalance !== null && newBalance !== undefined) {
         setBalance(newBalance)
-        toast.success(`URL generated — balance: ${newBalance} LKR`)
+        toast.success(`URL generated - balance: ${newBalance} LKR`)
       } else {
         toast.success('Overlay URL generated')
       }
@@ -215,7 +217,6 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
     })
   }
 
-  // Group matches by stage
   const matchesByStage = tournamentDetail?.matches?.reduce<Record<string, TournamentMatch[]>>(
     (acc, m) => {
       const key = m.matchStage ?? 'group'
@@ -229,54 +230,38 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
     !isAdmin && balance !== null && balance < pricing.overlay_per_match
 
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-              <Monitor className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="font-display text-3xl text-primary tracking-wider">Overlay Manager</h1>
-              <p className="font-stats text-sm text-gray-500">Generate & manage OBS overlay URLs</p>
-            </div>
-          </div>
-          {/* Wallet balance (operators only) */}
-          {!isAdmin && balance !== null && (
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-stats text-sm ${
-                insufficientBalance
-                  ? 'border-red-500/40 bg-red-500/10 text-red-400'
-                  : 'border-primary/30 bg-primary/10 text-primary'
-              }`}
-            >
-              <span className="text-base leading-none">◈</span>
-              <span>{balance} LKR</span>
-            </div>
-          )}
-          {isAdmin && (
-            <span className="font-stats text-xs text-gray-500 border border-gray-700 px-2.5 py-1 rounded-full">
-              Admin · Unlimited
-            </span>
-          )}
-        </div>
+    <AppPage className="max-w-7xl">
+      <PageHeader
+        eyebrow="Broadcast links"
+        title="Overlay manager for active tournaments"
+        description="Generate, copy, and revoke overlay URLs with the redesigned app shell while preserving the existing pricing and link lifecycle."
+        actions={
+          !isAdmin && balance !== null ? (
+            <AppBadge tone={insufficientBalance ? 'red' : 'green'}>{balance} LKR available</AppBadge>
+          ) : isAdmin ? (
+            <AppBadge tone="blue">Admin unlimited</AppBadge>
+          ) : null
+        }
+      />
 
-        {/* Tournament Selector */}
-        {tournaments.length === 0 ? (
-          <div className="bg-gray-900 rounded-xl p-8 border border-gray-800 text-center">
-            <p className="font-stats text-gray-500">No active tournaments found.</p>
+      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <SurfaceCard className="space-y-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf5ff] text-[#2d6fb0]">
+            <Monitor className="h-6 w-6" />
           </div>
-        ) : (
-          <>
-            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-              <label className="block text-xs font-stats text-gray-400 mb-2 uppercase tracking-wider">
-                Tournament
-              </label>
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Choose tournament</h2>
+            <p className="mt-1 text-sm text-slate-500">Only active tournaments are shown here.</p>
+          </div>
+          {tournaments.length === 0 ? (
+            <EmptyState title="No active tournaments" description="Start by creating or activating a tournament." />
+          ) : (
+            <div>
+              <label className={appLabelClass}>Tournament</label>
               <select
                 value={selectedTournamentId ?? ''}
                 onChange={(e) => setSelectedTournamentId(parseInt(e.target.value, 10))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm"
+                className={appInputClass}
               >
                 {tournaments.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -285,196 +270,137 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
                 ))}
               </select>
             </div>
+          )}
+        </SurfaceCard>
 
-            {/* Match List */}
-            {loadingTournament ? (
+        <div className="space-y-4">
+          {loadingTournament ? (
+            <SurfaceCard>
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <Loader2 className="h-6 w-6 animate-spin text-[#10994c]" />
               </div>
-            ) : matchesByStage && Object.keys(matchesByStage).length > 0 ? (
-              Object.entries(matchesByStage).map(([stage, stageMatches]) => (
-                <section key={stage}>
-                  <h2 className="font-stats text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    {stageLabels[stage] ?? stage}
-                  </h2>
-                  <div className="space-y-3">
-                    {stageMatches.map((match) => {
-                      const panel = matchPanels[match.id] ?? initPanel(match.id)
-                      return (
-                        <div
-                          key={match.id}
-                          className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden"
+            </SurfaceCard>
+          ) : matchesByStage && Object.keys(matchesByStage).length > 0 ? (
+            Object.entries(matchesByStage).map(([stage, stageMatches]) => (
+              <SurfaceCard key={stage} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="app-kicker">Stage</p>
+                    <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{stageLabels[stage] ?? stage}</h2>
+                  </div>
+                  <AppBadge tone="neutral">{stageMatches.length} matches</AppBadge>
+                </div>
+
+                <div className="space-y-3">
+                  {stageMatches.map((match) => {
+                    const panel = matchPanels[match.id] ?? initPanel(match.id)
+                    const activeCount = panel.links.filter((l) => l.isActive).length
+                    return (
+                      <div key={match.id} className="rounded-[1.5rem] border border-[#e1e7df] bg-[#f8faf7]">
+                        <button
+                          onClick={() => toggleExpand(match.id)}
+                          className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
                         >
-                          {/* Match header — click to expand */}
-                          <button
-                            onClick={() => toggleExpand(match.id)}
-                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 text-left">
-                              <span className="font-display text-lg text-white tracking-wide">
-                                {match.homeTeam.shortCode}
-                                <span className="text-gray-600 mx-1.5 text-base">vs</span>
-                                {match.awayTeam.shortCode}
-                              </span>
-                              {match.matchLabel && (
-                                <span className="font-stats text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">
-                                  {match.matchLabel}
-                                </span>
-                              )}
-                              <span
-                                className={`font-stats text-xs px-2 py-0.5 rounded-full ${
-                                  matchStatusColors[match.status] ?? matchStatusColors.setup
-                                }`}
-                              >
-                                {match.status}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-gray-500">
-                              {panel.links.filter((l) => l.isActive).length > 0 && (
-                                <span className="font-stats text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                                  {panel.links.filter((l) => l.isActive).length} active
-                                </span>
-                              )}
-                              {panel.expanded ? (
-                                <ChevronDown className="w-4 h-4" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4" />
-                              )}
-                            </div>
-                          </button>
+                          <div>
+                            <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
+                              {match.homeTeam.shortCode} <span className="text-slate-300">vs</span> {match.awayTeam.shortCode}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {match.matchLabel ?? 'Match'} . {match.status}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {activeCount > 0 ? <AppBadge tone="green">{activeCount} active</AppBadge> : null}
+                            {panel.expanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
+                          </div>
+                        </button>
 
-                          {/* Expanded panel */}
-                          {panel.expanded && (
-                            <div className="border-t border-gray-800 px-5 py-4 space-y-4">
-                              {/* Generate form */}
-                              <div className="flex items-end gap-3">
-                                <div className="flex-1">
-                                  <label className="block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider">
-                                    Label (optional)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. OBS Main"
-                                    value={panel.label}
-                                    onChange={(e) =>
-                                      updatePanel(match.id, { label: e.target.value })
-                                    }
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-body text-sm focus:outline-none focus:border-primary placeholder-gray-600"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => generateUrl(match.id)}
-                                  disabled={panel.generating || insufficientBalance}
-                                  title={
-                                    insufficientBalance
-                                      ? `Insufficient credits (need ${pricing.overlay_per_match} LKR)`
-                                      : undefined
-                                  }
-                                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-                                >
-                                  {panel.generating ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Link2 className="w-4 h-4" />
-                                  )}
-                                  {isAdmin
-                                    ? 'Generate URL'
-                                    : `Generate · ${pricing.overlay_per_match} LKR`}
-                                </button>
+                        {panel.expanded ? (
+                          <div className="space-y-4 border-t border-[#e1e7df] px-5 py-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                              <div className="flex-1">
+                                <label className={appLabelClass}>Label (optional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. OBS Main"
+                                  value={panel.label}
+                                  onChange={(e) => updatePanel(match.id, { label: e.target.value })}
+                                  className={appInputClass}
+                                />
                               </div>
+                              <div>
+                                <label className={appLabelClass}>Theme</label>
+                                <select
+                                  value={panel.selectedMode ?? 'standard'}
+                                  onChange={(e) => updatePanel(match.id, { selectedMode: e.target.value as OverlayMode })}
+                                  className={appInputClass}
+                                >
+                                  <option value="standard">Standard</option>
+                                  <option value="icc2023">ICC World Cup 2023</option>
+                                </select>
+                              </div>
+                              <AppButton
+                                onClick={() => generateUrl(match.id)}
+                                disabled={panel.generating || insufficientBalance}
+                                title={insufficientBalance ? `Insufficient credits (need ${pricing.overlay_per_match} LKR)` : undefined}
+                              >
+                                {panel.generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                                {isAdmin ? 'Generate URL' : `Generate - ${pricing.overlay_per_match} LKR`}
+                              </AppButton>
+                            </div>
 
-                              {/* Existing links */}
-                              {panel.loading ? (
-                                <div className="flex items-center justify-center py-4">
-                                  <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-                                </div>
-                              ) : panel.links.length > 0 ? (
-                                <div className="space-y-2">
-                                  <p className="text-xs font-stats text-gray-500 uppercase tracking-wider">
-                                    Generated URLs
-                                  </p>
-                                  {panel.links.map((link) => (
-                                    <div
-                                      key={link.id}
-                                      className={`flex items-center gap-3 p-3 rounded-lg border ${
-                                        link.isActive
-                                          ? 'bg-gray-800 border-gray-700'
-                                          : 'bg-gray-900 border-gray-800 opacity-50'
-                                      }`}
-                                    >
-                                      <span
-                                        className={`font-stats text-xs px-2 py-0.5 rounded-full border ${
-                                          link.isActive
-                                            ? 'bg-primary/10 text-primary border-primary/20'
-                                            : 'bg-gray-800 text-gray-500 border-gray-700'
-                                        }`}
-                                      >
-                                        {MODE_LABELS[link.mode] ?? link.mode}
-                                      </span>
-                                      {link.label && (
-                                        <span className="font-stats text-xs text-gray-400">
-                                          {link.label}
-                                        </span>
-                                      )}
-                                      <span className="font-mono text-xs text-gray-500 flex-1 truncate">
-                                        /overlay/t/{link.token.slice(0, 12)}…
-                                      </span>
-                                      {isAdmin && link.user && (
-                                        <span className="font-stats text-xs text-gray-600">
-                                          {link.user.username}
-                                        </span>
-                                      )}
-                                      {link.isActive && (
+                            {panel.loading ? (
+                              <div className="flex items-center justify-center py-4">
+                                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                              </div>
+                            ) : panel.links.length > 0 ? (
+                              <div className="space-y-2">
+                                {panel.links.map((link) => (
+                                  <div
+                                    key={link.id}
+                                    className={`flex flex-col gap-3 rounded-[1.25rem] border px-4 py-3 sm:flex-row sm:items-center ${
+                                      link.isActive ? 'border-[#d8e8dc] bg-white' : 'border-[#e7ece6] bg-[#f8faf7] opacity-60'
+                                    }`}
+                                  >
+                                    <div className="flex flex-1 flex-wrap items-center gap-2">
+                                      <AppBadge tone={link.isActive ? 'green' : 'neutral'}>{MODE_LABELS[link.mode] ?? link.mode}</AppBadge>
+                                      {link.label ? <span className="text-sm text-slate-600">{link.label}</span> : null}
+                                      <span className="font-mono text-xs text-slate-500">/overlay/t/{link.token.slice(0, 12)}...</span>
+                                      {isAdmin && link.user ? <span className="text-xs text-slate-400">{link.user.username}</span> : null}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {link.isActive ? (
                                         <>
-                                          <button
-                                            onClick={() => copyUrl(link.token)}
-                                            className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                                            title="Copy URL"
-                                          >
-                                            {copiedToken === link.token ? (
-                                              <Check className="w-3.5 h-3.5 text-secondary" />
-                                            ) : (
-                                              <Copy className="w-3.5 h-3.5" />
-                                            )}
+                                          <button onClick={() => copyUrl(link.token)} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eef6f0] text-[#10994c] transition hover:bg-[#dff0e4]" title="Copy URL">
+                                            {copiedToken === link.token ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                                           </button>
-                                          <button
-                                            onClick={() => revokeLink(match.id, link.id)}
-                                            className="p-1.5 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-colors"
-                                            title="Revoke link"
-                                          >
-                                            <X className="w-3.5 h-3.5" />
+                                          <button onClick={() => revokeLink(match.id, link.id)} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff1f0] text-[#c54e4c] transition hover:bg-[#ffe5e3]" title="Revoke link">
+                                            <X className="h-4 w-4" />
                                           </button>
                                         </>
-                                      )}
-                                      {!link.isActive && (
-                                        <span className="font-stats text-xs text-gray-600">
-                                          Revoked
-                                        </span>
+                                      ) : (
+                                        <AppBadge tone="neutral">Revoked</AppBadge>
                                       )}
                                     </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-xs font-stats text-gray-600 text-center py-2">
-                                  No overlay URLs generated yet for this match.
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </section>
-              ))
-            ) : tournamentDetail ? (
-              <div className="bg-gray-900 rounded-xl p-8 border border-gray-800 text-center">
-                <p className="font-stats text-gray-500">No matches in this tournament yet.</p>
-              </div>
-            ) : null}
-          </>
-        )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <EmptyState title="No URLs generated yet" description="Generate an overlay URL for this match to start using it in OBS or browser sources." />
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </SurfaceCard>
+            ))
+          ) : tournamentDetail ? (
+            <EmptyState title="No matches yet" description="This tournament does not have matches available for overlay generation yet." />
+          ) : null}
+        </div>
       </div>
-    </main>
+    </AppPage>
   )
 }

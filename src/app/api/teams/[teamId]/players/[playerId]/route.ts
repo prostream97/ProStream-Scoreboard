@@ -37,14 +37,19 @@ export async function PATCH(
     if (key in body) patch[key] = body[key]
   }
 
-  const [updated] = await db
-    .update(players)
-    .set(patch as Partial<InferInsertModel<typeof players>>)
-    .where(eq(players.id, id))
-    .returning()
+  try {
+    const [updated] = await db
+      .update(players)
+      .set(patch as Partial<InferInsertModel<typeof players>>)
+      .where(eq(players.id, id))
+      .returning()
 
-  if (!updated) return NextResponse.json({ error: 'Player not found' }, { status: 404 })
-  return NextResponse.json(updated)
+    if (!updated) return NextResponse.json({ error: 'Player not found' }, { status: 404 })
+    return NextResponse.json(updated)
+  } catch (err) {
+    console.error('Player update error:', err)
+    return NextResponse.json({ error: 'Failed to update player' }, { status: 500 })
+  }
 }
 
 export async function DELETE(
@@ -59,6 +64,11 @@ export async function DELETE(
   if (access === null) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
   if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await db.delete(players).where(eq(players.id, parseInt(playerId, 10)))
-  return NextResponse.json({ ok: true })
+  try {
+    await db.delete(players).where(eq(players.id, parseInt(playerId, 10)))
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Player delete error:', err)
+    return NextResponse.json({ error: 'Failed to delete player' }, { status: 500 })
+  }
 }

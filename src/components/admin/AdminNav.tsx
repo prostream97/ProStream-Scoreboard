@@ -16,15 +16,13 @@ const tabs: { key: AdminNavTab; label: string; href: string }[] = [
 
 export function AdminNav({ active }: AdminNavProps) {
   return (
-    <div className="flex items-center gap-1 border-b border-gray-800 mb-6">
+    <div className="app-tabbar">
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
-          className={`px-4 py-2.5 font-stats text-sm font-medium transition-colors duration-200 border-b-2 -mb-px ${
-            active === tab.key
-              ? 'border-primary text-primary'
-              : 'border-transparent text-gray-400 hover:text-gray-200'
+          className={`app-tab flex-1 sm:flex-none ${
+            active === tab.key ? 'app-tab-active' : 'hover:bg-[#f4f7f2] hover:text-slate-900'
           }`}
         >
           {tab.label}

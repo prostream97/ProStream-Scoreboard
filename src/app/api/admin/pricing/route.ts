@@ -16,9 +16,14 @@ export async function GET() {
   if (!isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const rows = await db.query.pricingConfig.findMany()
+  // Default fallbacks — these apply when no DB row exists for a key.
+  // Run a seed migration to insert the defaults: overlay_per_match=100, overlay_per_tournament=500
   const result: Record<string, number> = {
     overlay_per_match: 100,
     overlay_per_tournament: 500,
+  }
+  if (rows.length === 0) {
+    console.warn('[Pricing] No pricing rows found in DB — using in-memory defaults. Run the seed script to persist them.')
   }
   for (const row of rows) {
     result[row.key] = row.value

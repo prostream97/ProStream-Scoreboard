@@ -36,6 +36,13 @@
       "when": 1775221487484,
       "tag": "0004_add_standard_overlay_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775472853421,
+      "tag": "0005_wandering_jack_power",
+      "breakpoints": true
     }
   ]
 }

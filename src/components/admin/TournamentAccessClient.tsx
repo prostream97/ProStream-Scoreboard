@@ -4,6 +4,15 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Shield, Plus, X, ChevronDown } from 'lucide-react'
 import { AdminNav } from './AdminNav'
+import {
+  AppButton,
+  AppPage,
+  EmptyState,
+  PageHeader,
+  SurfaceCard,
+  appInputClass,
+  appLabelClass,
+} from '@/components/shared/AppPrimitives'
 
 type TournamentOption = { id: number; name: string; shortName: string; status: string }
 type UserOption = { id: number; username: string; displayName: string; role: string }
@@ -77,131 +86,134 @@ export function TournamentAccessClient({ tournaments, users, access: initialAcce
 
   const selectedTournament = tournaments.find((t) => t.id === selectedTournamentId)
 
-  const selectCls =
-    'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white font-stats text-sm focus:outline-none focus:border-primary appearance-none'
-
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-            <Shield className="w-5 h-5 text-primary" />
+    <AppPage className="max-w-6xl">
+      <PageHeader
+        eyebrow="Admin panel"
+        title="Tournament operator access"
+        description="Grant or revoke tournament-level access for operators while keeping ownership and auth logic untouched."
+      />
+
+      <AdminNav active="access" />
+
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <SurfaceCard className="space-y-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf5ff] text-[#2d6fb0]">
+            <Shield className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-display text-3xl text-primary tracking-wider">Admin Panel</h1>
-            <p className="font-stats text-sm text-gray-500">Manage users, access, and pricing</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Select tournament</h2>
+            <p className="mt-1 text-sm text-slate-500">Permissions below update the existing access matrix only.</p>
           </div>
-        </div>
 
-        <AdminNav active="access" />
-
-        {/* Tournament picker */}
-        <div className="relative">
-          <label className="block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider">
-            Tournament
-          </label>
           <div className="relative">
+            <label className={appLabelClass}>Tournament</label>
             <select
               value={selectedTournamentId ?? ''}
               onChange={(e) => {
                 setSelectedTournamentId(Number(e.target.value) || null)
                 setSelectedUserId('')
               }}
-              className={selectCls}
+              className={appInputClass}
             >
-              {tournaments.length === 0 && (
-                <option value="">No tournaments</option>
-              )}
+              {tournaments.length === 0 ? <option value="">No tournaments</option> : null}
               {tournaments.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="pointer-events-none absolute right-4 top-[2.55rem] h-4 w-4 text-slate-400" />
           </div>
-        </div>
 
-        {selectedTournament && (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-            {/* Users with access */}
-            <div className="p-5 border-b border-gray-800">
-              <h2 className="font-stats text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
-                Users with access
-              </h2>
+          {selectedTournament ? (
+            <div className="rounded-[1.5rem] border border-[#dde3dc] bg-[#f8faf7] p-4">
+              <p className="text-sm font-semibold text-slate-900">{selectedTournament.name}</p>
+              <p className="mt-1 text-sm text-slate-500">{selectedTournament.shortName}</p>
+            </div>
+          ) : null}
+        </SurfaceCard>
+
+        {selectedTournament ? (
+          <div className="space-y-4">
+            <SurfaceCard className="space-y-4">
+              <div>
+                <p className="app-kicker">Authorized operators</p>
+                <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Users with access</h3>
+              </div>
 
               {usersWithAccess.length === 0 ? (
-                <p className="font-stats text-sm text-gray-600 italic">No operators have access to this tournament yet.</p>
+                <EmptyState
+                  title="No operators assigned"
+                  description="No operator has access to this tournament yet."
+                />
               ) : (
-                <ul className="space-y-2">
+                <div className="space-y-3">
                   {usersWithAccess.map((u) => (
-                    <li
-                      key={u.id}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
-                          <span className="font-stats text-xs font-bold text-primary">
-                            {(u.displayName || u.username).charAt(0).toUpperCase()}
-                          </span>
+                    <div key={u.id} className="flex items-center justify-between rounded-[1.35rem] border border-[#e1e7df] bg-[#f8faf7] px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8f7ee] text-sm font-semibold text-[#10994c]">
+                          {(u.displayName || u.username).charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-stats text-sm text-white font-medium">{u.displayName}</p>
-                          <p className="font-stats text-xs text-gray-500">@{u.username}</p>
+                          <p className="font-semibold text-slate-900">{u.displayName}</p>
+                          <p className="text-sm text-slate-500">@{u.username}</p>
                         </div>
                       </div>
                       <button
                         onClick={() => handleRevoke(u.id)}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff1f0] text-[#c54e4c] transition hover:bg-[#ffe5e3]"
                         title="Revoke access"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="h-4 w-4" />
                       </button>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
-            </div>
+            </SurfaceCard>
 
-            {/* Add access */}
-            <div className="p-5">
-              <h2 className="font-stats text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
-                Grant access
-              </h2>
+            <SurfaceCard className="space-y-4">
+              <div>
+                <p className="app-kicker">Grant access</p>
+                <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Add operator</h3>
+              </div>
+
               {availableToAdd.length === 0 ? (
-                <p className="font-stats text-sm text-gray-600 italic">All operators already have access.</p>
+                <EmptyState
+                  title="All operators already assigned"
+                  description="Every operator already has access to this tournament."
+                />
               ) : (
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <div className="relative flex-1">
+                    <label className={appLabelClass}>Operator</label>
                     <select
                       value={selectedUserId}
                       onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : '')}
-                      className={selectCls}
+                      className={appInputClass}
                     >
-                      <option value="">Select operator…</option>
+                      <option value="">Select operator</option>
                       {availableToAdd.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.displayName} (@{u.username})
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <ChevronDown className="pointer-events-none absolute right-4 top-[2.55rem] h-4 w-4 text-slate-400" />
                   </div>
-                  <button
-                    onClick={handleGrant}
-                    disabled={granting || !selectedUserId}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors disabled:opacity-40 flex-shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                    {granting ? 'Granting…' : 'Grant'}
-                  </button>
+                  <div className="pt-[1.85rem]">
+                    <AppButton onClick={handleGrant} disabled={granting || !selectedUserId}>
+                      <Plus className="h-4 w-4" />
+                      {granting ? 'Granting...' : 'Grant access'}
+                    </AppButton>
+                  </div>
                 </div>
               )}
-            </div>
+            </SurfaceCard>
           </div>
-        )}
+        ) : null}
       </div>
-    </main>
+    </AppPage>
   )
 }

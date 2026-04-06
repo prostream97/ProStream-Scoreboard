@@ -18,10 +18,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing deliveryId or matchId' }, { status: 400 })
   }
 
+  const deliveryIdNum = parseInt(deliveryId, 10)
+  const matchIdNum = parseInt(matchId, 10)
+  if (isNaN(deliveryIdNum) || isNaN(matchIdNum)) {
+    return NextResponse.json({ error: 'deliveryId and matchId must be integers' }, { status: 400 })
+  }
+
   try {
     // Fetch the delivery to reverse its effect
     const delivery = await db.query.deliveries.findFirst({
-      where: eq(deliveries.id, deliveryId),
+      where: eq(deliveries.id, deliveryIdNum),
     })
 
     if (!delivery) {
@@ -33,12 +39,12 @@ export async function POST(req: NextRequest) {
       where: eq(innings.id, delivery.inningsId),
     })
 
-    if (!inningsRow || inningsRow.matchId !== matchId) {
+    if (!inningsRow || inningsRow.matchId !== matchIdNum) {
       return NextResponse.json({ error: 'Delivery does not belong to this match' }, { status: 403 })
     }
 
     const matchRow = await db.query.matches.findFirst({
-      where: eq(matches.id, matchId),
+      where: eq(matches.id, matchIdNum),
     })
     const ballsPerOver = matchRow?.ballsPerOver ?? 6
 
@@ -65,9 +71,9 @@ export async function POST(req: NextRequest) {
         currentBalls: Math.max(0, adjustedBalls),
         lastUpdated: new Date(),
       })
-      .where(eq(matchState.matchId, matchId))
+      .where(eq(matchState.matchId, matchIdNum))
 
-    await db.delete(deliveries).where(eq(deliveries.id, deliveryId))
+    await db.delete(deliveries).where(eq(deliveries.id, deliveryIdNum))
 
     return NextResponse.json({ ok: true })
   } catch (err) {

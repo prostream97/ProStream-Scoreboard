@@ -1,11 +1,22 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useCallback, useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useSession, signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import { TournamentNav } from '@/components/shared/TournamentNav'
+import {
+  AppBadge,
+  AppButton,
+  AppPage,
+  EmptyState,
+  PageHeader,
+  SurfaceCard,
+  appInputClass,
+  appLabelClass,
+  appTextareaClass,
+} from '@/components/shared/AppPrimitives'
 import type { Player } from '@/types/player'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
@@ -14,11 +25,11 @@ type Role = 'batsman' | 'bowler' | 'allrounder' | 'keeper'
 
 const ROLES: Role[] = ['batsman', 'bowler', 'allrounder', 'keeper']
 
-const ROLE_COLORS: Record<Role, string> = {
-  batsman: 'text-secondary',
-  bowler: 'text-primary',
-  allrounder: 'text-accent',
-  keeper: 'text-overlay-cyan',
+const ROLE_TONES: Record<Role, 'green' | 'blue' | 'amber' | 'neutral'> = {
+  batsman: 'blue',
+  bowler: 'green',
+  allrounder: 'amber',
+  keeper: 'neutral',
 }
 
 const emptyForm = {
@@ -42,41 +53,44 @@ function PlayersContent() {
 
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Add form
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [addError, setAddError] = useState('')
-
-  // Edit modal
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
-
-  // CSV
   const [csvText, setCsvText] = useState('')
   const [csvMode, setCsvMode] = useState(false)
   const [csvAdding, setCsvAdding] = useState(false)
 
-  async function loadPlayers() {
-    if (!teamId) return
+  const loadPlayers = useCallback(async () => {
+    if (!teamId) {
+      setLoading(false)
+      return
+    }
     const res = await fetch(`/api/teams/${teamId}/players`)
     if (res.ok) setPlayers(await res.json())
     setLoading(false)
+  }, [teamId])
+
+  useEffect(() => {
+    loadPlayers()
+  }, [loadPlayers])
+
+  function handleAddChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    const { name, value } = e.target
+    setForm((current) => ({ ...current, [name]: value }))
   }
 
-  useEffect(() => { loadPlayers() }, [teamId])
-
-  function handleAddChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleEditChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
     const { name, value } = e.target
-    setForm((f) => ({ ...f, [name]: value }))
-  }
-
-  function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value } = e.target
-    setEditForm((f) => ({ ...f, [name]: value }))
+    setEditForm((current) => ({ ...current, [name]: value }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -116,7 +130,9 @@ function PlayersContent() {
     try {
       const lines = csvText.trim().split('\n').filter(Boolean)
       const parsed = lines.map((line) => {
-        const [name, displayName, role, battingStyle, bowlingStyle] = line.split(',').map((s) => s.trim())
+        const [name, displayName, role, battingStyle, bowlingStyle] = line
+          .split(',')
+          .map((segment) => segment.trim())
         return {
           name,
           displayName: displayName || name,
@@ -142,20 +158,22 @@ function PlayersContent() {
     }
   }
 
-  function openEdit(p: Player) {
-    setEditingPlayer(p)
+  function openEdit(player: Player) {
+    setEditingPlayer(player)
     setEditForm({
-      name: p.name,
-      displayName: p.displayName,
-      role: p.role as Role,
-      battingStyle: p.battingStyle ?? '',
-      bowlingStyle: p.bowlingStyle ?? '',
-      headshotCloudinaryId: p.headshotCloudinaryId ?? '',
+      name: player.name,
+      displayName: player.displayName,
+      role: player.role as Role,
+      battingStyle: player.battingStyle ?? '',
+      bowlingStyle: player.bowlingStyle ?? '',
+      headshotCloudinaryId: player.headshotCloudinaryId ?? '',
     })
     setEditError('')
   }
 
-  function closeEdit() { setEditingPlayer(null) }
+  function closeEdit() {
+    setEditingPlayer(null)
+  }
 
   async function handleEditSave() {
     if (!editingPlayer) return
@@ -176,7 +194,9 @@ function PlayersContent() {
       })
       if (res.ok) {
         const updated: Player = await res.json()
-        setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+        setPlayers((current) =>
+          current.map((player) => (player.id === updated.id ? updated : player)),
+        )
         closeEdit()
       } else {
         const data = await res.json()
@@ -189,38 +209,64 @@ function PlayersContent() {
 
   if (!teamId) {
     return (
-      <div className="text-center py-12">
-        <p className="font-stats text-gray-400">No team selected.</p>
-        <Link href="/admin/teams" className="text-primary hover:underline font-stats text-sm mt-2 inline-block">← Back to Teams</Link>
-      </div>
+      <AppPage className="mx-auto max-w-3xl">
+        <EmptyState
+          title="No team selected"
+          description="Pick a team first so player management stays scoped to the right roster."
+          action={<AppButton href="/admin/teams">Back to Teams</AppButton>}
+        />
+      </AppPage>
     )
   }
 
-  const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
-  const labelCls = 'block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider'
-
-  // Shared player fields (role + batting/bowling style selects)
-  function StyleFields({ f, onChange }: { f: typeof emptyForm; onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void }) {
+  function StyleFields({
+    value,
+    onChange,
+  }: {
+    value: typeof emptyForm
+    onChange: (
+      e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    ) => void
+  }) {
     return (
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <div>
-          <label className={labelCls}>Role</label>
-          <select name="role" value={f.role} onChange={onChange} className={inputCls}>
-            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          <label className={appLabelClass}>Role</label>
+          <select
+            name="role"
+            value={value.role}
+            onChange={onChange}
+            className={appInputClass}
+          >
+            {ROLES.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
           </select>
         </div>
         <div>
-          <label className={labelCls}>Batting Style</label>
-          <select name="battingStyle" value={f.battingStyle} onChange={onChange} className={inputCls}>
-            <option value="">—</option>
+          <label className={appLabelClass}>Batting Style</label>
+          <select
+            name="battingStyle"
+            value={value.battingStyle}
+            onChange={onChange}
+            className={appInputClass}
+          >
+            <option value="">Not set</option>
             <option value="right-hand">Right Hand</option>
             <option value="left-hand">Left Hand</option>
           </select>
         </div>
         <div>
-          <label className={labelCls}>Bowling Style</label>
-          <select name="bowlingStyle" value={f.bowlingStyle} onChange={onChange} className={inputCls}>
-            <option value="">—</option>
+          <label className={appLabelClass}>Bowling Style</label>
+          <select
+            name="bowlingStyle"
+            value={value.bowlingStyle}
+            onChange={onChange}
+            className={appInputClass}
+          >
+            <option value="">Not set</option>
             <option value="right-arm-fast">RA Fast</option>
             <option value="right-arm-medium">RA Medium</option>
             <option value="right-arm-offbreak">RA Off Break</option>
@@ -235,250 +281,382 @@ function PlayersContent() {
     )
   }
 
+  const manageCallback = `/admin/players?teamId=${teamId}&teamName=${encodeURIComponent(teamName)}`
+
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-6 font-stats text-sm text-gray-500">
-          <Link href="/" className="hover:text-gray-300 transition-colors">Dashboard</Link>
+    <AppPage className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <Link href="/" className="transition hover:text-slate-800">
+            Dashboard
+          </Link>
           <span>/</span>
-          <Link href="/admin/tournaments" className="hover:text-gray-300 transition-colors">Tournaments</Link>
-          {tournamentId && (
+          <Link href="/admin/tournaments" className="transition hover:text-slate-800">
+            Tournaments
+          </Link>
+          {tournamentId ? (
             <>
               <span>/</span>
-              <Link href={`/admin/tournaments/${tournamentId}`} className="hover:text-gray-300 transition-colors">{tournamentName}</Link>
-            </>
-          )}
-          <span>/</span>
-          <span className="text-gray-300">{teamName}</span>
-        </div>
-
-        {tournamentId && (
-          <TournamentNav tournamentId={parseInt(tournamentId, 10)} activeSegment="players" />
-        )}
-
-        <div className="flex items-center justify-between mb-6 mt-6">
-          <div>
-            <h1 className="font-display text-4xl text-primary tracking-wider">PLAYERS</h1>
-            <p className="font-stats text-gray-400 text-sm mt-1">{teamName} · {players.length} players</p>
-          </div>
-          <div className="flex gap-2">
-            {isAuthenticated ? (
-              <>
-                <button
-                  onClick={() => { setCsvMode((v) => !v); setShowForm(false) }}
-                  className="px-3 py-2 bg-gray-800 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  {csvMode ? 'Cancel CSV' : 'CSV Import'}
-                </button>
-                <button
-                  onClick={() => { setShowForm((v) => !v); setCsvMode(false); setAddError('') }}
-                  className="px-4 py-2 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 transition-colors text-sm"
-                >
-                  {showForm ? 'Cancel' : '+ Add Player'}
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => signIn(undefined, { callbackUrl: `/admin/players?teamId=${teamId}&teamName=${encodeURIComponent(teamName)}` })}
-                className="px-4 py-2 bg-gray-700 text-gray-300 font-stats font-semibold rounded-lg hover:bg-gray-600 transition-colors text-sm"
+              <Link
+                href={`/admin/tournaments/${tournamentId}`}
+                className="transition hover:text-slate-800"
               >
-                Sign in to manage
-              </button>
-            )}
-          </div>
+                {tournamentName}
+              </Link>
+            </>
+          ) : null}
+          <span>/</span>
+          <span className="text-slate-900">{teamName}</span>
         </div>
 
-        {addError && <p className="text-red-400 font-stats text-sm mb-4">{addError}</p>}
+        {tournamentId ? (
+          <TournamentNav
+            tournamentId={parseInt(tournamentId, 10)}
+            activeSegment="players"
+          />
+        ) : null}
+      </div>
 
-        {/* ── Add Player form ── */}
-        {showForm && isAuthenticated && (
-          <form onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-4">
-            <h2 className="font-stats font-semibold text-gray-200">Add Player</h2>
+      <PageHeader
+        eyebrow="Team Roster"
+        title={teamName}
+        description="Manage every squad member, import players in bulk, and keep the roster ready for the operator and viewer experiences."
+        actions={
+          isAdmin ? (
+            <>
+              <AppButton
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setCsvMode((current) => !current)
+                  setShowForm(false)
+                }}
+              >
+                {csvMode ? 'Close CSV' : 'CSV Import'}
+              </AppButton>
+              <AppButton
+                type="button"
+                onClick={() => {
+                  setShowForm((current) => !current)
+                  setCsvMode(false)
+                  setAddError('')
+                }}
+              >
+                {showForm ? 'Close Form' : 'Add Player'}
+              </AppButton>
+            </>
+          ) : (
+            <AppButton
+              type="button"
+              onClick={() => signIn(undefined, { callbackUrl: manageCallback })}
+            >
+              Sign In to Manage
+            </AppButton>
+          )
+        }
+      />
 
+      <section className="grid gap-4 md:grid-cols-3">
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Players</p>
+          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            {players.length}
+          </p>
+          <p className="text-sm text-slate-500">Active roster entries available for match setup.</p>
+        </SurfaceCard>
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Editable</p>
+          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            {isAdmin ? 'Yes' : 'No'}
+          </p>
+          <p className="text-sm text-slate-500">Admin sign-in still controls write access.</p>
+        </SurfaceCard>
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Quick Path</p>
+          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
+            Bulk import or hand-edit
+          </p>
+          <p className="text-sm text-slate-500">Both flows continue to hit the existing team player APIs.</p>
+        </SurfaceCard>
+      </section>
+
+      {addError ? (
+        <SurfaceCard className="border-[#f4c3c1] bg-[#fff3f2] text-sm text-[#b94342]">
+          {addError}
+        </SurfaceCard>
+      ) : null}
+
+      {showForm && isAdmin ? (
+        <SurfaceCard className="space-y-5">
+          <div>
+            <p className="app-kicker">Manual Entry</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+              Add Player
+            </h2>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             <ImageUpload
               value={form.headshotCloudinaryId || null}
-              onChange={(publicId) => setForm((f) => ({ ...f, headshotCloudinaryId: publicId }))}
+              onChange={(publicId) =>
+                setForm((current) => ({ ...current, headshotCloudinaryId: publicId }))
+              }
               folder="player-headshots"
               label="Player Photo (optional)"
               previewShape="circle"
               id="add-player-photo"
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className={labelCls}>Full Name</label>
-                <input name="name" value={form.name} onChange={handleAddChange} className={inputCls} placeholder="e.g. Rohit Sharma" required />
+                <label className={appLabelClass}>Full Name</label>
+                <input
+                  name="name"
+                  value={form.name}
+                  onChange={handleAddChange}
+                  className={appInputClass}
+                  placeholder="e.g. Rohit Sharma"
+                  required
+                />
               </div>
               <div>
-                <label className={labelCls}>Display Name</label>
-                <input name="displayName" value={form.displayName} onChange={handleAddChange} className={inputCls} placeholder="e.g. RG Sharma" />
+                <label className={appLabelClass}>Display Name</label>
+                <input
+                  name="displayName"
+                  value={form.displayName}
+                  onChange={handleAddChange}
+                  className={appInputClass}
+                  placeholder="e.g. RG Sharma"
+                />
               </div>
             </div>
 
-            <StyleFields f={form} onChange={handleAddChange} />
+            <StyleFields value={form} onChange={handleAddChange} />
 
-            <button type="submit" disabled={adding} className="w-full py-2.5 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 disabled:opacity-40 transition-colors text-sm">
-              {adding ? 'Adding...' : 'Add Player'}
-            </button>
+            <div className="flex justify-end">
+              <AppButton type="submit" disabled={adding}>
+                {adding ? 'Adding...' : 'Add Player'}
+              </AppButton>
+            </div>
           </form>
-        )}
+        </SurfaceCard>
+      ) : null}
 
-        {/* ── CSV import ── */}
-        {csvMode && isAuthenticated && (
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-3">
-            <div>
-              <h2 className="font-stats font-semibold text-gray-200">CSV Import</h2>
-              <p className="font-stats text-xs text-gray-500 mt-1">
-                Format: Name, Display Name, Role, Batting Style, Bowling Style (one per line)
-              </p>
-            </div>
-            <textarea
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              className="w-full h-36 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white font-body text-sm focus:outline-none focus:border-primary resize-none"
-              placeholder={`Virat Kohli, V Kohli, batsman, right-hand\nJasprit Bumrah, JJ Bumrah, bowler, right-hand, right-arm-fast`}
-            />
-            <button
-              onClick={handleCsvImport}
+      {csvMode && isAdmin ? (
+        <SurfaceCard className="space-y-4">
+          <div>
+            <p className="app-kicker">Bulk Import</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+              CSV Paste
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Format each line as: <code>Name, Display Name, Role, Batting Style, Bowling Style</code>
+            </p>
+          </div>
+
+          <textarea
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            className={appTextareaClass + ' min-h-40'}
+            placeholder={
+              'Virat Kohli, V Kohli, batsman, right-hand\nJasprit Bumrah, JJ Bumrah, bowler, right-hand, right-arm-fast'
+            }
+          />
+
+          <div className="flex justify-end">
+            <AppButton
+              type="button"
               disabled={csvAdding || !csvText.trim()}
-              className="w-full py-2.5 bg-secondary text-white font-stats font-semibold rounded-lg hover:bg-emerald-600 disabled:opacity-40 transition-colors text-sm"
+              onClick={handleCsvImport}
             >
-              {csvAdding ? 'Importing...' : `Import ${csvText.trim().split('\n').filter(Boolean).length} Players`}
-            </button>
+              {csvAdding
+                ? 'Importing...'
+                : `Import ${csvText.trim().split('\n').filter(Boolean).length} Players`}
+            </AppButton>
           </div>
-        )}
+        </SurfaceCard>
+      ) : null}
 
-        {/* ── Player list ── */}
-        {loading ? (
-          <div className="text-center py-12 font-stats text-gray-500">Loading players...</div>
-        ) : players.length === 0 ? (
-          <div className="text-center py-16 text-gray-600">
-            <p className="font-display text-3xl mb-2">NO PLAYERS YET</p>
-            <p className="font-stats text-sm">Add players using the form or CSV import above.</p>
-          </div>
-        ) : (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-800">
-                  <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">#</th>
-                  <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Name</th>
-                  <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Role</th>
-                  <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Batting</th>
-                  <th className="text-left px-4 py-3 font-stats text-xs text-gray-400 uppercase tracking-wider">Bowling</th>
-                  {isAuthenticated && <th className="px-4 py-3"></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((p, i) => (
-                  <tr key={p.id} className="border-t border-gray-800 hover:bg-gray-800/40 transition-colors">
-                    <td className="px-4 py-3 font-stats text-xs text-gray-500">{i + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {p.headshotCloudinaryId ? (
-                          <img
-                            src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_32,h_32,f_webp/${p.headshotCloudinaryId}`}
-                            alt={p.displayName}
-                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center font-stats text-xs text-gray-400 flex-shrink-0">
-                            {p.displayName.charAt(0)}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-stats font-semibold text-white text-sm">{p.displayName}</p>
-                          {p.displayName !== p.name && <p className="font-stats text-xs text-gray-500">{p.name}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`font-stats text-xs font-semibold capitalize ${ROLE_COLORS[p.role as Role]}`}>{p.role}</span>
-                    </td>
-                    <td className="px-4 py-3 font-stats text-xs text-gray-400">{p.battingStyle ?? '—'}</td>
-                    <td className="px-4 py-3 font-stats text-xs text-gray-400">{p.bowlingStyle ?? '—'}</td>
-                    {isAuthenticated && (
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => openEdit(p)}
-                          className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-xs rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <SurfaceCard className="py-16 text-center text-sm text-slate-500">
+          Loading players...
+        </SurfaceCard>
+      ) : players.length === 0 ? (
+        <EmptyState
+          title="No players yet"
+          description="Add players manually or import a CSV to populate this team before creating a match."
+          action={
+            isAdmin ? (
+              <AppButton
+                type="button"
+                onClick={() => {
+                  setShowForm(true)
+                  setCsvMode(false)
+                }}
+              >
+                Add First Player
+              </AppButton>
+            ) : undefined
+          }
+        />
+      ) : (
+        <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {players.map((player) => (
+            <SurfaceCard key={player.id} className="flex h-full flex-col gap-4">
+              <div className="flex items-start gap-3">
+                {player.headshotCloudinaryId ? (
+                  <img
+                    src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_72,h_72,f_webp/${player.headshotCloudinaryId}`}
+                    alt={player.displayName}
+                    className="h-16 w-16 rounded-2xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eff4ee] text-lg font-semibold text-slate-600">
+                    {player.displayName.charAt(0)}
+                  </div>
+                )}
 
-      {/* ── Edit Player Modal ── */}
-      {editingPlayer && (
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div>
+                    <h3 className="truncate text-lg font-semibold tracking-[-0.03em] text-slate-950">
+                      {player.displayName}
+                    </h3>
+                    {player.displayName !== player.name ? (
+                      <p className="truncate text-sm text-slate-500">{player.name}</p>
+                    ) : null}
+                  </div>
+                  <AppBadge tone={ROLE_TONES[player.role as Role] ?? 'neutral'}>
+                    {player.role}
+                  </AppBadge>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-[1.4rem] bg-[#f4f7f2] p-4 text-sm text-slate-600 sm:grid-cols-2">
+                <div>
+                  <p className="app-kicker">Batting</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {player.battingStyle ?? 'Not set'}
+                  </p>
+                </div>
+                <div>
+                  <p className="app-kicker">Bowling</p>
+                  <p className="mt-1 font-medium text-slate-900">
+                    {player.bowlingStyle ?? 'Not set'}
+                  </p>
+                </div>
+              </div>
+
+              {isAdmin ? (
+                <div className="mt-auto flex justify-end">
+                  <AppButton
+                    type="button"
+                    variant="secondary"
+                    onClick={() => openEdit(player)}
+                  >
+                    Edit Player
+                  </AppButton>
+                </div>
+              ) : null}
+            </SurfaceCard>
+          ))}
+        </section>
+      )}
+
+      {editingPlayer ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={(e) => { if (e.target === e.currentTarget) closeEdit() }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#08110d]/70 px-4 py-8"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeEdit()
+          }}
         >
-          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md mx-4 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="font-stats font-semibold text-white text-lg">Edit Player</h2>
-              <button onClick={closeEdit} className="text-gray-400 hover:text-white transition-colors text-xl leading-none">✕</button>
-            </div>
-
-            {editError && <p className="text-red-400 font-stats text-sm">{editError}</p>}
-
-            <ImageUpload
-              value={editForm.headshotCloudinaryId || null}
-              onChange={(publicId) => setEditForm((f) => ({ ...f, headshotCloudinaryId: publicId }))}
-              folder="player-headshots"
-              label="Player Photo"
-              previewShape="circle"
-              id={`edit-player-photo-${editingPlayer.id}`}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-[#d7ddd6] bg-[#fbfcf8] p-6 shadow-[0_32px_90px_rgba(8,17,13,0.26)]">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <label className={labelCls}>Full Name</label>
-                <input name="name" value={editForm.name} onChange={handleEditChange} className={inputCls} required />
+                <p className="app-kicker">Roster Update</p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  Edit Player
+                </h2>
               </div>
-              <div>
-                <label className={labelCls}>Display Name</label>
-                <input name="displayName" value={editForm.displayName} onChange={handleEditChange} className={inputCls} />
-              </div>
-            </div>
-
-            <StyleFields f={editForm} onChange={handleEditChange} />
-
-            <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={closeEdit}
-                className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d7ddd6] text-slate-500 transition hover:bg-white hover:text-slate-900"
+                aria-label="Close edit player modal"
               >
-                Cancel
+                ×
               </button>
-              <button
-                type="button"
-                onClick={handleEditSave}
-                disabled={saving}
-                className="flex-1 px-4 py-2 bg-primary text-white font-stats font-semibold text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {editError ? (
+                <div className="rounded-2xl border border-[#f4c3c1] bg-[#fff3f2] px-4 py-3 text-sm text-[#b94342]">
+                  {editError}
+                </div>
+              ) : null}
+
+              <ImageUpload
+                value={editForm.headshotCloudinaryId || null}
+                onChange={(publicId) =>
+                  setEditForm((current) => ({
+                    ...current,
+                    headshotCloudinaryId: publicId,
+                  }))
+                }
+                folder="player-headshots"
+                label="Player Photo"
+                previewShape="circle"
+                id={`edit-player-photo-${editingPlayer.id}`}
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className={appLabelClass}>Full Name</label>
+                  <input
+                    name="name"
+                    value={editForm.name}
+                    onChange={handleEditChange}
+                    className={appInputClass}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={appLabelClass}>Display Name</label>
+                  <input
+                    name="displayName"
+                    value={editForm.displayName}
+                    onChange={handleEditChange}
+                    className={appInputClass}
+                  />
+                </div>
+              </div>
+
+              <StyleFields value={editForm} onChange={handleEditChange} />
+
+              <div className="flex flex-wrap justify-end gap-3">
+                <AppButton type="button" variant="secondary" onClick={closeEdit}>
+                  Cancel
+                </AppButton>
+                <AppButton type="button" onClick={handleEditSave} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </AppButton>
+              </div>
             </div>
           </div>
         </div>
-      )}
-    </main>
+      ) : null}
+    </AppPage>
   )
 }
 
 export default function PlayersPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center"><p className="font-stats text-gray-500">Loading...</p></div>}>
+    <Suspense
+      fallback={
+        <AppPage className="flex min-h-[50vh] items-center justify-center text-sm text-slate-500">
+          Loading...
+        </AppPage>
+      }
+    >
       <PlayersContent />
     </Suspense>
   )

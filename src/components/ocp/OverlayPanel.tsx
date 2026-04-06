@@ -63,63 +63,57 @@ export function OverlayPanel() {
     : ELEMENTS.filter(({ key }) => key !== 'mostWickets')
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 h-full flex flex-col gap-4 overflow-hidden">
-      <p className="font-stats text-xs text-gray-500 uppercase tracking-wider">Overlays</p>
+    <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
+      <div className="mb-4">
+        <p className="app-kicker">Overlay control</p>
+        <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">On-air elements</h3>
+      </div>
 
-      {/* Toggle buttons */}
-      <div className="flex flex-col gap-2">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
         {visibleElements.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => toggle(key)}
-            className={`px-3 py-2 font-stats text-xs rounded-lg border transition-colors text-left ${
+            className={`rounded-[1.2rem] border px-4 py-3 text-left text-sm font-semibold transition ${
               display[key]
-                ? 'bg-accent/20 border-accent text-accent'
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                ? 'border-[#cce8d4] bg-[#eef8f1] text-[#10994c]'
+                : 'border-[#e1e7df] bg-[#f8faf7] text-slate-600 hover:bg-white'
             }`}
           >
-            {display[key] ? '●' : '○'} {label}
+            {display[key] ? 'On' : 'Off'} . {label}
           </button>
         ))}
       </div>
 
-      {/* Quick player card section */}
-      <div className="border-t border-gray-800 pt-3 flex flex-col gap-2">
-        <span className="font-stats text-xs text-gray-600">Show card:</span>
-        {striker && (
-          <button
-            onClick={() => showPlayerCard(
-              (striker as { id?: number; playerId?: number }).id
-                ?? (striker as { playerId?: number }).playerId!
-            )}
-            className="px-3 py-2 bg-secondary/10 border border-secondary/40 text-secondary font-stats text-xs rounded-lg hover:bg-secondary/20 transition-colors text-left"
-          >
-            * {'displayName' in striker ? striker.displayName : (striker as { displayName: string }).displayName}
-          </button>
-        )}
-        {nonStriker && nonStriker !== striker && (
-          <button
-            onClick={() => showPlayerCard(
-              (nonStriker as { id?: number; playerId?: number }).id
-                ?? (nonStriker as { playerId?: number }).playerId!
-            )}
-            className="px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-xs rounded-lg hover:bg-gray-700 transition-colors text-left"
-          >
-            {'displayName' in nonStriker ? nonStriker.displayName : (nonStriker as { displayName: string }).displayName}
-          </button>
-        )}
-        {currentBowler && (
-          <button
-            onClick={() => showPlayerCard(
-              (currentBowler as { id?: number; playerId?: number }).id
-                ?? (currentBowler as { playerId?: number }).playerId!
-            )}
-            className="px-3 py-2 bg-primary/10 border border-primary/40 text-primary font-stats text-xs rounded-lg hover:bg-primary/20 transition-colors text-left"
-          >
-            ▶ {'displayName' in currentBowler ? currentBowler.displayName : (currentBowler as { displayName: string }).displayName}
-          </button>
-        )}
+      <div className="mt-5 border-t border-[#e2e8e1] pt-4">
+        <p className="app-kicker !text-slate-400">Quick player cards</p>
+        <div className="mt-3 grid gap-2">
+          {striker ? (
+            <button
+              onClick={() => showPlayerCard((striker as { id?: number; playerId?: number }).id ?? (striker as { playerId?: number }).playerId!)}
+              className="rounded-[1.2rem] bg-[#eef8f1] px-4 py-3 text-left text-sm font-semibold text-[#10994c]"
+            >
+              Striker: {'displayName' in striker ? striker.displayName : (striker as { displayName: string }).displayName}
+            </button>
+          ) : null}
+          {nonStriker && nonStriker !== striker ? (
+            <button
+              onClick={() => showPlayerCard((nonStriker as { id?: number; playerId?: number }).id ?? (nonStriker as { playerId?: number }).playerId!)}
+              className="rounded-[1.2rem] bg-[#f8faf7] px-4 py-3 text-left text-sm font-semibold text-slate-700"
+            >
+              Non-striker: {'displayName' in nonStriker ? nonStriker.displayName : (nonStriker as { displayName: string }).displayName}
+            </button>
+          ) : null}
+          {currentBowler ? (
+            <button
+              onClick={() => showPlayerCard((currentBowler as { id?: number; playerId?: number }).id ?? (currentBowler as { playerId?: number }).playerId!)}
+              className="rounded-[1.2rem] bg-[#eef4fb] px-4 py-3 text-left text-sm font-semibold text-[#2d6fb0]"
+            >
+              Bowler: {'displayName' in currentBowler ? currentBowler.displayName : (currentBowler as { displayName: string }).displayName}
+            </button>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </section>
   )
 }

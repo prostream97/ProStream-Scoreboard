@@ -39,9 +39,14 @@ export async function PATCH(
     if (key in body) (patch as Record<string, unknown>)[key] = body[key]
   }
 
-  const [updated] = await db.update(teams).set(patch).where(eq(teams.id, id)).returning()
-  if (!updated) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
-  return NextResponse.json(updated)
+  try {
+    const [updated] = await db.update(teams).set(patch).where(eq(teams.id, id)).returning()
+    if (!updated) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+    return NextResponse.json(updated)
+  } catch (err) {
+    console.error('Team update error:', err)
+    return NextResponse.json({ error: 'Failed to update team' }, { status: 500 })
+  }
 }
 
 export async function DELETE(
@@ -58,6 +63,11 @@ export async function DELETE(
   if (access === null) return NextResponse.json({ error: 'Team not found' }, { status: 404 })
   if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await db.delete(teams).where(eq(teams.id, id))
-  return NextResponse.json({ ok: true })
+  try {
+    await db.delete(teams).where(eq(teams.id, id))
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Team delete error:', err)
+    return NextResponse.json({ error: 'Failed to delete team' }, { status: 500 })
+  }
 }

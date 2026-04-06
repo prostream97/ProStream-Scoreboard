@@ -413,8 +413,8 @@ export async function getTournamentMostWickets(matchId: number): Promise<Tournam
 
       rowsByBowler.set(bowlerId, {
         bowlerId,
-        bowlerName: existing?.bowlerName ?? meta!.bowlerName,
-        teamName: existing?.teamName ?? meta!.teamName,
+        bowlerName: existing?.bowlerName ?? meta?.bowlerName ?? '',
+        teamName: existing?.teamName ?? meta?.teamName ?? '',
         innings: (existing?.innings ?? 0) + (currentInningsBowlers.has(bowlerId) ? 0 : 1),
         balls: (existing?.balls ?? 0) + addition.balls,
         wickets: (existing?.wickets ?? 0) + addition.wickets,

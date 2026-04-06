@@ -14,6 +14,7 @@ import { BowlerSelect } from './BowlerSelect'
 import { SquadPanel } from './SquadPanel'
 import { PlayerEditModal } from './PlayerEditModal'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import type { MatchSnapshot } from '@/types/match'
 import type { DeliveryAddedPayload, OverCompletePayload } from '@/types/pusher'
 
@@ -32,20 +33,16 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
   const isBowlerSelectOpen = useUIStore((s) => s.isBowlerSelectOpen)
   const router = useRouter()
 
-  // Hydrate Zustand from server-fetched snapshot — inside useEffect to avoid SSR mismatch
   useEffect(() => {
     hydrate(initialSnapshot)
   }, [hydrate, initialSnapshot])
 
-  // Watch for over completion (6 legal deliveries) — open BowlerSelect
-  // isBowlerSelectOpen guard prevents double-opening within same render cycle
   useEffect(() => {
     if (legalDeliveryCount === ballsPerOver && !isBowlerSelectOpen) {
       openBowlerSelect()
     }
   }, [legalDeliveryCount, ballsPerOver, isBowlerSelectOpen, openBowlerSelect])
 
-  // Navigate home when batting team wins (target reached mid-delivery)
   useEffect(() => {
     if (winDetected) {
       clearWinDetected()
@@ -53,7 +50,6 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
     }
   }, [winDetected, clearWinDetected, router])
 
-  // Keep operator view in sync with Pusher (multi-device safety)
   useEvent(`match-${initialSnapshot.matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
     updateFromPusher({
       strikerId: data.strikerId,
@@ -62,26 +58,24 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
   })
 
   useEvent(`match-${initialSnapshot.matchId}`, 'over.complete', (_data: OverCompletePayload) => {
-    // Handled locally via legalDeliveryCount watcher above
+    // handled by legalDeliveryCount watcher
   })
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5.5rem)] bg-gray-950">
-      {/* Top: combined match controls + score */}
-      <OCPTopBar />
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f7faf5_0%,#eef3ed_100%)]">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-3 py-3 sm:px-4">
+        <OCPTopBar />
 
-      {/* Middle: three-column OCP */}
-      <div className="flex-1 grid grid-cols-3 gap-4 p-4 overflow-hidden">
-        {/* Left: Batting + Bowling stacked */}
-        <div className="flex flex-col gap-4 overflow-hidden">
-          <BattingPanel />
-          <BowlingPanel />
+        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_0.9fr]">
+          <div className="grid gap-4">
+            <BattingPanel />
+            <BowlingPanel />
+          </div>
+          <ScoringControls />
+          <OverlayPanel />
         </div>
-        <ScoringControls />
-        <OverlayPanel />
       </div>
 
-      {/* Modals */}
       <WicketModal />
       <BowlerSelect />
       <SquadPanel />
@@ -92,8 +86,10 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
 
 export function OCPLayout({ initialSnapshot }: OCPLayoutProps) {
   return (
-    <PusherProvider>
-      <OCPInner initialSnapshot={initialSnapshot} />
-    </PusherProvider>
+    <ErrorBoundary>
+      <PusherProvider>
+        <OCPInner initialSnapshot={initialSnapshot} />
+      </PusherProvider>
+    </ErrorBoundary>
   )
 }

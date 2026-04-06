@@ -36,17 +36,23 @@ export async function POST(req: NextRequest) {
 
   const updatedBalance = wallet.balance + amountNum
 
-  await db.insert(walletTransactions).values({
-    walletId: wallet.id,
-    type: 'topup',
-    amount: amountNum,
-    balanceBefore: wallet.balance,
-    balanceAfter: updatedBalance,
-    description: description || `Admin top-up by ${session.user.username}`,
-    createdBy: adminId,
-  })
-
-  await db.update(wallets).set({ balance: updatedBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet.id))
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(walletTransactions).values({
+        walletId: wallet.id,
+        type: 'topup',
+        amount: amountNum,
+        balanceBefore: wallet.balance,
+        balanceAfter: updatedBalance,
+        description: description || `Admin top-up by ${session.user.username}`,
+        createdBy: adminId,
+      })
+      await tx.update(wallets).set({ balance: updatedBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet.id))
+    })
+  } catch (err) {
+    console.error('Wallet topup transaction error:', err)
+    return NextResponse.json({ error: 'Failed to process top-up' }, { status: 500 })
+  }
 
   return NextResponse.json({ newBalance: updatedBalance }, { status: 201 })
 }

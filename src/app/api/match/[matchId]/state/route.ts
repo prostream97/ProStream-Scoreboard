@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
-import { matchState } from '@/lib/db/schema'
+import { matchState, matches } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getMatchSnapshot } from '@/lib/db/queries/match'
 import type { DeliveryBuffer } from '@/lib/db/schema'
@@ -56,10 +56,27 @@ export async function PATCH(
   if ('strikerId' in body) patch.strikerId = body.strikerId ?? null
   if ('nonStrikerId' in body) patch.nonStrikerId = body.nonStrikerId ?? null
   if ('currentBowlerId' in body) patch.currentBowlerId = body.currentBowlerId ?? null
-  if ('currentOver' in body && typeof body.currentOver === 'number') patch.currentOver = body.currentOver
+  if ('currentOver' in body && typeof body.currentOver === 'number') {
+    const match = await db.query.matches.findFirst({
+      where: eq(matches.id, id),
+      columns: { totalOvers: true },
+    })
+    if (match && body.currentOver > match.totalOvers) {
+      return NextResponse.json(
+        { error: `currentOver cannot exceed totalOvers (${match.totalOvers})` },
+        { status: 400 },
+      )
+    }
+    patch.currentOver = body.currentOver
+  }
   if ('currentBalls' in body && typeof body.currentBalls === 'number') patch.currentBalls = body.currentBalls
   if ('currentOverBuffer' in body) patch.currentOverBuffer = body.currentOverBuffer ?? []
 
-  await db.update(matchState).set({ ...patch, lastUpdated: new Date() }).where(eq(matchState.matchId, id))
-  return NextResponse.json({ ok: true })
+  try {
+    await db.update(matchState).set({ ...patch, lastUpdated: new Date() }).where(eq(matchState.matchId, id))
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Match state update error:', err)
+    return NextResponse.json({ error: 'Failed to update match state' }, { status: 500 })
+  }
 }

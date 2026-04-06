@@ -9,8 +9,6 @@ export default async function Dashboard() {
   const tournaments = await getTournamentListWithCounts(userId)
 
   return (
-    <main className="min-h-screen bg-gray-950 px-4 sm:px-8">
-      <DashboardClient tournaments={tournaments} />
-    </main>
+    <DashboardClient tournaments={tournaments} />
   )
 }

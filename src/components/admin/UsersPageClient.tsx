@@ -7,6 +7,16 @@ import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import { AdminNav } from './AdminNav'
+import {
+  AppBadge,
+  AppButton,
+  AppPage,
+  EmptyState,
+  PageHeader,
+  SurfaceCard,
+  appInputClass,
+  appLabelClass,
+} from '@/components/shared/AppPrimitives'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
@@ -67,7 +77,6 @@ export function UsersPageClient() {
   const [deleteError, setDeleteError] = useState('')
   const [deleting, setDeleting] = useState(false)
 
-  // Wallet / topup
   const [walletBalances, setWalletBalances] = useState<Record<number, number>>({})
   const [topupUser, setTopupUser] = useState<UserRow | null>(null)
   const [topupAmount, setTopupAmount] = useState('')
@@ -88,7 +97,6 @@ export function UsersPageClient() {
       const rows = await res.json() as UserRow[]
       setUsers(rows)
 
-      // Fetch wallet balances in parallel
       const wRes = await fetch('/api/admin/wallets', { cache: 'no-store' })
       if (wRes.ok) {
         const wRows = await wRes.json() as { userId: number; balance: number }[]
@@ -132,16 +140,12 @@ export function UsersPageClient() {
     void loadUsers()
   }, [])
 
-  function handleCreateChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) {
+  function handleCreateChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
     setCreateForm((current) => ({ ...current, [name]: value }))
   }
 
-  function handleEditChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) {
+  function handleEditChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
     setEditForm((current) => ({ ...current, [name]: value }))
   }
@@ -247,408 +251,323 @@ export function UsersPageClient() {
 
   const currentUserId = session?.user?.id ?? ''
   const adminCount = users.filter((user) => user.role === 'admin').length
-  const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
-  const labelCls = 'block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider'
 
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div className="w-full">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
-                <Shield className="h-5 w-5 text-primary" />
+    <AppPage className="max-w-7xl">
+      <PageHeader
+        eyebrow="Admin panel"
+        title="User accounts, roles, and wallet balances"
+        description="Manage database-backed users and top up operator credit balances without changing the existing auth or wallet flows."
+        actions={<AppButton onClick={() => { setShowCreate(true); setCreateError('') }}>Create User</AppButton>}
+      />
+
+      <AdminNav active="users" />
+
+      {error ? (
+        <div className="rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+          {error}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <SurfaceCard>
+          <p className="py-12 text-center text-sm text-slate-500">Loading users...</p>
+        </SurfaceCard>
+      ) : users.length === 0 ? (
+        <EmptyState
+          title="No users yet"
+          description="Create the first account to enable multi-user login and operator wallet management."
+          action={<AppButton onClick={() => setShowCreate(true)}>Create User</AppButton>}
+        />
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
+          <SurfaceCard className="overflow-hidden p-0">
+            <div className="app-table-wrap rounded-none border-0 shadow-none">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Display Name</th>
+                    <th>Role</th>
+                    <th>Balance</th>
+                    <th>Created</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => {
+                    const isSelf = currentUserId === String(user.id)
+                    const isLastAdmin = user.role === 'admin' && adminCount === 1
+
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[#f4f7f2]">
+                              {user.photoCloudinaryId && CLOUD_NAME ? (
+                                <img
+                                  src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_80,h_80,f_webp/${user.photoCloudinaryId}`}
+                                  alt={user.displayName}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-sm font-semibold text-slate-500">{user.displayName.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-950">{user.username}</p>
+                              {user.phone ? <p className="text-xs text-slate-500">{user.phone}</p> : null}
+                              {isSelf ? <p className="text-xs font-medium text-[#10994c]">You</p> : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{user.displayName}</td>
+                        <td>
+                          <AppBadge tone={user.role === 'admin' ? 'blue' : 'green'}>
+                            {user.role === 'admin' ? <Shield className="h-3 w-3" /> : null}
+                            {user.role}
+                          </AppBadge>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900">{walletBalances[user.id] ?? 0} LKR</span>
+                            <button
+                              onClick={() => { setTopupUser(user); setTopupAmount(''); setTopupDesc('') }}
+                              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8f7ee] text-[#10994c] transition hover:bg-[#dff0e4]"
+                              title="Add credits"
+                            >
+                              <PlusCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                        <td>{formatDate(user.createdAt)}</td>
+                        <td>
+                          <div className="flex justify-end gap-2">
+                            <AppButton variant="secondary" className="h-9 px-3 text-xs" onClick={() => openEdit(user)}>
+                              Edit
+                            </AppButton>
+                            <AppButton
+                              variant="danger"
+                              className="h-9 px-3 text-xs"
+                              onClick={() => { setDeletingUser(user); setDeleteError('') }}
+                              disabled={isSelf || isLastAdmin}
+                            >
+                              Delete
+                            </AppButton>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard className="space-y-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf5ff] text-[#2d6fb0]">
+              <Wallet className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Quick summary</h3>
+              <p className="mt-1 text-sm text-slate-500">Admin and operator management at a glance.</p>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-[1.4rem] border border-[#dde3dc] bg-[#f8faf7] p-4">
+                <p className="text-sm text-slate-500">Total users</p>
+                <p className="mt-1 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{users.length}</p>
               </div>
-              <div>
-                <h1 className="font-display text-3xl text-primary tracking-wider">Admin Panel</h1>
-                <p className="font-stats text-sm text-gray-500">Manage users, access, and pricing</p>
+              <div className="rounded-[1.4rem] border border-[#dde3dc] bg-[#f8faf7] p-4">
+                <p className="text-sm text-slate-500">Operators</p>
+                <p className="mt-1 text-4xl font-semibold tracking-[-0.05em] text-slate-950">
+                  {users.filter((user) => user.role === 'operator').length}
+                </p>
+              </div>
+              <div className="rounded-[1.4rem] border border-[#dde3dc] bg-[#f8faf7] p-4">
+                <p className="text-sm text-slate-500">Admins</p>
+                <p className="mt-1 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{adminCount}</p>
               </div>
             </div>
-            <AdminNav active="users" />
-          </div>
-
-          <button
-            onClick={() => {
-              setShowCreate(true)
-              setCreateError('')
-            }}
-            className="rounded-xl bg-primary px-5 py-2.5 font-stats text-sm font-semibold text-white transition-all duration-300 hover:bg-indigo-600 hover:shadow-[0_4px_20px_rgba(79,70,229,0.4)]"
-          >
-            Create User
-          </button>
+          </SurfaceCard>
         </div>
-
-        {error && (
-          <p className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-stats text-sm text-red-300">
-            {error}
-          </p>
-        )}
-
-        {loading ? (
-          <div className="py-16 text-center font-stats text-gray-500">Loading users...</div>
-        ) : users.length === 0 ? (
-          <div className="rounded-2xl border border-gray-800 bg-gray-900 px-8 py-16 text-center text-gray-500">
-            <p className="font-display text-3xl text-white">NO USERS YET</p>
-            <p className="mt-2 font-stats text-sm">Create the first database-backed account to enable multi-user login.</p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-900/70">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-800 bg-gray-900/90">
-                  <th className="px-4 py-3 text-left font-stats text-xs uppercase tracking-wider text-gray-400">Username</th>
-                  <th className="px-4 py-3 text-left font-stats text-xs uppercase tracking-wider text-gray-400">Display Name</th>
-                  <th className="px-4 py-3 text-left font-stats text-xs uppercase tracking-wider text-gray-400">Role</th>
-                  <th className="px-4 py-3 text-left font-stats text-xs uppercase tracking-wider text-gray-400">Balance</th>
-                  <th className="px-4 py-3 text-left font-stats text-xs uppercase tracking-wider text-gray-400">Created</th>
-                  <th className="px-4 py-3 text-right font-stats text-xs uppercase tracking-wider text-gray-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => {
-                  const isSelf = currentUserId === String(user.id)
-                  const isLastAdmin = user.role === 'admin' && adminCount === 1
-
-                  return (
-                    <tr key={user.id} className="border-t border-gray-800 transition-colors hover:bg-gray-800/40">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-800 border border-gray-700 flex items-center justify-center">
-                            {user.photoCloudinaryId && CLOUD_NAME ? (
-                              <img
-                                src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_80,h_80,f_webp/${user.photoCloudinaryId}`}
-                                alt={user.displayName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="font-stats text-sm font-bold text-gray-400">
-                                {user.displayName.charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-stats text-sm font-semibold text-white">{user.username}</p>
-                            {user.phone && (
-                              <p className="font-stats text-xs text-gray-500">{user.phone}</p>
-                            )}
-                            {isSelf && <p className="font-stats text-xs text-primary">You</p>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 font-stats text-sm text-gray-300">{user.displayName}</td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 font-stats text-[0.7rem] uppercase tracking-[0.2em] ${
-                            user.role === 'admin'
-                              ? 'border-primary/30 bg-primary/10 text-primary'
-                              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                          }`}
-                        >
-                          {user.role === 'admin' && <Shield className="h-3.5 w-3.5" />}
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-stats text-sm text-gray-300">
-                            {walletBalances[user.id] ?? 0} LKR
-                          </span>
-                          <button
-                            onClick={() => { setTopupUser(user); setTopupAmount(''); setTopupDesc('') }}
-                            className="p-1 rounded text-gray-500 hover:text-primary hover:bg-primary/10 transition-colors"
-                            title="Add credits"
-                          >
-                            <PlusCircle className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 font-stats text-sm text-gray-400">{formatDate(user.createdAt)}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => openEdit(user)}
-                            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 font-stats text-sm text-gray-300 transition-colors hover:bg-gray-700"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeletingUser(user)
-                              setDeleteError('')
-                            }}
-                            disabled={isSelf || isLastAdmin}
-                            className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-stats text-sm text-red-300 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
 
       <AnimatePresence>
-        {showCreate && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowCreate(false)}
-            />
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 280, damping: 30 }}
-              className="relative flex h-full w-full max-w-md flex-col border-l border-gray-800 bg-gray-900 shadow-2xl"
-            >
-              <div className="flex items-center justify-between border-b border-gray-800 p-6">
-                <h2 className="font-display text-2xl tracking-widest text-white">NEW USER</h2>
-                <button onClick={() => setShowCreate(false)} className="text-gray-400 transition-colors hover:text-white">
-                  <X className="h-6 w-6" />
-                </button>
+        {showCreate ? (
+          <SidePanel
+            title="New user"
+            onClose={() => setShowCreate(false)}
+            footer={
+              <AppButton form="create-user-form" type="submit" disabled={creating} className="w-full">
+                {creating ? 'Creating...' : 'Create User'}
+              </AppButton>
+            }
+          >
+            <form id="create-user-form" onSubmit={handleCreate} className="space-y-5">
+              {createError ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{createError}</p> : null}
+              <div className="flex justify-center">
+                <ImageUpload
+                  folder="user-profiles"
+                  value={createForm.photoCloudinaryId || null}
+                  onChange={(id) => setCreateForm((f) => ({ ...f, photoCloudinaryId: id }))}
+                  previewShape="circle"
+                  label="Profile Photo"
+                />
               </div>
-
-              <div className="flex-1 overflow-y-auto p-6">
-                <form id="create-user-form" onSubmit={handleCreate} className="space-y-5">
-                  {createError && (
-                    <p className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 font-stats text-sm text-red-300">
-                      {createError}
-                    </p>
-                  )}
-
-                  <div className="flex justify-center">
-                    <ImageUpload
-                      folder="user-profiles"
-                      value={createForm.photoCloudinaryId || null}
-                      onChange={(id) => setCreateForm((f) => ({ ...f, photoCloudinaryId: id }))}
-                      previewShape="circle"
-                      label="Profile Photo"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Username</label>
-                    <input name="username" value={createForm.username} onChange={handleCreateChange} className={inputCls} autoComplete="username" required />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Display Name</label>
-                    <input name="displayName" value={createForm.displayName} onChange={handleCreateChange} className={inputCls} required />
-                  </div>
-                  <div>
-                    <label className={labelCls}>WhatsApp / Phone</label>
-                    <input name="phone" type="tel" value={createForm.phone} onChange={handleCreateChange} className={inputCls} placeholder="+94 77 123 4567" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Role</label>
-                    <select name="role" value={createForm.role} onChange={handleCreateChange} className={inputCls}>
-                      <option value="operator">Operator</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Password</label>
-                    <input name="password" type="password" value={createForm.password} onChange={handleCreateChange} className={inputCls} autoComplete="new-password" required />
-                  </div>
-                </form>
-              </div>
-
-              <div className="border-t border-gray-800 bg-gray-900/70 p-6">
-                <button
-                  form="create-user-form"
-                  type="submit"
-                  disabled={creating}
-                  className="w-full rounded-xl bg-primary py-3 font-stats text-sm font-semibold text-white transition-all hover:bg-indigo-600 disabled:opacity-50"
-                >
-                  {creating ? 'CREATING...' : 'CREATE USER'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              <Field label="Username"><input name="username" value={createForm.username} onChange={handleCreateChange} className={appInputClass} autoComplete="username" required /></Field>
+              <Field label="Display Name"><input name="displayName" value={createForm.displayName} onChange={handleCreateChange} className={appInputClass} required /></Field>
+              <Field label="WhatsApp / Phone"><input name="phone" type="tel" value={createForm.phone} onChange={handleCreateChange} className={appInputClass} placeholder="+94 77 123 4567" /></Field>
+              <Field label="Role">
+                <select name="role" value={createForm.role} onChange={handleCreateChange} className={appInputClass}>
+                  <option value="operator">Operator</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </Field>
+              <Field label="Password"><input name="password" type="password" value={createForm.password} onChange={handleCreateChange} className={appInputClass} autoComplete="new-password" required /></Field>
+            </form>
+          </SidePanel>
+        ) : null}
       </AnimatePresence>
 
-      {editingUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setEditingUser(null)
-          }}
-        >
-          <div className="mx-4 w-full max-w-md space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h2 className="font-stats text-lg font-semibold text-white">Edit User</h2>
-              <button onClick={() => setEditingUser(null)} className="text-xl leading-none text-gray-400 transition-colors hover:text-white">×</button>
-            </div>
-
-            {editError && <p className="font-stats text-sm text-red-300">{editError}</p>}
-
-            <div className="flex justify-center py-2">
-              <ImageUpload
-                folder="user-profiles"
-                value={editForm.photoCloudinaryId || null}
-                onChange={(id) => setEditForm((f) => ({ ...f, photoCloudinaryId: id }))}
-                previewShape="circle"
-                label="Profile Photo"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Username</label>
-              <input name="username" value={editForm.username} onChange={handleEditChange} className={inputCls} autoComplete="username" />
-            </div>
-            <div>
-              <label className={labelCls}>Display Name</label>
-              <input name="displayName" value={editForm.displayName} onChange={handleEditChange} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>WhatsApp / Phone</label>
-              <input name="phone" type="tel" value={editForm.phone} onChange={handleEditChange} className={inputCls} placeholder="+94 77 123 4567" />
-            </div>
-            <div>
-              <label className={labelCls}>Role</label>
-              <select
-                name="role"
-                value={editForm.role}
-                onChange={handleEditChange}
-                className={inputCls}
-                disabled={editingUser.role === 'admin' && adminCount === 1}
-              >
-                <option value="operator">Operator</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>New Password</label>
-              <input name="password" type="password" value={editForm.password} onChange={handleEditChange} className={inputCls} autoComplete="new-password" placeholder="Leave blank to keep current password" />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setEditingUser(null)}
-                className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 font-stats text-sm text-gray-300 transition-colors hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveEdit}
-                disabled={saving}
-                className="flex-1 rounded-lg bg-primary px-4 py-2 font-stats text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
+      {editingUser ? (
+        <ModalCard title="Edit user" onClose={() => setEditingUser(null)}>
+          {editError ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{editError}</p> : null}
+          <div className="flex justify-center py-2">
+            <ImageUpload
+              folder="user-profiles"
+              value={editForm.photoCloudinaryId || null}
+              onChange={(id) => setEditForm((f) => ({ ...f, photoCloudinaryId: id }))}
+              previewShape="circle"
+              label="Profile Photo"
+            />
           </div>
-        </div>
-      )}
-
-      {deletingUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setDeletingUser(null)
-          }}
-        >
-          <div className="mx-4 w-full max-w-md space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
-            <div>
-              <h2 className="font-stats text-lg font-semibold text-white">Delete User</h2>
-              <p className="mt-2 font-stats text-sm text-gray-400">
-                Delete <span className="font-semibold text-white">{deletingUser.username}</span>? This cannot be undone.
-              </p>
-            </div>
-
-            {deleteError && <p className="font-stats text-sm text-red-300">{deleteError}</p>}
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeletingUser(null)}
-                className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 font-stats text-sm text-gray-300 transition-colors hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-stats text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Delete User'}
-              </button>
-            </div>
+          <Field label="Username"><input name="username" value={editForm.username} onChange={handleEditChange} className={appInputClass} autoComplete="username" /></Field>
+          <Field label="Display Name"><input name="displayName" value={editForm.displayName} onChange={handleEditChange} className={appInputClass} /></Field>
+          <Field label="WhatsApp / Phone"><input name="phone" type="tel" value={editForm.phone} onChange={handleEditChange} className={appInputClass} placeholder="+94 77 123 4567" /></Field>
+          <Field label="Role">
+            <select
+              name="role"
+              value={editForm.role}
+              onChange={handleEditChange}
+              className={appInputClass}
+              disabled={editingUser.role === 'admin' && adminCount === 1}
+            >
+              <option value="operator">Operator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </Field>
+          <Field label="New Password"><input name="password" type="password" value={editForm.password} onChange={handleEditChange} className={appInputClass} autoComplete="new-password" placeholder="Leave blank to keep current password" /></Field>
+          <div className="flex gap-3 pt-2">
+            <AppButton variant="secondary" className="flex-1" onClick={() => setEditingUser(null)}>Cancel</AppButton>
+            <AppButton className="flex-1" onClick={handleSaveEdit} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</AppButton>
           </div>
-        </div>
-      )}
-      {/* Add Credits Modal */}
-      {topupUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={(e) => { if (e.target === e.currentTarget) setTopupUser(null) }}
-        >
-          <div className="mx-4 w-full max-w-sm space-y-4 rounded-xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-primary" />
-                <h2 className="font-stats text-lg font-semibold text-white">Add Credits</h2>
-              </div>
-              <button onClick={() => setTopupUser(null)} className="text-gray-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="font-stats text-sm text-gray-400">
-              Adding credits to <span className="text-white font-semibold">{topupUser.displayName}</span>
-              <span className="text-gray-500 ml-1">({walletBalances[topupUser.id] ?? 0} LKR current)</span>
-            </p>
-            <form onSubmit={handleTopup} className="space-y-4">
-              <div>
-                <label className={labelCls}>Amount (LKR)</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={topupAmount}
-                  onChange={(e) => setTopupAmount(e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. 500"
-                  required
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Note (optional)</label>
-                <input
-                  type="text"
-                  value={topupDesc}
-                  onChange={(e) => setTopupDesc(e.target.value)}
-                  className={inputCls}
-                  placeholder="Reason or reference"
-                />
-              </div>
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setTopupUser(null)}
-                  className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 font-stats text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={topupLoading || !topupAmount}
-                  className="flex-1 rounded-lg bg-primary px-4 py-2 font-stats text-sm font-semibold text-white hover:bg-indigo-600 transition-colors disabled:opacity-50"
-                >
-                  {topupLoading ? 'Adding…' : 'Add Credits'}
-                </button>
-              </div>
-            </form>
+        </ModalCard>
+      ) : null}
+
+      {deletingUser ? (
+        <ModalCard title="Delete user" onClose={() => setDeletingUser(null)}>
+          <p className="text-sm text-slate-600">
+            Delete <span className="font-semibold text-slate-950">{deletingUser.username}</span>? This cannot be undone.
+          </p>
+          {deleteError ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{deleteError}</p> : null}
+          <div className="flex gap-3 pt-2">
+            <AppButton variant="secondary" className="flex-1" onClick={() => setDeletingUser(null)}>Cancel</AppButton>
+            <AppButton variant="danger" className="flex-1" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting...' : 'Delete User'}</AppButton>
           </div>
+        </ModalCard>
+      ) : null}
+
+      {topupUser ? (
+        <ModalCard title="Add credits" onClose={() => setTopupUser(null)}>
+          <p className="text-sm text-slate-600">
+            Adding credits to <span className="font-semibold text-slate-950">{topupUser.displayName}</span>
+            <span className="ml-1 text-slate-500">({walletBalances[topupUser.id] ?? 0} LKR current)</span>
+          </p>
+          <form onSubmit={handleTopup} className="space-y-4">
+            <Field label="Amount (LKR)"><input type="number" min={1} value={topupAmount} onChange={(e) => setTopupAmount(e.target.value)} className={appInputClass} placeholder="e.g. 500" required /></Field>
+            <Field label="Note (optional)"><input type="text" value={topupDesc} onChange={(e) => setTopupDesc(e.target.value)} className={appInputClass} placeholder="Reason or reference" /></Field>
+            <div className="flex gap-3 pt-1">
+              <AppButton variant="secondary" className="flex-1" type="button" onClick={() => setTopupUser(null)}>Cancel</AppButton>
+              <AppButton className="flex-1" type="submit" disabled={topupLoading || !topupAmount}>{topupLoading ? 'Adding...' : 'Add Credits'}</AppButton>
+            </div>
+          </form>
+        </ModalCard>
+      ) : null}
+    </AppPage>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className={appLabelClass}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function SidePanel({
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+  footer?: React.ReactNode
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/35 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+        className="relative flex h-full w-full max-w-lg flex-col border-l border-[#d7ddd6] bg-[#f8faf7] shadow-[0_24px_70px_rgba(10,14,18,0.18)]"
+      >
+        <div className="flex items-center justify-between border-b border-[#dfe6df] px-6 py-5">
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-500 transition hover:text-slate-900">
+            <X className="h-5 w-5" />
+          </button>
         </div>
-      )}
-    </main>
+        <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
+        {footer ? <div className="border-t border-[#dfe6df] px-6 py-5">{footer}</div> : null}
+      </motion.div>
+    </div>
+  )
+}
+
+function ModalCard({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 backdrop-blur-sm" onClick={(e) => {
+      if (e.target === e.currentTarget) onClose()
+    }}>
+      <div className="w-full max-w-lg rounded-[2rem] border border-[#d7ddd6] bg-white p-6 shadow-[0_32px_80px_rgba(10,14,18,0.18)]">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4f7f2] text-slate-500 transition hover:text-slate-900">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="space-y-4">{children}</div>
+      </div>
+    </div>
   )
 }

@@ -24,7 +24,11 @@ export function MatchControls() {
   const router = useRouter()
   const [endingInnings, setEndingInnings] = useState(false)
 
-  if (!snapshot) return null
+  if (!snapshot) return (
+    <div className="bg-gray-900 border-t border-gray-800 px-6 py-3">
+      <span className="font-stats text-xs text-gray-500">Loading match…</span>
+    </div>
+  )
 
   const { status, matchId, currentInnings } = snapshot
 
@@ -50,21 +54,31 @@ export function MatchControls() {
     await flushOverToNeon()
     await updateMatchStatus(matchId, 'break')
     setStatus('break')
-    await fetch('/api/pusher/trigger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchId, event: 'break.start', payload: {} }),
-    })
+    try {
+      const res = await fetch('/api/pusher/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId, event: 'break.start', payload: {} }),
+      })
+      if (!res.ok) throw new Error(`Pusher trigger failed: ${res.status}`)
+    } catch (err) {
+      console.error('[MatchControls] break.start trigger failed:', err)
+    }
   }
 
   async function handleResumeBreak() {
     await updateMatchStatus(matchId, 'active')
     setStatus('active')
-    await fetch('/api/pusher/trigger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchId, event: 'break.end', payload: {} }),
-    })
+    try {
+      const res = await fetch('/api/pusher/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId, event: 'break.end', payload: {} }),
+      })
+      if (!res.ok) throw new Error(`Pusher trigger failed: ${res.status}`)
+    } catch (err) {
+      console.error('[MatchControls] break.end trigger failed:', err)
+    }
   }
 
   async function handleEndInnings() {

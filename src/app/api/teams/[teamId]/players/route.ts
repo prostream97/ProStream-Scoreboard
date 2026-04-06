@@ -19,8 +19,12 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { teamId } = await params
   const id = parseInt(teamId, 10)
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid teamId' }, { status: 400 })
 
   try {
     const rows = await db.query.players.findMany({

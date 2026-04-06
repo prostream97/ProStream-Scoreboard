@@ -80,7 +80,7 @@ export function WicketAlert({ wicket, snapshot }: Props) {
 
         {/* Batter name */}
         {outBatter && (
-          <p className="font-display text-4xl text-white/90 tracking-wider mb-3">
+          <p className="font-display text-4xl text-white/90 tracking-wider mb-3 truncate max-w-md">
             {outBatter.displayName.toUpperCase()}
           </p>
         )}

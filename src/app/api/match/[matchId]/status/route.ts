@@ -17,6 +17,8 @@ export async function PATCH(
 
   const { matchId } = await params
   const id = parseInt(matchId, 10)
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid matchId' }, { status: 400 })
+
   const { status } = await req.json()
 
   const validStatuses = ['setup', 'active', 'paused', 'break', 'complete']

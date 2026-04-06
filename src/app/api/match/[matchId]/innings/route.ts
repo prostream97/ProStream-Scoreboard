@@ -31,6 +31,14 @@ export async function POST(
         return NextResponse.json({ error: 'Innings 1 not found' }, { status: 404 })
       }
 
+      // Guard against duplicate innings 2 creation
+      const existingInnings2 = await db.query.innings.findFirst({
+        where: and(eq(innings.matchId, id), eq(innings.inningsNumber, 2)),
+      })
+      if (existingInnings2) {
+        return NextResponse.json({ error: 'Innings 2 already exists' }, { status: 409 })
+      }
+
       const target = innings1.totalRuns + 1
 
       await db

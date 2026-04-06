@@ -8,13 +8,27 @@ import { eq, asc } from 'drizzle-orm'
 export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const tournamentId = searchParams.get('tournamentId')
 
+  if (tournamentId !== null) {
+    const tid = parseInt(tournamentId, 10)
+    if (isNaN(tid)) return NextResponse.json({ error: 'Invalid tournamentId' }, { status: 400 })
+
+    try {
+      const rows = await db.select().from(teams).where(eq(teams.tournamentId, tid)).orderBy(asc(teams.name))
+      return NextResponse.json(rows)
+    } catch (err) {
+      console.error('Teams fetch error:', err)
+      return NextResponse.json({ error: 'Failed to fetch teams' }, { status: 500 })
+    }
+  }
+
   try {
-    const rows = tournamentId
-      ? await db.select().from(teams).where(eq(teams.tournamentId, parseInt(tournamentId, 10))).orderBy(asc(teams.name))
-      : await db.select().from(teams).orderBy(asc(teams.name))
+    const rows = await db.select().from(teams).orderBy(asc(teams.name))
     return NextResponse.json(rows)
   } catch (err) {
     console.error('Teams fetch error:', err)

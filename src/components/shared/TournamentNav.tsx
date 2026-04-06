@@ -14,7 +14,7 @@ export function TournamentNav({ tournamentId, activeSegment }: { tournamentId: n
   const base = `/admin/tournaments/${tournamentId}`
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-gray-900 border border-gray-800 rounded-xl">
+    <div className="app-tabbar">
       {TABS.map(({ label, segment }) => {
         const href = segment ? `${base}/${segment}` : base
         const active = activeSegment !== undefined
@@ -27,10 +27,8 @@ export function TournamentNav({ tournamentId, activeSegment }: { tournamentId: n
           <Link
             key={label}
             href={href}
-            className={`flex-1 text-center px-4 py-2 rounded-lg font-stats text-sm transition-colors ${
-              active
-                ? 'bg-primary text-white font-semibold'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+            className={`app-tab flex-1 ${
+              active ? 'app-tab-active font-semibold' : 'hover:bg-[#f4f7f2] hover:text-slate-900'
             }`}
           >
             {label}

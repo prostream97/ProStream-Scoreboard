@@ -86,7 +86,7 @@ export function StandardScorebug({ snapshot }: Props) {
                 <div data-layer="Container" className="Container" style={{ width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter1.isStriker ? 1 : 0 }}>
                   <div data-layer="▶" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>▶</div>
                 </div>
-                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>{batter1.displayName}</div>
+                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>{batter1.displayName}</div>
               </div>
               <div data-layer="Paragraph" className="Paragraph" style={{ justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex' }}>
                 <div data-layer="Runs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{batter1.runs} </div>
@@ -103,7 +103,7 @@ export function StandardScorebug({ snapshot }: Props) {
                 <div data-layer="Container" className="Container" style={{ width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter2.isStriker ? 1 : 0 }}>
                   <div data-layer="▶" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>▶</div>
                 </div>
-                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>{batter2.displayName}</div>
+                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>{batter2.displayName}</div>
               </div>
               <div data-layer="Paragraph" className="Paragraph" style={{ justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex' }}>
                 <div data-layer="Runs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{batter2.runs} </div>
@@ -155,7 +155,7 @@ export function StandardScorebug({ snapshot }: Props) {
             <>
               <div data-layer="Container" className="Container" style={{ flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 1, display: 'inline-flex' }}>
                 <div data-layer="Container" className="Container" style={{ alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex' }}>
-                  <div data-layer="BowlerName" className="BowlerName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>{currentBowler.displayName}</div>
+                  <div data-layer="BowlerName" className="BowlerName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>{currentBowler.displayName}</div>
                 </div>
                 <div data-layer="Paragraph" className="Paragraph" style={{ alignSelf: 'stretch', justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'inline-flex' }}>
                   <div data-layer="WicketsRuns" className="WicketsRuns" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{currentBowler.wickets}-{currentBowler.runs}  </div>

@@ -1,23 +1,35 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TournamentNav } from '@/components/shared/TournamentNav'
+import {
+  AppBadge,
+  AppButton,
+  AppPage,
+  EmptyState,
+  PageHeader,
+  SurfaceCard,
+} from '@/components/shared/AppPrimitives'
 import type { Player } from '@/types/player'
 import type { TournamentTeamSummary } from '@/types/tournament'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
-const ROLE_COLORS: Record<string, string> = {
-  batsman: 'text-secondary',
-  bowler: 'text-primary',
-  allrounder: 'text-accent',
-  keeper: 'text-overlay-cyan',
+const ROLE_TONES: Record<string, 'neutral' | 'green' | 'blue' | 'amber'> = {
+  batsman: 'blue',
+  bowler: 'green',
+  allrounder: 'amber',
+  keeper: 'neutral',
 }
 
 type TeamWithPlayers = TournamentTeamSummary & { players: Player[] }
 
-export default function PlayersOverviewPage({ params }: { params: Promise<{ id: string }> }) {
+export default function PlayersOverviewPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const { id } = use(params)
   const tournamentId = parseInt(id, 10)
 
@@ -27,134 +39,190 @@ export default function PlayersOverviewPage({ params }: { params: Promise<{ id: 
 
   useEffect(() => {
     async function load() {
-      const tRes = await fetch(`/api/tournaments/${tournamentId}`)
-      if (!tRes.ok) { setLoading(false); return }
-      const tournament = await tRes.json()
+      const tournamentRes = await fetch(`/api/tournaments/${tournamentId}`)
+      if (!tournamentRes.ok) {
+        setLoading(false)
+        return
+      }
+
+      const tournament = await tournamentRes.json()
       setTournamentName(tournament.name)
 
       const teamsWithPlayers: TeamWithPlayers[] = await Promise.all(
         (tournament.teams ?? []).map(async (team: TournamentTeamSummary) => {
-          const pRes = await fetch(`/api/teams/${team.id}/players`)
-          const players: Player[] = pRes.ok ? await pRes.json() : []
+          const playersRes = await fetch(`/api/teams/${team.id}/players`)
+          const players: Player[] = playersRes.ok ? await playersRes.json() : []
           return { ...team, players }
         }),
       )
+
       setTeams(teamsWithPlayers)
       setLoading(false)
     }
+
     load()
   }, [tournamentId])
 
-  const totalPlayers = teams.reduce((sum, t) => sum + t.players.length, 0)
+  const totalPlayers = teams.reduce((sum, team) => sum + team.players.length, 0)
 
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-6 font-stats text-sm text-gray-500">
-          <Link href="/" className="hover:text-gray-300 transition-colors">Dashboard</Link>
+    <AppPage className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <Link href="/" className="transition hover:text-slate-800">
+            Dashboard
+          </Link>
           <span>/</span>
-          <Link href="/admin/tournaments" className="hover:text-gray-300 transition-colors">Tournaments</Link>
+          <Link href="/admin/tournaments" className="transition hover:text-slate-800">
+            Tournaments
+          </Link>
           <span>/</span>
-          <Link href={`/admin/tournaments/${tournamentId}`} className="hover:text-gray-300 transition-colors">{tournamentName || '…'}</Link>
+          <Link
+            href={`/admin/tournaments/${tournamentId}`}
+            className="transition hover:text-slate-800"
+          >
+            {tournamentName || 'Tournament'}
+          </Link>
           <span>/</span>
-          <span className="text-gray-300">Players</span>
+          <span className="text-slate-900">Players</span>
         </div>
 
-        <TournamentNav tournamentId={tournamentId} />
+        <TournamentNav tournamentId={tournamentId} activeSegment="players" />
+      </div>
 
-        <div className="mb-6 mt-6">
-          <h1 className="font-display text-4xl text-primary tracking-wider">PLAYERS</h1>
-          <p className="font-stats text-gray-400 text-sm mt-1">
-            {tournamentName} · {teams.length} {teams.length === 1 ? 'team' : 'teams'} · {totalPlayers} {totalPlayers === 1 ? 'player' : 'players'}
+      <PageHeader
+        eyebrow="Tournament Rosters"
+        title="Players"
+        description="Review each squad and jump into per-team roster editing without changing the underlying player endpoints."
+      />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Teams</p>
+          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            {teams.length}
           </p>
-        </div>
+          <p className="text-sm text-slate-500">Tournament teams with roster access.</p>
+        </SurfaceCard>
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Players</p>
+          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            {totalPlayers}
+          </p>
+          <p className="text-sm text-slate-500">Combined roster count across this tournament.</p>
+        </SurfaceCard>
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Workflow</p>
+          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
+            Team-first editing
+          </p>
+          <p className="text-sm text-slate-500">Roster updates still happen inside the existing team player screen.</p>
+        </SurfaceCard>
+      </section>
 
-        {loading ? (
-          <div className="text-center py-12 font-stats text-gray-500">Loading players...</div>
-        ) : teams.length === 0 ? (
-          <div className="text-center py-16 text-gray-600">
-            <p className="font-display text-3xl mb-2">NO TEAMS YET</p>
-            <p className="font-stats text-sm mb-4">Add teams first, then manage their players.</p>
-            <Link
-              href={`/admin/tournaments/${tournamentId}/teams`}
-              className="px-4 py-2 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors"
-            >
-              Add Teams
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {teams.map((team) => (
-              <div key={team.id} className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-                {/* Team header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800" style={{ borderLeftWidth: 3, borderLeftColor: team.primaryColor }}>
-                  <div className="flex items-center gap-3">
-                    {team.logoCloudinaryId ? (
-                      <img
-                        src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_32,h_32,f_webp/${team.logoCloudinaryId}`}
-                        alt=""
-                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: team.primaryColor + '33' }}>
-                        <span className="w-full h-full flex items-center justify-center font-display text-xs" style={{ color: team.primaryColor }}>
-                          {team.shortCode.charAt(0)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="font-display text-sm tracking-wider" style={{ color: team.primaryColor }}>{team.shortCode}</span>
-                      <span className="font-stats text-sm text-gray-300 ml-2">{team.name}</span>
-                      <span className="font-stats text-xs text-gray-500 ml-2">· {team.players.length} {team.players.length === 1 ? 'player' : 'players'}</span>
+      {loading ? (
+        <SurfaceCard className="py-16 text-center text-sm text-slate-500">
+          Loading players...
+        </SurfaceCard>
+      ) : teams.length === 0 ? (
+        <EmptyState
+          title="No teams yet"
+          description="Create teams for this tournament first, then add players to each roster."
+          action={<AppButton href={`/admin/tournaments/${tournamentId}/teams`}>Add Teams</AppButton>}
+        />
+      ) : (
+        <section className="space-y-5">
+          {teams.map((team) => (
+            <SurfaceCard key={team.id} className="space-y-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  {team.logoCloudinaryId ? (
+                    <img
+                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_72,h_72,f_webp/${team.logoCloudinaryId}`}
+                      alt={team.name}
+                      className="h-16 w-16 rounded-[1.3rem] object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-16 w-16 items-center justify-center rounded-[1.3rem] text-lg font-semibold tracking-[0.18em]"
+                      style={{
+                        backgroundColor: `${team.primaryColor}22`,
+                        color: team.primaryColor,
+                      }}
+                    >
+                      {team.shortCode}
+                    </div>
+                  )}
+
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                      {team.name}
+                    </h2>
+                    <p
+                      className="text-sm font-semibold tracking-[0.18em]"
+                      style={{ color: team.primaryColor }}
+                    >
+                      {team.shortCode}
+                    </p>
+                    <div className="mt-2">
+                      <AppBadge tone="blue">{team.players.length} Players</AppBadge>
                     </div>
                   </div>
-                  <Link
-                    href={`/admin/players?teamId=${team.id}&teamName=${encodeURIComponent(team.name)}&tournamentId=${tournamentId}&tournamentName=${encodeURIComponent(tournamentName)}`}
-                    className="px-3 py-1.5 bg-primary text-white font-stats text-xs rounded-lg hover:bg-indigo-600 transition-colors"
-                  >
-                    Manage →
-                  </Link>
                 </div>
 
-                {/* Player list */}
-                {team.players.length === 0 ? (
-                  <div className="px-4 py-4 text-center">
-                    <p className="font-stats text-xs text-gray-600">No players yet.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-800">
-                    {team.players.map((player) => (
-                      <div key={player.id} className="flex items-center gap-3 px-4 py-2.5">
+                <AppButton
+                  href={`/admin/players?teamId=${team.id}&teamName=${encodeURIComponent(team.name)}&tournamentId=${tournamentId}&tournamentName=${encodeURIComponent(tournamentName)}`}
+                >
+                  Manage Team Players
+                </AppButton>
+              </div>
+
+              {team.players.length === 0 ? (
+                <div className="rounded-[1.5rem] bg-[#f4f7f2] px-5 py-8 text-center text-sm text-slate-500">
+                  No players added yet.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {team.players.map((player) => (
+                    <div
+                      key={player.id}
+                      className="rounded-[1.4rem] border border-[#dbe2db] bg-[#f8faf7] p-4"
+                    >
+                      <div className="flex items-start gap-3">
                         {player.headshotCloudinaryId ? (
                           <img
-                            src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_32,h_32,f_webp/${player.headshotCloudinaryId}`}
-                            alt=""
-                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                            src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_56,h_56,f_webp/${player.headshotCloudinaryId}`}
+                            alt={player.displayName}
+                            className="h-14 w-14 rounded-2xl object-cover"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center font-stats text-xs text-gray-400 flex-shrink-0">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-base font-semibold text-slate-600">
                             {player.displayName.charAt(0)}
                           </div>
                         )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-stats text-sm font-semibold text-white truncate">{player.displayName}</p>
-                          {player.displayName !== player.name && (
-                            <p className="font-stats text-xs text-gray-500 truncate">{player.name}</p>
-                          )}
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-950">
+                            {player.displayName}
+                          </p>
+                          {player.displayName !== player.name ? (
+                            <p className="truncate text-xs text-slate-500">{player.name}</p>
+                          ) : null}
+                          <div className="mt-2">
+                            <AppBadge tone={ROLE_TONES[player.role] ?? 'neutral'}>
+                              {player.role}
+                            </AppBadge>
+                          </div>
                         </div>
-                        <span className={`font-stats text-xs font-semibold capitalize flex-shrink-0 ${ROLE_COLORS[player.role] ?? 'text-gray-400'}`}>
-                          {player.role}
-                        </span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </main>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SurfaceCard>
+          ))}
+        </section>
+      )}
+    </AppPage>
   )
 }

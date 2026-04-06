@@ -56,11 +56,17 @@ export async function PATCH(
     if (key in body) patch[key] = body[key]
   }
 
-  const [updated] = await db
-    .update(tournaments)
-    .set(patch)
-    .where(eq(tournaments.id, tournamentId))
-    .returning()
+  try {
+    const [updated] = await db
+      .update(tournaments)
+      .set(patch)
+      .where(eq(tournaments.id, tournamentId))
+      .returning()
 
-  return NextResponse.json(updated)
+    if (!updated) return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
+    return NextResponse.json(updated)
+  } catch (err) {
+    console.error('Tournament update error:', err)
+    return NextResponse.json({ error: 'Failed to update tournament' }, { status: 500 })
+  }
 }

@@ -10,6 +10,12 @@ export default function OverlayLayout({ children }: { children: ReactNode }) {
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&display=swap"
       />
+      {/* Kufam font for ICC World Cup 2023 overlay theme */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Kufam:wght@400;500;600;700;900&display=swap"
+      />
       <div
         style={{
           width: 1920,

@@ -10,8 +10,6 @@ export default async function NewMatchPage() {
   const tournaments = await getTournamentsWithTeams()
 
   return (
-    <main className="min-h-screen bg-gray-950 px-4 sm:px-8">
-      <NewMatchWizard tournaments={tournaments} />
-    </main>
+    <NewMatchWizard tournaments={tournaments} />
   )
 }

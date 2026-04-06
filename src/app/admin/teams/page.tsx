@@ -1,9 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useSession, signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
+import {
+  AppBadge,
+  AppButton,
+  AppPage,
+  EmptyState,
+  PageHeader,
+  SurfaceCard,
+  appInputClass,
+  appLabelClass,
+} from '@/components/shared/AppPrimitives'
 import type { Team } from '@/types/player'
 import type { Tournament } from '@/types/tournament'
 
@@ -13,8 +23,8 @@ const emptyForm = {
   tournamentId: '',
   name: '',
   shortCode: '',
-  primaryColor: '#4F46E5',
-  secondaryColor: '#10B981',
+  primaryColor: '#1e3a8a',
+  secondaryColor: '#17b45b',
   logoCloudinaryId: '',
 }
 
@@ -24,20 +34,16 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Create form
   const [creating, setCreating] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [createError, setCreateError] = useState('')
-
-  // Edit modal
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
-  async function loadTeams() {
+  const loadTeams = useCallback(async () => {
     const [teamsRes, tournamentsRes] = await Promise.all([
       fetch('/api/teams'),
       fetch('/api/tournaments'),
@@ -46,15 +52,23 @@ export default function TeamsPage() {
     if (teamsRes.ok) setTeams(await teamsRes.json())
     if (tournamentsRes.ok) setTournaments(await tournamentsRes.json())
     setLoading(false)
-  }
+  }, [])
 
-  useEffect(() => { loadTeams() }, [])
+  useEffect(() => {
+    loadTeams()
+  }, [loadTeams])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, target: 'create' | 'edit') {
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    target: 'create' | 'edit',
+  ) {
     const { name, value } = e.target
-    const val = name === 'shortCode' ? value.toUpperCase().slice(0, 3) : value
-    if (target === 'create') setForm((f) => ({ ...f, [name]: val }))
-    else setEditForm((f) => ({ ...f, [name]: val }))
+    const normalized = name === 'shortCode' ? value.toUpperCase().slice(0, 3) : value
+    if (target === 'create') {
+      setForm((current) => ({ ...current, [name]: normalized }))
+    } else {
+      setEditForm((current) => ({ ...current, [name]: normalized }))
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -97,7 +111,9 @@ export default function TeamsPage() {
     setEditError('')
   }
 
-  function closeEdit() { setEditingTeam(null) }
+  function closeEdit() {
+    setEditingTeam(null)
+  }
 
   async function handleEditSave() {
     if (!editingTeam) return
@@ -107,11 +123,16 @@ export default function TeamsPage() {
       const res = await fetch(`/api/teams/${editingTeam.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editForm, logoCloudinaryId: editForm.logoCloudinaryId || null }),
+        body: JSON.stringify({
+          ...editForm,
+          logoCloudinaryId: editForm.logoCloudinaryId || null,
+        }),
       })
       if (res.ok) {
         const updated: Team = await res.json()
-        setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+        setTeams((current) =>
+          current.map((team) => (team.id === updated.id ? updated : team)),
+        )
         closeEdit()
       } else {
         const data = await res.json()
@@ -122,244 +143,408 @@ export default function TeamsPage() {
     }
   }
 
-  const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
-  const labelCls = 'block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider'
-
   function TeamFormFields({
-    f,
+    value,
     onChange,
     idPrefix,
     showTournamentField = false,
   }: {
-    f: typeof emptyForm
+    value: typeof emptyForm
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void
     idPrefix: string
     showTournamentField?: boolean
   }) {
     return (
-      <>
-        <div className="grid grid-cols-2 gap-4">
-          {showTournamentField && (
-            <div className="col-span-2">
-              <label className={labelCls}>Tournament</label>
-              <select
-                name="tournamentId"
-                value={f.tournamentId}
-                onChange={onChange}
-                className={inputCls}
-                required
-              >
-                <option value="">Select tournament</option>
-                {tournaments.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>
-                    {tournament.name} ({tournament.shortName})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+      <div className="space-y-5">
+        {showTournamentField ? (
           <div>
-            <label className={labelCls}>Team Name</label>
-            <input name="name" value={f.name} onChange={onChange} className={inputCls} placeholder="e.g. Mumbai Indians" required />
+            <label className={appLabelClass}>Tournament</label>
+            <select
+              name="tournamentId"
+              value={value.tournamentId}
+              onChange={onChange}
+              className={appInputClass}
+              required
+            >
+              <option value="">Select tournament</option>
+              {tournaments.map((tournament) => (
+                <option key={tournament.id} value={tournament.id}>
+                  {tournament.name} ({tournament.shortName})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className={appLabelClass}>Team Name</label>
+            <input
+              name="name"
+              value={value.name}
+              onChange={onChange}
+              className={appInputClass}
+              placeholder="e.g. Mumbai Indians"
+              required
+            />
           </div>
           <div>
-            <label className={labelCls}>Short Code (3 letters)</label>
-            <input name="shortCode" value={f.shortCode} onChange={onChange} className={inputCls} placeholder="e.g. MI" maxLength={3} required />
+            <label className={appLabelClass}>Short Code</label>
+            <input
+              name="shortCode"
+              value={value.shortCode}
+              onChange={onChange}
+              className={appInputClass}
+              maxLength={3}
+              placeholder="e.g. MI"
+              required
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className={labelCls}>Primary Color</label>
-            <div className="flex gap-2 items-center">
-              <input type="color" name="primaryColor" value={f.primaryColor} onChange={onChange} className="h-10 w-12 rounded border border-gray-700 bg-gray-800 cursor-pointer" />
-              <input name="primaryColor" value={f.primaryColor} onChange={onChange} className={`${inputCls} flex-1`} placeholder="#4F46E5" />
+            <label className={appLabelClass}>Primary Color</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                name="primaryColor"
+                value={value.primaryColor}
+                onChange={onChange}
+                className="h-11 w-14 rounded-2xl border border-[#d7ddd6] bg-white p-1"
+              />
+              <input
+                name="primaryColor"
+                value={value.primaryColor}
+                onChange={onChange}
+                className={appInputClass}
+                placeholder="#1e3a8a"
+              />
             </div>
           </div>
           <div>
-            <label className={labelCls}>Secondary Color</label>
-            <div className="flex gap-2 items-center">
-              <input type="color" name="secondaryColor" value={f.secondaryColor} onChange={onChange} className="h-10 w-12 rounded border border-gray-700 bg-gray-800 cursor-pointer" />
-              <input name="secondaryColor" value={f.secondaryColor} onChange={onChange} className={`${inputCls} flex-1`} placeholder="#10B981" />
+            <label className={appLabelClass}>Secondary Color</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                name="secondaryColor"
+                value={value.secondaryColor}
+                onChange={onChange}
+                className="h-11 w-14 rounded-2xl border border-[#d7ddd6] bg-white p-1"
+              />
+              <input
+                name="secondaryColor"
+                value={value.secondaryColor}
+                onChange={onChange}
+                className={appInputClass}
+                placeholder="#17b45b"
+              />
             </div>
           </div>
         </div>
 
         <ImageUpload
-          value={f.logoCloudinaryId || null}
-          onChange={(publicId) => {
-            // Dispatch a synthetic change to the parent setter via the name convention
-            onChange({ target: { name: 'logoCloudinaryId', value: publicId } } as React.ChangeEvent<HTMLInputElement>)
-          }}
+          value={value.logoCloudinaryId || null}
+          onChange={(publicId) =>
+            onChange({
+              target: { name: 'logoCloudinaryId', value: publicId },
+            } as React.ChangeEvent<HTMLInputElement>)
+          }
           folder="team-logos"
           label="Team Logo (optional)"
           previewShape="square"
           id={`${idPrefix}-logo`}
         />
 
-        {/* Preview strip */}
-        <div className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
-          {f.logoCloudinaryId
-            ? <img src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_32,h_32,f_webp/${f.logoCloudinaryId}`} alt="" className="w-8 h-8 rounded-full object-cover" />
-            : <>
-                <div className="w-8 h-8 rounded-full" style={{ backgroundColor: f.primaryColor }} />
-                <div className="w-8 h-8 rounded-full" style={{ backgroundColor: f.secondaryColor }} />
-              </>
-          }
-          <span className="font-display text-xl tracking-wider" style={{ color: f.primaryColor }}>{f.shortCode || 'XXX'}</span>
-          <span className="font-stats text-gray-300 text-sm">{f.name || 'Team Name'}</span>
+        <div className="rounded-[1.5rem] bg-[#f4f7f2] p-4">
+          <p className="app-kicker">Preview</p>
+          <div className="mt-3 flex items-center gap-3">
+            {value.logoCloudinaryId ? (
+              <img
+                src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_56,h_56,f_webp/${value.logoCloudinaryId}`}
+                alt=""
+                className="h-14 w-14 rounded-2xl object-cover"
+              />
+            ) : (
+              <div className="flex gap-2">
+                <div
+                  className="h-12 w-12 rounded-2xl"
+                  style={{ backgroundColor: value.primaryColor }}
+                />
+                <div
+                  className="h-12 w-12 rounded-2xl"
+                  style={{ backgroundColor: value.secondaryColor }}
+                />
+              </div>
+            )}
+            <div>
+              <p
+                className="text-xl font-semibold tracking-[0.18em]"
+                style={{ color: value.primaryColor }}
+              >
+                {value.shortCode || 'XXX'}
+              </p>
+              <p className="text-sm text-slate-600">{value.name || 'Team Name'}</p>
+            </div>
+          </div>
         </div>
-      </>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-3xl mx-auto">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-6 font-stats text-sm text-gray-500">
-          <Link href="/" className="hover:text-gray-300 transition-colors">Dashboard</Link>
-          <span>/</span>
-          <span className="text-gray-300">Teams</span>
-        </div>
+    <AppPage className="space-y-6">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+        <Link href="/" className="transition hover:text-slate-800">
+          Dashboard
+        </Link>
+        <span>/</span>
+        <span className="text-slate-900">Teams</span>
+      </div>
 
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="font-display text-4xl text-primary tracking-wider">TEAMS</h1>
-          {isAdmin ? (
-            <button
-              onClick={() => { setShowForm((v) => !v); setCreateError('') }}
-              className="px-4 py-2 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 transition-colors text-sm"
+      <PageHeader
+        eyebrow="Clubs and Squads"
+        title="Teams"
+        description="Manage tournament teams, their branding, and the player management entry point without changing the existing team APIs."
+        actions={
+          isAdmin ? (
+            <AppButton
+              type="button"
+              onClick={() => {
+                setShowForm((current) => !current)
+                setCreateError('')
+              }}
             >
-              {showForm ? 'Cancel' : '+ Create Team'}
-            </button>
+              {showForm ? 'Close Form' : 'Create Team'}
+            </AppButton>
           ) : (
-            <button
+            <AppButton
+              type="button"
               onClick={() => signIn(undefined, { callbackUrl: '/admin/teams' })}
-              className="px-4 py-2 bg-gray-700 text-gray-300 font-stats font-semibold rounded-lg hover:bg-gray-600 transition-colors text-sm"
             >
-              Sign in to manage
-            </button>
-          )}
-        </div>
+              Sign In to Manage
+            </AppButton>
+          )
+        }
+      />
 
-        {/* ── Create team form ── */}
-        {showForm && isAdmin && (
-          <form
-            onSubmit={handleCreate}
-            className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6 space-y-4"
-          >
-            <h2 className="font-stats font-semibold text-gray-200">New Team</h2>
-            {createError && <p className="text-red-400 font-stats text-sm">{createError}</p>}
-            <TeamFormFields f={form} onChange={(e) => handleChange(e, 'create')} idPrefix="new" showTournamentField />
-            <button
-              type="submit"
-              disabled={creating}
-              className="w-full py-2.5 bg-primary text-white font-stats font-semibold rounded-lg hover:bg-indigo-600 disabled:opacity-40 transition-colors text-sm"
-            >
-              {creating ? 'Creating...' : 'Create Team'}
-            </button>
-          </form>
-        )}
+      <section className="grid gap-4 md:grid-cols-3">
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Teams</p>
+          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            {teams.length}
+          </p>
+          <p className="text-sm text-slate-500">All teams available for match setup and overlays.</p>
+        </SurfaceCard>
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Tournaments</p>
+          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            {tournaments.length}
+          </p>
+          <p className="text-sm text-slate-500">Team creation still requires assigning a tournament.</p>
+        </SurfaceCard>
+        <SurfaceCard className="space-y-1">
+          <p className="app-kicker">Roster Flow</p>
+          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
+            Team branding plus players
+          </p>
+          <p className="text-sm text-slate-500">Team cards link directly into the existing player management route.</p>
+        </SurfaceCard>
+      </section>
 
-        {/* ── Team list ── */}
-        {loading ? (
-          <div className="text-center py-12 font-stats text-gray-500">Loading teams...</div>
-        ) : teams.length === 0 ? (
-          <div className="text-center py-16 text-gray-600">
-            <p className="font-display text-3xl mb-2">NO TEAMS YET</p>
-            <p className="font-stats text-sm">Create your first team above.</p>
+      {showForm && isAdmin ? (
+        <SurfaceCard className="space-y-5">
+          <div>
+            <p className="app-kicker">Create Team</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+              New Team
+            </h2>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {teams.map((team) => (
-              <div
-                key={team.id}
-                className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-4">
-                  {/* Logo (single display) */}
+
+          {createError ? (
+            <div className="rounded-2xl border border-[#f4c3c1] bg-[#fff3f2] px-4 py-3 text-sm text-[#b94342]">
+              {createError}
+            </div>
+          ) : null}
+
+          <form onSubmit={handleCreate} className="space-y-5">
+            <TeamFormFields
+              value={form}
+              onChange={(e) => handleChange(e, 'create')}
+              idPrefix="new-team"
+              showTournamentField
+            />
+            <div className="flex justify-end">
+              <AppButton type="submit" disabled={creating}>
+                {creating ? 'Creating...' : 'Create Team'}
+              </AppButton>
+            </div>
+          </form>
+        </SurfaceCard>
+      ) : null}
+
+      {loading ? (
+        <SurfaceCard className="py-16 text-center text-sm text-slate-500">
+          Loading teams...
+        </SurfaceCard>
+      ) : teams.length === 0 ? (
+        <EmptyState
+          title="No teams yet"
+          description="Create a team first, then attach players and use that roster in match setup."
+          action={
+            isAdmin ? (
+              <AppButton type="button" onClick={() => setShowForm(true)}>
+                Create First Team
+              </AppButton>
+            ) : undefined
+          }
+        />
+      ) : (
+        <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {teams.map((team) => {
+            const tournament = tournaments.find(
+              (entry) => entry.id === team.tournamentId,
+            )
+
+            return (
+              <SurfaceCard key={team.id} className="flex h-full flex-col gap-4">
+                <div className="flex items-start gap-4">
                   {team.logoCloudinaryId ? (
                     <img
-                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_64,h_64,f_webp/${team.logoCloudinaryId}`}
+                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_88,h_88,f_webp/${team.logoCloudinaryId}`}
                       alt={team.name}
-                      className="w-16 h-16 rounded-xl object-cover border border-gray-700 flex-shrink-0"
+                      className="h-18 w-18 rounded-[1.35rem] object-cover"
                     />
                   ) : (
                     <div
-                      className="w-16 h-16 rounded-xl flex items-center justify-center font-display text-xl tracking-wider border border-white/10 flex-shrink-0"
-                      style={{ backgroundColor: team.primaryColor + '33', color: team.primaryColor }}
+                      className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[1.35rem] text-lg font-semibold tracking-[0.16em]"
+                      style={{
+                        backgroundColor: `${team.primaryColor}22`,
+                        color: team.primaryColor,
+                      }}
                     >
                       {team.shortCode}
                     </div>
                   )}
+
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div>
+                      <h3 className="truncate text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                        {team.name}
+                      </h3>
+                      <p
+                        className="text-sm font-semibold tracking-[0.18em]"
+                        style={{ color: team.primaryColor }}
+                      >
+                        {team.shortCode}
+                      </p>
+                    </div>
+                    {tournament ? (
+                      <AppBadge tone="neutral">{tournament.shortName}</AppBadge>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 rounded-[1.4rem] bg-[#f4f7f2] p-4">
                   <div>
-                    <p className="font-stats font-semibold text-white text-base">{team.name}</p>
-                    <p className="font-display text-lg tracking-wider" style={{ color: team.primaryColor }}>{team.shortCode}</p>
-                    <div className="flex gap-1.5 mt-1">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.primaryColor }} title="Primary" />
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.secondaryColor }} title="Secondary" />
+                    <p className="app-kicker">Primary</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span
+                        className="h-4 w-4 rounded-full border border-white"
+                        style={{ backgroundColor: team.primaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-900">
+                        {team.primaryColor}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="app-kicker">Secondary</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span
+                        className="h-4 w-4 rounded-full border border-white"
+                        style={{ backgroundColor: team.secondaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-900">
+                        {team.secondaryColor}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {isAdmin && (
-                    <button
+                <div className="mt-auto flex flex-wrap justify-end gap-3">
+                  {isAdmin ? (
+                    <AppButton
+                      type="button"
+                      variant="secondary"
                       onClick={() => openEdit(team)}
-                      className="px-3 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
                     >
                       Edit
-                    </button>
-                  )}
-                  <Link
+                    </AppButton>
+                  ) : null}
+                  <AppButton
                     href={`/admin/players?teamId=${team.id}&teamName=${encodeURIComponent(team.name)}`}
-                    className="px-3 py-1.5 bg-gray-800 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
+                    variant="primary"
                   >
                     Manage Players
-                  </Link>
+                  </AppButton>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </SurfaceCard>
+            )
+          })}
+        </section>
+      )}
 
-      {/* ── Edit Team Modal ── */}
-      {editingTeam && (
+      {editingTeam ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={(e) => { if (e.target === e.currentTarget) closeEdit() }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#08110d]/70 px-4 py-8"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeEdit()
+          }}
         >
-          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md mx-4 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="font-stats font-semibold text-white text-lg">Edit Team</h2>
-              <button onClick={closeEdit} className="text-gray-400 hover:text-white transition-colors text-xl leading-none">✕</button>
-            </div>
-
-            {editError && <p className="text-red-400 font-stats text-sm">{editError}</p>}
-
-            <TeamFormFields f={editForm} onChange={(e) => handleChange(e, 'edit')} idPrefix={`edit-${editingTeam.id}`} />
-
-            <div className="flex gap-3 pt-2">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-[#d7ddd6] bg-[#fbfcf8] p-6 shadow-[0_32px_90px_rgba(8,17,13,0.26)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="app-kicker">Team Update</p>
+                <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  Edit Team
+                </h2>
+              </div>
               <button
                 type="button"
                 onClick={closeEdit}
-                className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 text-gray-300 font-stats text-sm rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d7ddd6] text-slate-500 transition hover:bg-white hover:text-slate-900"
+                aria-label="Close edit team modal"
               >
-                Cancel
+                ×
               </button>
-              <button
-                type="button"
-                onClick={handleEditSave}
-                disabled={saving}
-                className="flex-1 px-4 py-2 bg-primary text-white font-stats font-semibold text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save Changes'}
-              </button>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {editError ? (
+                <div className="rounded-2xl border border-[#f4c3c1] bg-[#fff3f2] px-4 py-3 text-sm text-[#b94342]">
+                  {editError}
+                </div>
+              ) : null}
+
+              <TeamFormFields
+                value={editForm}
+                onChange={(e) => handleChange(e, 'edit')}
+                idPrefix={`edit-team-${editingTeam.id}`}
+              />
+
+              <div className="flex flex-wrap justify-end gap-3">
+                <AppButton type="button" variant="secondary" onClick={closeEdit}>
+                  Cancel
+                </AppButton>
+                <AppButton type="button" onClick={handleEditSave} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </AppButton>
+              </div>
             </div>
           </div>
         </div>
-      )}
-    </main>
+      ) : null}
+    </AppPage>
   )
 }

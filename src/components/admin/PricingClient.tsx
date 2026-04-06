@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Settings, DollarSign, Save } from 'lucide-react'
+import { DollarSign, Save, Settings } from 'lucide-react'
 import { AdminNav } from './AdminNav'
+import { AppButton, AppPage, PageHeader, SurfaceCard, appInputClass, appLabelClass } from '@/components/shared/AppPrimitives'
 
 type Props = {
   initialPricing: Record<string, number>
@@ -40,71 +41,69 @@ export function PricingClient({ initialPricing }: Props) {
     }
   }
 
-  const inputCls =
-    'w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white font-body focus:outline-none focus:border-primary text-sm'
-  const labelCls = 'block text-xs font-stats text-gray-400 mb-1 uppercase tracking-wider'
-
   return (
-    <main className="min-h-screen bg-gray-950 p-8">
-      <div className="max-w-xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-            <Settings className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-display text-3xl text-primary tracking-wider">Admin Panel</h1>
-            <p className="font-stats text-sm text-gray-500">Manage users, access, and pricing</p>
-          </div>
-        </div>
+    <AppPage className="max-w-5xl">
+      <PageHeader
+        eyebrow="Admin panel"
+        title="Pricing and operator wallet policy"
+        description="Set the credit cost for overlay generation without changing any backend behavior."
+      />
 
-        <AdminNav active="pricing" />
+      <AdminNav active="pricing" />
 
-        {/* Pricing Card */}
-        <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 space-y-6">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="w-4 h-4 text-primary" />
-            <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
-              Overlay Pricing (LKR)
-            </h2>
-          </div>
-          <p className="text-xs font-stats text-gray-500">
-            Set the LKR cost charged to operators when generating a new overlay URL.
-          </p>
-
-          <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <SurfaceCard className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e8f7ee] text-[#10994c]">
+              <DollarSign className="h-6 w-6" />
+            </div>
             <div>
-              <label className={labelCls}>Match Overlay (LKR)</label>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Overlay pricing</h2>
+              <p className="text-sm text-slate-500">Charges applied when operators generate a fresh overlay URL.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={appLabelClass}>Match Overlay (LKR)</label>
               <input
                 type="number"
                 min={0}
                 value={matchPrice}
                 onChange={(e) => setMatchPrice(e.target.value)}
-                className={inputCls}
+                className={appInputClass}
               />
             </div>
             <div>
-              <label className={labelCls}>Tournament Overlay (LKR)</label>
+              <label className={appLabelClass}>Tournament Overlay (LKR)</label>
               <input
                 type="number"
                 min={0}
                 value={tournamentPrice}
                 onChange={(e) => setTournamentPrice(e.target.value)}
-                className={inputCls}
+                className={appInputClass}
               />
             </div>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving…' : 'Save Pricing'}
-          </button>
-        </div>
+          <AppButton onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving...' : 'Save Pricing'}
+          </AppButton>
+        </SurfaceCard>
+
+        <SurfaceCard className="space-y-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf5ff] text-[#2d6fb0]">
+            <Settings className="h-6 w-6" />
+          </div>
+          <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Usage notes</h3>
+          <ul className="space-y-3 text-sm text-slate-600">
+            <li>Operators are charged when creating a new overlay URL.</li>
+            <li>Admins remain unrestricted.</li>
+            <li>Existing API routes and wallet flows remain unchanged.</li>
+          </ul>
+        </SurfaceCard>
       </div>
-    </main>
+    </AppPage>
   )
 }

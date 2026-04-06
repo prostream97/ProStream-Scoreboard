@@ -34,15 +34,20 @@ export async function PATCH(
     ? eq(overlayLinks.id, linkId)
     : and(eq(overlayLinks.id, linkId), eq(overlayLinks.userId, userId))
 
-  const [updated] = await db
-    .update(overlayLinks)
-    .set({ isActive: body.isActive })
-    .where(whereClause)
-    .returning()
+  try {
+    const [updated] = await db
+      .update(overlayLinks)
+      .set({ isActive: body.isActive })
+      .where(whereClause)
+      .returning()
 
-  if (!updated) {
-    return NextResponse.json({ error: 'Link not found or access denied' }, { status: 404 })
+    if (!updated) {
+      return NextResponse.json({ error: 'Link not found or access denied' }, { status: 404 })
+    }
+
+    return NextResponse.json(updated)
+  } catch (err) {
+    console.error('Overlay link update error:', err)
+    return NextResponse.json({ error: 'Failed to update overlay link' }, { status: 500 })
   }
-
-  return NextResponse.json(updated)
 }

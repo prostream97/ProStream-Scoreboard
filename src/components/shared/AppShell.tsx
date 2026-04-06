@@ -4,9 +4,10 @@ import { usePathname } from 'next/navigation'
 import { Navbar } from './Navbar'
 import { Sidebar } from './Sidebar'
 
-const EXCLUDED = ['/login', '/overlay/']
+const EXCLUDED = ['/login', '/overlay/', '/viewer/']
 
 function isExcluded(pathname: string) {
+  if (pathname.startsWith('/match/') && pathname.endsWith('/operator')) return true
   return EXCLUDED.some((prefix) => pathname.startsWith(prefix))
 }
 
@@ -20,8 +21,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Navbar />
       <Sidebar />
       <div
-        className="transition-[padding-left] duration-300 ease-in-out min-h-screen bg-gray-950 text-gray-100"
-        style={{ paddingTop: '5.5rem', paddingLeft: 'var(--sidebar-width, 240px)' }}
+        className="min-h-screen transition-[padding-left] duration-300 ease-in-out"
+        style={{
+          paddingTop: '4.75rem',
+          paddingLeft: 'var(--sidebar-width, 88px)',
+          paddingBottom: '5.5rem',
+        }}
       >
         {children}
       </div>

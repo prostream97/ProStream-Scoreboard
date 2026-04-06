@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import type { TournamentUserSummary } from '@/types/tournament'
+import { AppBadge, AppButton, SurfaceCard, appInputClass, appLabelClass } from '@/components/shared/AppPrimitives'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
@@ -28,15 +29,15 @@ function UserAvatar({ user }: { user: TournamentUserSummary }) {
     .join('')
 
   return (
-    <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-gray-800 border border-gray-700 flex items-center justify-center">
+    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#f4f7f2]">
       {user.photoCloudinaryId && CLOUD_NAME ? (
         <img
           src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_72,h_72,f_webp/${user.photoCloudinaryId}`}
           alt={user.displayName}
-          className="w-full h-full object-cover"
+          className="h-full w-full object-cover"
         />
       ) : (
-        <span className="font-stats text-xs font-bold text-primary">
+        <span className="text-xs font-semibold text-[#10994c]">
           {initials || user.displayName.charAt(0).toUpperCase()}
         </span>
       )}
@@ -70,7 +71,9 @@ export function TournamentAccessSection({
         setOperators(data.operators)
         setAvailableOperators(data.availableOperators)
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error('[TournamentAccess] Failed to load access data:', err)
+      })
   }, [canManage, tournamentId])
 
   async function handleGrant() {
@@ -128,89 +131,88 @@ export function TournamentAccessSection({
   }
 
   return (
-    <section className="bg-gray-900 rounded-xl p-6 border border-gray-800 space-y-5">
+    <SurfaceCard className="space-y-5">
       <div>
-        <h2 className="font-stats font-semibold text-gray-300 text-sm uppercase tracking-wider">
-          Tournament Access
-        </h2>
-        <p className="font-stats text-xs text-gray-500 mt-1">
+        <p className="app-kicker">Tournament access</p>
+        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Owner and operators</h2>
+        <p className="mt-1 text-sm text-slate-500">
           The creator is the owner and provides tournament branding. Additional granted users act as tournament operators.
         </p>
       </div>
 
-      {owner && (
-        <div className="bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+      {owner ? (
+        <div className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-[#dfe6df] bg-[#f8faf7] px-4 py-3">
           <div className="flex items-center gap-3">
             <UserAvatar user={owner} />
             <div>
-              <p className="font-stats text-sm text-white font-medium">{owner.displayName}</p>
-              <p className="font-stats text-xs text-gray-500">@{owner.username}</p>
+              <p className="font-medium text-slate-950">{owner.displayName}</p>
+              <p className="text-sm text-slate-500">@{owner.username}</p>
             </div>
           </div>
-          <span className="font-stats text-xs uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1">
-            Owner
-          </span>
+          <AppBadge tone="blue">Owner</AppBadge>
         </div>
-      )}
+      ) : null}
 
-      <div className="space-y-2">
-        <p className="font-stats text-xs uppercase tracking-wider text-gray-500">Operators</p>
+      <div className="space-y-3">
+        <p className="app-kicker !text-slate-400">Operators</p>
         {operators.length === 0 ? (
-          <p className="font-stats text-xs text-gray-600">No additional operators granted yet.</p>
+          <p className="text-sm text-slate-500">No additional operators granted yet.</p>
         ) : (
           operators.map((operator) => (
-            <div key={operator.id} className="bg-gray-800 rounded-xl px-4 py-3 flex items-center justify-between gap-4 border border-gray-700">
+            <div key={operator.id} className="flex items-center justify-between gap-4 rounded-[1.35rem] border border-[#dfe6df] bg-[#f8faf7] px-4 py-3">
               <div className="flex items-center gap-3">
                 <UserAvatar user={operator} />
                 <div>
-                  <p className="font-stats text-sm text-white font-medium">{operator.displayName}</p>
-                  <p className="font-stats text-xs text-gray-500">@{operator.username}</p>
+                  <p className="font-medium text-slate-950">{operator.displayName}</p>
+                  <p className="text-sm text-slate-500">@{operator.username}</p>
                 </div>
               </div>
-              {canManage && (
-                <button
+              {canManage ? (
+                <AppButton
+                  variant="danger"
+                  className="h-9 px-3 text-xs"
                   onClick={() => handleRevoke(operator.id)}
                   disabled={revokingId === operator.id}
-                  className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 text-red-300 font-stats text-xs rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-40"
                 >
-                  {revokingId === operator.id ? 'Removing…' : 'Remove'}
-                </button>
-              )}
+                  {revokingId === operator.id ? 'Removing...' : 'Remove'}
+                </AppButton>
+              ) : null}
             </div>
           ))
         )}
       </div>
 
-      {canManage && (
-        <div className="pt-2 border-t border-gray-800 space-y-3">
-          <p className="font-stats text-xs uppercase tracking-wider text-gray-500">Grant Operator Access</p>
+      {canManage ? (
+        <div className="space-y-3 border-t border-[#e2e8e1] pt-4">
+          <p className="app-kicker !text-slate-400">Grant operator access</p>
           {availableOperators.length === 0 ? (
-            <p className="font-stats text-xs text-gray-600">All operator accounts already have access to this tournament.</p>
+            <p className="text-sm text-slate-500">All operator accounts already have access to this tournament.</p>
           ) : (
-            <div className="flex items-center gap-3">
-              <select
-                value={selectedOperatorId}
-                onChange={(e) => setSelectedOperatorId(e.target.value ? Number(e.target.value) : '')}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white font-stats text-sm focus:outline-none focus:border-primary"
-              >
-                <option value="">Select operator…</option>
-                {availableOperators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>
-                    {operator.displayName} (@{operator.username})
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleGrant}
-                disabled={granting || !selectedOperatorId}
-                className="px-4 py-2.5 bg-primary text-white font-stats text-sm rounded-lg hover:bg-indigo-600 transition-colors disabled:opacity-40"
-              >
-                {granting ? 'Granting…' : 'Grant'}
-              </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex-1">
+                <label className={appLabelClass}>Operator</label>
+                <select
+                  value={selectedOperatorId}
+                  onChange={(e) => setSelectedOperatorId(e.target.value ? Number(e.target.value) : '')}
+                  className={appInputClass}
+                >
+                  <option value="">Select operator</option>
+                  {availableOperators.map((operator) => (
+                    <option key={operator.id} value={operator.id}>
+                      {operator.displayName} (@{operator.username})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="pt-[1.85rem]">
+                <AppButton onClick={handleGrant} disabled={granting || !selectedOperatorId}>
+                  {granting ? 'Granting...' : 'Grant'}
+                </AppButton>
+              </div>
             </div>
           )}
         </div>
-      )}
-    </section>
+      ) : null}
+    </SurfaceCard>
   )
 }

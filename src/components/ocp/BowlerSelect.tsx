@@ -38,8 +38,9 @@ export function BowlerSelect() {
     const newStrikerId = isInningsStart ? selectedStrikerId : snapshot.strikerId
     const newNonStrikerId = isInningsStart ? selectedNonStrikerId : snapshot.nonStrikerId
 
-    // Advance the over BEFORE setting the bowler — startNextOver resets currentBowlerId to null,
-    // so it must run first; setBowler then sets the correct value on the already-advanced snapshot.
+    // startNextOver() must run BEFORE setBowler(). startNextOver increments the over counter and
+    // resets currentBowlerId to null. setBowler then writes to the already-advanced snapshot.
+    // Both are synchronous Zustand mutations — this ordering is intentional and safe.
     if (!isInningsStart) {
       startNextOver()
     }
@@ -52,15 +53,20 @@ export function BowlerSelect() {
     setBowler(selectedBowlerId)
 
     // Persist to DB so players survive page refresh
-    await fetch(`/api/match/${snapshot.matchId}/state`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        strikerId: newStrikerId,
-        nonStrikerId: newNonStrikerId,
-        currentBowlerId: selectedBowlerId,
-      }),
-    })
+    try {
+      const res = await fetch(`/api/match/${snapshot.matchId}/state`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strikerId: newStrikerId,
+          nonStrikerId: newNonStrikerId,
+          currentBowlerId: selectedBowlerId,
+        }),
+      })
+      if (!res.ok) console.error('[BowlerSelect] Failed to persist state to DB:', res.status)
+    } catch (err) {
+      console.error('[BowlerSelect] Failed to persist state to DB:', err)
+    }
 
     setSelectedBowlerId(null)
     setSelectedStrikerId(null)
