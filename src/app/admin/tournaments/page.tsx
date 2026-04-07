@@ -132,7 +132,7 @@ export default function TournamentsPage() {
       <PageHeader
         eyebrow="Tournament management"
         title="Series, formats, windows, and launch setup"
-        description="Manage tournaments with a lighter card system and responsive admin layout while keeping the existing CRUD flow intact."
+        description="Manage tournaments."
         actions={
           isAuthenticated ? (
             <AppButton onClick={() => { setShowForm(true); setCreateError('') }}>
@@ -260,9 +260,9 @@ export default function TournamentsPage() {
           {tournaments.map((t) => {
             const windowActive = t.matchDaysFrom && t.matchDaysTo
               ? (() => {
-                  const now = today()
-                  return now >= t.matchDaysFrom! && now <= t.matchDaysTo!
-                })()
+                const now = today()
+                return now >= t.matchDaysFrom! && now <= t.matchDaysTo!
+              })()
               : null
 
             return (
