@@ -11,6 +11,9 @@ export default auth((req) => {
   const publicPrefixes = ['/login', '/overlay/', '/api/', '/_next/', '/favicon']
   if (publicPrefixes.some((p) => path.startsWith(p))) return NextResponse.next()
 
+  // Allow Google Search Console verification files and other static .html files
+  if (path.endsWith('.html')) return NextResponse.next()
+
   if (!isLoggedIn)
     return NextResponse.redirect(new URL('/login', req.url))
 
