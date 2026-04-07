@@ -44,8 +44,8 @@ export function DashboardClient({ tournaments }: TournamentProps) {
       <motion.div variants={itemVars}>
         <PageHeader
           eyebrow="Control Center"
-          title="Broadcast operations, redesigned for every screen"
-          description="A Figma-informed shell for tournament setup, live scoring, overlays, and viewer output without touching the underlying logic."
+          title="Broadcast operations"
+          description="Tournament setup, live scoring, overlays, and viewer output"
           actions={
             <>
               <AppButton href="/match/new">
