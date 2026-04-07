@@ -8,7 +8,7 @@ export default auth((req) => {
   const isAdmin = session?.user?.role === 'admin'
   const path = nextUrl.pathname
 
-  const publicPrefixes = ['/login', '/overlay/', '/api/', '/_next/', '/favicon']
+  const publicPrefixes = ['/login', '/overlay/', '/api/', '/_next/', '/favicon', '/sitemap.xml', '/robots.txt']
   if (publicPrefixes.some((p) => path.startsWith(p))) return NextResponse.next()
 
   // Allow Google Search Console verification files and other static .html files
