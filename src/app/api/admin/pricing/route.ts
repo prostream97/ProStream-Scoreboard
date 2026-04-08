@@ -7,20 +7,19 @@ import { pricingConfig } from '@/lib/db/schema'
 
 export const runtime = 'nodejs'
 
-const PRICING_KEYS = ['overlay_per_match', 'overlay_per_tournament'] as const
+const PRICING_KEYS = ['overlay_per_match', 'overlay_per_tournament', 'overlay_per_day'] as const
 
-// GET /api/admin/pricing — returns { overlay_per_match: N, overlay_per_tournament: N }
+// GET /api/admin/pricing — returns { overlay_per_match: N, overlay_per_tournament: N, overlay_per_day: N }
+// Readable by all authenticated users; PATCH is admin-only
 export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const rows = await db.query.pricingConfig.findMany()
-  // Default fallbacks — these apply when no DB row exists for a key.
-  // Run a seed migration to insert the defaults: overlay_per_match=100, overlay_per_tournament=500
   const result: Record<string, number> = {
     overlay_per_match: 100,
     overlay_per_tournament: 500,
+    overlay_per_day: 200,
   }
   if (rows.length === 0) {
     console.warn('[Pricing] No pricing rows found in DB — using in-memory defaults. Run the seed script to persist them.')

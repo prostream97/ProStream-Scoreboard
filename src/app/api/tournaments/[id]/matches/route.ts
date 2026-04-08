@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
-import { getBattingFirstTeamId } from '@/lib/auth/utils'
+import { getBattingFirstTeamId, isAdminSession } from '@/lib/auth/utils'
 import { canEditTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
 import { matches, matchState, innings, tournaments, teams } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { count, eq } from 'drizzle-orm'
 import type { MatchStage } from '@/types/tournament'
 import { buildTournamentStageStructure, MATCH_STAGE_ORDER } from '@/lib/tournament/stageRules'
 
@@ -87,6 +87,36 @@ export async function POST(
       { error: stageStructure.reasonsByStage[matchStage] ?? 'This match stage is not available right now.' },
       { status: 400 },
     )
+  }
+
+  // ── Plan limit enforcement (operators only) ────────────────────────────────
+  if (!isAdminSession(session)) {
+    if (tournament.planType === 'match' && tournament.matchLimit !== null) {
+      const [{ value: matchCount }] = await db
+        .select({ value: count() })
+        .from(matches)
+        .where(eq(matches.tournamentId, tournamentId))
+      if (matchCount >= tournament.matchLimit) {
+        return NextResponse.json(
+          { error: `Match limit of ${tournament.matchLimit} reached for this tournament plan` },
+          { status: 403 },
+        )
+      }
+    }
+
+    if (tournament.planType === 'daily' && tournament.planDay) {
+      const today = new Date()
+      const yyyy = today.getFullYear()
+      const mm = String(today.getMonth() + 1).padStart(2, '0')
+      const dd = String(today.getDate()).padStart(2, '0')
+      const todayStr = `${yyyy}-${mm}-${dd}`
+      if (tournament.planDay !== todayStr) {
+        return NextResponse.json(
+          { error: `Matches can only be created on ${tournament.planDay} for this daily plan` },
+          { status: 403 },
+        )
+      }
+    }
   }
 
   try {

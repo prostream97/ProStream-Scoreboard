@@ -15,6 +15,7 @@ export function PricingClient({ initialPricing }: Props) {
   const [tournamentPrice, setTournamentPrice] = useState(
     String(initialPricing.overlay_per_tournament ?? 500),
   )
+  const [dayPrice, setDayPrice] = useState(String(initialPricing.overlay_per_day ?? 200))
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
@@ -26,6 +27,7 @@ export function PricingClient({ initialPricing }: Props) {
         body: JSON.stringify({
           overlay_per_match: parseInt(matchPrice, 10),
           overlay_per_tournament: parseInt(tournamentPrice, 10),
+          overlay_per_day: parseInt(dayPrice, 10),
         }),
       })
       if (res.ok) {
@@ -63,9 +65,19 @@ export function PricingClient({ initialPricing }: Props) {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className={appLabelClass}>Match Overlay (LKR)</label>
+              <label className={appLabelClass}>Tournament Plan (LKR)</label>
+              <input
+                type="number"
+                min={0}
+                value={tournamentPrice}
+                onChange={(e) => setTournamentPrice(e.target.value)}
+                className={appInputClass}
+              />
+            </div>
+            <div>
+              <label className={appLabelClass}>Match Plan · per match (LKR)</label>
               <input
                 type="number"
                 min={0}
@@ -75,12 +87,12 @@ export function PricingClient({ initialPricing }: Props) {
               />
             </div>
             <div>
-              <label className={appLabelClass}>Tournament Overlay (LKR)</label>
+              <label className={appLabelClass}>Daily Plan (LKR)</label>
               <input
                 type="number"
                 min={0}
-                value={tournamentPrice}
-                onChange={(e) => setTournamentPrice(e.target.value)}
+                value={dayPrice}
+                onChange={(e) => setDayPrice(e.target.value)}
                 className={appInputClass}
               />
             </div>
@@ -98,9 +110,10 @@ export function PricingClient({ initialPricing }: Props) {
           </div>
           <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Usage notes</h3>
           <ul className="space-y-3 text-sm text-slate-600">
-            <li>Operators are charged when creating a new overlay URL.</li>
-            <li>Admins remain unrestricted.</li>
-            <li>Existing API routes and wallet flows remain unchanged.</li>
+            <li><strong>Tournament plan</strong> — charged once at creation. Unlimited matches within the date range.</li>
+            <li><strong>Match plan</strong> — charged per match × number of matches selected.</li>
+            <li><strong>Daily plan</strong> — charged once. Matches only on the selected day.</li>
+            <li>Admins are always unrestricted and free.</li>
           </ul>
         </SurfaceCard>
       </div>

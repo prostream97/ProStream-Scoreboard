@@ -8,7 +8,7 @@ import { overlayLinks, matches, tournaments, wallets, walletTransactions, pricin
 
 export const runtime = 'nodejs'
 
-// GET /api/overlay-links?matchId=N
+// GET /api/overlay-links?matchId=N OR ?tournamentId=N
 // Admin: all links (optionally filtered). Operator: own links only.
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -16,15 +16,21 @@ export async function GET(req: NextRequest) {
 
   const userId = parseInt(session.user.id, 10)
   const matchIdParam = req.nextUrl.searchParams.get('matchId')
+  const tournamentIdParam = req.nextUrl.searchParams.get('tournamentId')
   const matchId = matchIdParam ? parseInt(matchIdParam, 10) : null
+  const tournamentId = tournamentIdParam ? parseInt(tournamentIdParam, 10) : null
 
   const isAdmin = isAdminSession(session)
 
   const rows = await db.query.overlayLinks.findMany({
-    where: (t, { and: $and, eq: $eq }) => {
+    where: (t, { and: $and, eq: $eq, isNull }) => {
       const conditions = []
       if (!isAdmin) conditions.push($eq(t.userId, userId))
       if (matchId && !isNaN(matchId)) conditions.push($eq(t.matchId, matchId))
+      if (tournamentId && !isNaN(tournamentId)) {
+        conditions.push($eq(t.tournamentId, tournamentId))
+        conditions.push(isNull(t.matchId))
+      }
       return conditions.length ? $and(...conditions as [ReturnType<typeof $eq>]) : undefined
     },
     with: {

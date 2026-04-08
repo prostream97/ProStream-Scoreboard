@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, X, Trophy, Calendar } from 'lucide-react'
+import { Plus, X, Trophy, Calendar, Zap } from 'lucide-react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import {
   AppBadge,
@@ -34,6 +34,9 @@ const emptyForm = {
   logoCloudinaryId: '',
   match_days_from: '',
   match_days_to: '',
+  planType: 'tournament' as 'tournament' | 'match' | 'daily',
+  matchLimit: 5,
+  plan_day: '',
 }
 
 const statusTone: Record<string, 'neutral' | 'blue' | 'amber'> = {
@@ -41,6 +44,12 @@ const statusTone: Record<string, 'neutral' | 'blue' | 'amber'> = {
   group_stage: 'blue',
   knockout: 'amber',
   complete: 'neutral',
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  tournament: 'Tournament',
+  match: 'Match',
+  daily: 'Daily',
 }
 
 function fmtDate(d: string | null) {
@@ -61,6 +70,11 @@ export default function TournamentsPage() {
   const [form, setForm] = useState(emptyForm)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
+  const [pricing, setPricing] = useState<Record<string, number>>({
+    overlay_per_tournament: 500,
+    overlay_per_match: 100,
+    overlay_per_day: 200,
+  })
 
   const loadTournaments = useCallback(async () => {
     const res = await fetch('/api/tournaments')
@@ -69,6 +83,14 @@ export default function TournamentsPage() {
   }, [])
 
   useEffect(() => { loadTournaments() }, [loadTournaments])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetch('/api/admin/pricing').then(r => r.ok ? r.json() : null).then(data => {
+        if (data) setPricing(data)
+      }).catch(() => {})
+    }
+  }, [isAuthenticated])
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
@@ -84,9 +106,17 @@ export default function TournamentsPage() {
         match_days_from: value,
         match_days_to: f.match_days_to < value ? '' : f.match_days_to,
       }))
+    } else if (name === 'matchLimit') {
+      setForm((f) => ({ ...f, matchLimit: Math.max(1, parseInt(value, 10) || 1) }))
     } else {
       setForm((f) => ({ ...f, [name]: value }))
     }
+  }
+
+  function calcPrice() {
+    if (form.planType === 'tournament') return pricing.overlay_per_tournament
+    if (form.planType === 'daily') return pricing.overlay_per_day
+    return pricing.overlay_per_match * form.matchLimit
   }
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
@@ -94,25 +124,35 @@ export default function TournamentsPage() {
     setCreateError('')
 
     if (!isAdmin) {
-      if (!form.match_days_from || !form.match_days_to) {
-        setCreateError('Match days from and to are required')
-        return
-      }
-      const from = new Date(form.match_days_from)
-      const to = new Date(form.match_days_to)
-      const diffDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
-      if (diffDays > 1) {
-        setCreateError('Match days window cannot exceed 2 days')
-        return
+      if (form.planType === 'daily') {
+        if (!form.plan_day) { setCreateError('Please select a day for the daily plan'); return }
+      } else {
+        if (!form.match_days_from || !form.match_days_to) {
+          setCreateError('Match days from and to are required'); return
+        }
       }
     }
 
     setCreating(true)
     try {
+      const payload: Record<string, unknown> = {
+        name: form.name,
+        shortName: form.shortName,
+        format: form.format,
+        totalOvers: form.totalOvers,
+        ballsPerOver: form.ballsPerOver,
+        logoCloudinaryId: form.logoCloudinaryId,
+        planType: form.planType,
+        match_days_from: form.planType === 'daily' ? form.plan_day : form.match_days_from,
+        match_days_to: form.planType === 'daily' ? form.plan_day : form.match_days_to,
+      }
+      if (form.planType === 'match') payload.matchLimit = form.matchLimit
+      if (form.planType === 'daily') payload.plan_day = form.plan_day
+
       const res = await fetch('/api/tournaments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
         setForm(emptyForm)
@@ -130,9 +170,9 @@ export default function TournamentsPage() {
   return (
     <AppPage className="max-w-7xl">
       <PageHeader
-        eyebrow="Tournament management"
-        title="Series, formats, windows, and launch setup"
-        description="Manage tournaments."
+        eyebrow="Tournament setup"
+        title="Series, formats and launch setup"
+        description="Manage tournaments"
         actions={
           isAuthenticated ? (
             <AppButton onClick={() => { setShowForm(true); setCreateError('') }}>
@@ -193,36 +233,135 @@ export default function TournamentsPage() {
                     <input name="ballsPerOver" type="number" min={1} max={10} value={form.ballsPerOver} onChange={handleChange} className={appInputClass} required />
                   </Field>
 
+                  {/* ── Plan selector ── */}
                   <SurfaceCard className="space-y-4 bg-[#f3f7f2]">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-[#10994c]" />
-                      <p className="app-kicker !text-slate-600">Match days window</p>
+                      <Zap className="h-4 w-4 text-[#10994c]" />
+                      <p className="app-kicker !text-slate-600">Overlay plan{!isAdmin ? '' : ' (admin — no charge)'}</p>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label={`From${!isAdmin ? ' *' : ''}`}>
+
+                    <div className="grid gap-2">
+                      {([
+                        {
+                          value: 'tournament' as const,
+                          label: 'Tournament Plan',
+                          desc: 'Unlimited matches within the date range',
+                          price: pricing.overlay_per_tournament,
+                        },
+                        {
+                          value: 'match' as const,
+                          label: 'Match Plan',
+                          desc: 'Fixed number of matches',
+                          price: pricing.overlay_per_match,
+                        },
+                        {
+                          value: 'daily' as const,
+                          label: 'Daily Plan',
+                          desc: 'Matches on one specific day only',
+                          price: pricing.overlay_per_day,
+                        },
+                      ] as const).map((plan) => (
+                        <label
+                          key={plan.value}
+                          className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${form.planType === plan.value ? 'border-[#10994c] bg-white shadow-sm' : 'border-[#dfe6df] bg-[#f8faf7] hover:border-[#b8d7c0]'}`}
+                        >
+                          <input
+                            type="radio"
+                            name="planType"
+                            value={plan.value}
+                            checked={form.planType === plan.value}
+                            onChange={handleChange}
+                            className="mt-0.5 accent-[#10994c]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-900">{plan.label}</p>
+                            <p className="text-xs text-slate-500">{plan.desc}</p>
+                          </div>
+                          {!isAdmin && (
+                            <span className="text-xs font-semibold text-[#10994c] whitespace-nowrap">
+                              {plan.value === 'match' ? `${plan.price} × N LKR` : `${plan.price} LKR`}
+                            </span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Match limit input */}
+                    {form.planType === 'match' && (
+                      <Field label="Number of matches *">
                         <input
-                          name="match_days_from"
+                          name="matchLimit"
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={form.matchLimit}
+                          onChange={handleChange}
+                          className={appInputClass}
+                          required
+                        />
+                      </Field>
+                    )}
+
+                    {/* Price preview for operators */}
+                    {!isAdmin && (
+                      <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 border border-[#dfe6df]">
+                        <p className="text-xs text-slate-500 uppercase tracking-[0.18em]">Total charge</p>
+                        <p className="text-base font-bold text-slate-900">{calcPrice()} LKR</p>
+                      </div>
+                    )}
+                  </SurfaceCard>
+
+                  {/* ── Date fields ── */}
+                  {form.planType === 'daily' ? (
+                    <SurfaceCard className="space-y-4 bg-[#f3f7f2]">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-[#10994c]" />
+                        <p className="app-kicker !text-slate-600">Match day</p>
+                      </div>
+                      <Field label="Select day *">
+                        <input
+                          name="plan_day"
                           type="date"
-                          value={form.match_days_from}
+                          value={form.plan_day}
                           onChange={handleChange}
                           min={today()}
                           className={appInputClass}
                           required={!isAdmin}
                         />
                       </Field>
-                      <Field label={`To${!isAdmin ? ' *' : ''}`}>
-                        <input
-                          name="match_days_to"
-                          type="date"
-                          value={form.match_days_to}
-                          onChange={handleChange}
-                          min={form.match_days_from || today()}
-                          className={appInputClass}
-                          required={!isAdmin}
-                        />
-                      </Field>
-                    </div>
-                  </SurfaceCard>
+                    </SurfaceCard>
+                  ) : (
+                    <SurfaceCard className="space-y-4 bg-[#f3f7f2]">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-[#10994c]" />
+                        <p className="app-kicker !text-slate-600">Match days window</p>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label={`From${!isAdmin ? ' *' : ''}`}>
+                          <input
+                            name="match_days_from"
+                            type="date"
+                            value={form.match_days_from}
+                            onChange={handleChange}
+                            min={today()}
+                            className={appInputClass}
+                            required={!isAdmin}
+                          />
+                        </Field>
+                        <Field label={`To${!isAdmin ? ' *' : ''}`}>
+                          <input
+                            name="match_days_to"
+                            type="date"
+                            value={form.match_days_to}
+                            onChange={handleChange}
+                            min={form.match_days_from || today()}
+                            className={appInputClass}
+                            required={!isAdmin}
+                          />
+                        </Field>
+                      </div>
+                    </SurfaceCard>
+                  )}
 
                   <ImageUpload
                     value={form.logoCloudinaryId || null}
@@ -237,7 +376,7 @@ export default function TournamentsPage() {
 
               <div className="border-t border-[#dfe6df] px-6 py-5">
                 <AppButton form="create-tournament-form" type="submit" disabled={creating} className="w-full">
-                  {creating ? 'Creating...' : 'Create Tournament'}
+                  {creating ? 'Creating...' : `Create Tournament${!isAdmin ? ` · ${calcPrice()} LKR` : ''}`}
                 </AppButton>
               </div>
             </motion.div>
@@ -290,10 +429,14 @@ export default function TournamentsPage() {
                           <p className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{t.name}</p>
                           <AppBadge tone="neutral">{t.shortName}</AppBadge>
                           <AppBadge tone={statusTone[t.status] ?? 'neutral'}>{t.status.replace('_', ' ')}</AppBadge>
+                          {(t as any).planType && (
+                            <AppBadge tone="blue">{PLAN_LABELS[(t as any).planType] ?? (t as any).planType}</AppBadge>
+                          )}
                         </div>
                         <p className="mt-2 text-sm text-slate-600">
                           {t.format} . {t.totalOvers} overs
                           {t.ballsPerOver !== 6 ? ` . ${t.ballsPerOver} balls/over` : ''}
+                          {(t as any).matchLimit ? ` . ${(t as any).matchLimit} matches` : ''}
                         </p>
                         <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">{fmtId(t.id)}</p>
                       </div>

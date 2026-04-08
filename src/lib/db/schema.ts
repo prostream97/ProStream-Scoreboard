@@ -102,6 +102,8 @@ export const overlayModeEnum = pgEnum('overlay_mode', ['bug', 'card', 'partnersh
 
 export const transactionTypeEnum = pgEnum('transaction_type', ['topup', 'deduction'])
 
+export const planTypeEnum = pgEnum('plan_type', ['tournament', 'match', 'daily'])
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export const users = pgTable(
@@ -137,6 +139,9 @@ export const tournaments = pgTable('tournaments', {
   createdBy: integer('created_by').references(() => users.id),
   matchDaysFrom: date('match_days_from'),
   matchDaysTo: date('match_days_to'),
+  planType: planTypeEnum('plan_type').notNull().default('tournament'),
+  matchLimit: integer('match_limit'),
+  planDay: date('plan_day'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
@@ -291,14 +296,13 @@ export const matchState = pgTable('match_state', {
 
 export const overlayLinks = pgTable('overlay_links', {
   id: serial('id').primaryKey(),
-  matchId: integer('match_id')
-    .notNull()
-    .references(() => matches.id, { onDelete: 'cascade' }),
+  matchId: integer('match_id').references(() => matches.id, { onDelete: 'cascade' }),
+  tournamentId: integer('tournament_id').references(() => tournaments.id, { onDelete: 'cascade' }),
   userId: integer('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   token: varchar('token', { length: 64 }).notNull().unique(),
-  mode: overlayModeEnum('mode').notNull().default('bug'),
+  mode: overlayModeEnum('mode').notNull().default('standard'),
   label: text('label'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -447,6 +451,7 @@ export const matchStateRelations = relations(matchState, ({ one }) => ({
 
 export const overlayLinksRelations = relations(overlayLinks, ({ one }) => ({
   match: one(matches, { fields: [overlayLinks.matchId], references: [matches.id] }),
+  tournament: one(tournaments, { fields: [overlayLinks.tournamentId], references: [tournaments.id] }),
   user: one(users, { fields: [overlayLinks.userId], references: [users.id] }),
 }))
 

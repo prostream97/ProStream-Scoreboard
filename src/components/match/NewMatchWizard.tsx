@@ -108,8 +108,8 @@ export function NewMatchWizard({ tournaments }: WizardProps) {
     <AppPage className="max-w-6xl">
       <PageHeader
         eyebrow="Match setup"
-        title="Start a live match in three steps"
-        description="Choose the tournament, assign the teams, and launch the operator control room without changing the current creation flow."
+        title="Start a live match"
+        description="Choose the tournament, assign the teams, and launch the operator control room."
       />
 
       <SurfaceCard className="space-y-6">
