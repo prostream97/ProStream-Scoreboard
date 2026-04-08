@@ -46,6 +46,7 @@ export function Sidebar() {
   const isTournamentsActive = pathname.startsWith('/admin/tournaments')
   const isMatchActive = pathname.startsWith('/match/new')
   const isOverlayActive = pathname.startsWith('/overlay-manager')
+  const isWalletActive = pathname.startsWith('/wallet')
   const isAdminActive =
     pathname.startsWith('/admin/users') ||
     pathname.startsWith('/admin/access') ||
@@ -223,7 +224,7 @@ export function Sidebar() {
       </aside>
 
       <div className="app-shell-surface fixed inset-x-3 bottom-3 z-40 rounded-full border px-2 py-2 shadow-[0_18px_50px_rgba(10,14,18,0.16)] md:hidden">
-        <nav className="grid grid-cols-4 gap-1">
+        <nav className="grid grid-cols-5 gap-1">
           <BottomNavLink href="/" label="Home" active={isDashboardActive} icon={LayoutDashboard} />
           <BottomNavLink href="/admin/tournaments" label="Series" active={isTournamentsActive} icon={Trophy} />
           <BottomNavLink href="/match/new" label="Match" active={isMatchActive} icon={PlayCircle} />
@@ -233,6 +234,7 @@ export function Sidebar() {
             active={isAdmin ? isAdminActive : isOverlayActive}
             icon={isAdmin ? Shield : Monitor}
           />
+          <BottomNavLink href="/wallet" label="Wallet" active={isWalletActive} icon={Wallet} />
         </nav>
       </div>
     </>
