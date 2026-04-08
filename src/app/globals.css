@@ -86,7 +86,16 @@
   }
 
   .app-tabbar {
-    @apply flex flex-wrap items-center gap-2 rounded-full border bg-white/80 p-1.5 shadow-[0_8px_24px_rgba(26,36,32,0.04)];
+    @apply flex items-center gap-2 rounded-full border bg-white/80 px-1.5 py-1.5 shadow-[0_8px_24px_rgba(26,36,32,0.04)];
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .app-tabbar::-webkit-scrollbar {
+    display: none;
   }
 
   .app-tab {

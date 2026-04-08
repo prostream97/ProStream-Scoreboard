@@ -405,10 +405,10 @@ export default function TournamentsPage() {
               : null
 
             return (
-              <button
+              <div
                 key={t.id}
                 onClick={() => router.push(`/admin/tournaments/${t.id}`)}
-                className="text-left"
+                className="cursor-pointer text-left"
               >
                 <SurfaceCard className="h-full transition hover:-translate-y-0.5 hover:border-[#b8d7c0] hover:shadow-[0_18px_38px_rgba(26,36,32,0.08)]">
                   <div className="flex items-start justify-between gap-4">
@@ -463,7 +463,7 @@ export default function TournamentsPage() {
                     </div>
                   </div>
                 </SurfaceCard>
-              </button>
+              </div>
             )
           })}
         </div>

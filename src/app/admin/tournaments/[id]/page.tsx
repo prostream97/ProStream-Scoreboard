@@ -231,16 +231,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         <SurfaceCard className="space-y-5">
           {/* Header row: logo + info + status dropdown */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.25rem] border border-[#dfe6df] bg-[#f4f7f2] sm:h-20 sm:w-20 sm:rounded-[1.5rem]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] border border-[#dfe6df] bg-[#f4f7f2] sm:h-20 sm:w-20">
                 {tournament.logoCloudinaryId && CLOUD_NAME ? (
                   <img
-                    src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_96,h_96,f_webp/${tournament.logoCloudinaryId}`}
+                    src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_120,h_120,f_webp/${tournament.logoCloudinaryId}`}
                     alt={tournament.name}
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <Trophy className="h-7 w-7 text-[#10994c] sm:h-8 sm:w-8" />
+                  <Trophy className="h-9 w-9 text-[#10994c] sm:h-8 sm:w-8" />
                 )}
               </div>
               <div className="min-w-0 space-y-1">

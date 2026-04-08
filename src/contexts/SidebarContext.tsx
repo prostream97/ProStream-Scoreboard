@@ -22,9 +22,17 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return
-    const width = isOpen ? '280px' : '88px'
-    document.documentElement.style.setProperty('--sidebar-width', width)
+
+    function applyWidth() {
+      const isMobile = window.innerWidth < 768
+      const width = isMobile ? '0px' : isOpen ? '280px' : '88px'
+      document.documentElement.style.setProperty('--sidebar-width', width)
+    }
+
+    applyWidth()
     localStorage.setItem('sidebar_open', String(isOpen))
+    window.addEventListener('resize', applyWidth)
+    return () => window.removeEventListener('resize', applyWidth)
   }, [isOpen, mounted])
 
   return (

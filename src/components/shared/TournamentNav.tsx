@@ -28,7 +28,7 @@ export function TournamentNav({ tournamentId, activeSegment }: { tournamentId: n
           <Link
             key={label}
             href={href}
-            className={`app-tab flex-1 ${
+            className={`app-tab shrink-0 ${
               active ? 'app-tab-active font-semibold' : 'hover:bg-[#f4f7f2] hover:text-slate-900'
             }`}
           >

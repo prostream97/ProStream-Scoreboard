@@ -160,9 +160,8 @@ export default function TeamsPage({
     <AppPage className="space-y-6">
       <TournamentNav tournamentId={tournamentId} />
 
-      <div className="flex items-center justify-between gap-4">
-        <div />
-        {isAuthenticated ? (
+      {isAuthenticated ? (
+        <div className="flex justify-end -mt-3">
           <AppButton
             type="button"
             onClick={() => {
@@ -172,8 +171,8 @@ export default function TeamsPage({
           >
             {showForm ? 'Close Form' : 'Add Team'}
           </AppButton>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {addError ? (
         <SurfaceCard className="border-[#f4c3c1] bg-[#fff3f2] text-sm text-[#b94342]">
@@ -358,19 +357,21 @@ export default function TeamsPage({
                 </div>
               </div>
 
-              <div className="mt-auto flex flex-wrap justify-end gap-3">
+              <div className="mt-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
                 <AppButton
                   href={`/admin/players?teamId=${team.id}&teamName=${encodeURIComponent(team.name)}&tournamentId=${tournamentId}&tournamentName=${encodeURIComponent(tournamentName)}`}
                   variant="primary"
+                  className="w-full sm:w-auto"
                 >
                   Manage Players
                 </AppButton>
                 {isAuthenticated ? (
-                  <>
+                  <div className="flex gap-2 sm:contents">
                     <AppButton
                       type="button"
                       variant="secondary"
                       onClick={() => openEdit(team)}
+                      className="flex-1 sm:flex-none"
                     >
                       Edit
                     </AppButton>
@@ -378,10 +379,11 @@ export default function TeamsPage({
                       type="button"
                       variant="danger"
                       onClick={() => handleDelete(team.id)}
+                      className="flex-1 sm:flex-none"
                     >
                       Delete
                     </AppButton>
-                  </>
+                  </div>
                 ) : null}
               </div>
             </SurfaceCard>
