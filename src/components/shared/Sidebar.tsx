@@ -13,6 +13,7 @@ import {
   PlayCircle,
   Shield,
   Trophy,
+  Wallet,
 } from 'lucide-react'
 import { useSidebar } from '@/contexts/SidebarContext'
 
@@ -62,7 +63,7 @@ export function Sidebar() {
     },
     {
       href: '/match/new',
-      label: 'New Match',
+      label: 'Quick Match',
       icon: PlayCircle,
       match: (path) => path.startsWith('/match/new'),
     },
@@ -71,6 +72,12 @@ export function Sidebar() {
       label: 'Overlay',
       icon: Monitor,
       match: (path) => path.startsWith('/overlay-manager'),
+    },
+    {
+      href: '/wallet',
+      label: 'Wallet',
+      icon: Wallet,
+      match: (path) => path.startsWith('/wallet'),
     },
   ]
 

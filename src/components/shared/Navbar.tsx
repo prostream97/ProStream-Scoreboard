@@ -12,8 +12,9 @@ const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 const TITLES: Array<{ match: (pathname: string) => boolean; label: string }> = [
   { match: (pathname) => pathname === '/', label: 'Dashboard' },
   { match: (pathname) => pathname.startsWith('/admin/tournaments'), label: 'Tournaments' },
-  { match: (pathname) => pathname.startsWith('/match/new'), label: 'New Match' },
+  { match: (pathname) => pathname.startsWith('/match/new'), label: 'Quick Match' },
   { match: (pathname) => pathname.startsWith('/overlay-manager'), label: 'Overlay Manager' },
+  { match: (pathname) => pathname.startsWith('/wallet'), label: 'Wallet' },
   { match: (pathname) => pathname.startsWith('/admin/users'), label: 'User Management' },
   { match: (pathname) => pathname.startsWith('/admin/access'), label: 'Tournament Access' },
   { match: (pathname) => pathname.startsWith('/admin/pricing'), label: 'Pricing' },
@@ -61,7 +62,7 @@ export function Navbar() {
           : 'border-b border-transparent bg-[#151822]'
       }`}
     >
-      <div className="mx-auto flex h-[4.75rem] w-full max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="flex h-[4.75rem] w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={toggle}
@@ -80,12 +81,13 @@ export function Navbar() {
               />
             </div>
             <div className="hidden min-w-0 sm:block">
-              <p className="truncate font-stats text-[0.72rem] uppercase tracking-[0.28em] text-emerald-300/90">
-                Cricket Live Control
+              <p className="text-2xl font-bold leading-none tracking-tight">
+                <span style={{ color: '#4F46E5' }}>Pro</span>
+                <span style={{ color: '#10B981' }}>Stream</span>
               </p>
-              <div className="flex items-center gap-2">
-                <p className="truncate text-lg font-semibold tracking-[-0.03em] text-white">{getPageTitle(pathname)}</p>
-                {pathname !== '/' ? <ChevronRight className="h-4 w-4 text-white/35" /> : null}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="truncate text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-white/45">{getPageTitle(pathname)}</p>
+                {pathname !== '/' ? <ChevronRight className="h-3 w-3 text-white/30" /> : null}
               </div>
             </div>
           </Link>

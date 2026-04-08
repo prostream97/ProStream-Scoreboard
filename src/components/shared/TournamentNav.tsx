@@ -7,6 +7,7 @@ const TABS = [
   { label: 'Main', segment: '' },
   { label: 'Teams', segment: 'teams' },
   { label: 'Players', segment: 'players' },
+  { label: 'Access', segment: 'access' },
 ]
 
 export function TournamentNav({ tournamentId, activeSegment }: { tournamentId: number; activeSegment?: string }) {

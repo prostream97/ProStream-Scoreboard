@@ -485,3 +485,16 @@ export async function getMatchList() {
   })
   return rows
 }
+
+export async function getLiveMatches() {
+  return db.query.matches.findMany({
+    where: inArray(matches.status, ['active', 'paused', 'break']),
+    with: {
+      homeTeam: true,
+      awayTeam: true,
+      innings: true,
+      tournament: { columns: { name: true, shortName: true } },
+    },
+    orderBy: (m, { desc }) => [desc(m.createdAt)],
+  })
+}

@@ -1,8 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { signIn, useSession } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import {
@@ -10,7 +9,6 @@ import {
   AppButton,
   AppPage,
   EmptyState,
-  PageHeader,
   SurfaceCard,
   appInputClass,
   appLabelClass,
@@ -160,75 +158,22 @@ export default function TeamsPage({
 
   return (
     <AppPage className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <Link href="/" className="transition hover:text-slate-800">
-            Dashboard
-          </Link>
-          <span>/</span>
-          <Link href="/admin/tournaments" className="transition hover:text-slate-800">
-            Tournaments
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/admin/tournaments/${tournamentId}`}
-            className="transition hover:text-slate-800"
+      <TournamentNav tournamentId={tournamentId} />
+
+      <div className="flex items-center justify-between gap-4">
+        <div />
+        {isAuthenticated ? (
+          <AppButton
+            type="button"
+            onClick={() => {
+              setShowForm((current) => !current)
+              setAddError('')
+            }}
           >
-            {tournamentName || 'Tournament'}
-          </Link>
-          <span>/</span>
-          <span className="text-slate-900">Teams</span>
-        </div>
-
-        <TournamentNav tournamentId={tournamentId} />
+            {showForm ? 'Close Form' : 'Add Team'}
+          </AppButton>
+        ) : null}
       </div>
-
-      <PageHeader
-        eyebrow="Tournament Squads"
-        title="Teams"
-        description="Manage the teams assigned to this tournament and keep roster access one step away."
-        actions={
-          isAdmin ? (
-            <AppButton
-              type="button"
-              onClick={() => {
-                setShowForm((current) => !current)
-                setAddError('')
-              }}
-            >
-              {showForm ? 'Close Form' : 'Add Team'}
-            </AppButton>
-          ) : (
-            <AppButton type="button" onClick={() => signIn()}>
-              Sign In to Manage
-            </AppButton>
-          )
-        }
-      />
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Teams</p>
-          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-            {teams.length}
-          </p>
-          <p className="text-sm text-slate-500">Tournament entries currently available.</p>
-        </SurfaceCard>
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Player Access</p>
-          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
-            Per-team management
-          </p>
-          <p className="text-sm text-slate-500">Each card routes into the existing player editor for that team.</p>
-        </SurfaceCard>
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Branding</p>
-          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
-            Colors and logo stay intact
-          </p>
-          <p className="text-sm text-slate-500">Overlay and scoreboard identity keep using the same stored values.</p>
-        </SurfaceCard>
-      </section>
 
       {addError ? (
         <SurfaceCard className="border-[#f4c3c1] bg-[#fff3f2] text-sm text-[#b94342]">
@@ -236,7 +181,7 @@ export default function TeamsPage({
         </SurfaceCard>
       ) : null}
 
-      {showForm && isAdmin ? (
+      {showForm && isAuthenticated ? (
         <SurfaceCard className="space-y-5">
           <div>
             <p className="app-kicker">Create Team</p>
@@ -340,7 +285,7 @@ export default function TeamsPage({
           title="No teams added"
           description="Create a team for this tournament first, then attach players and use the same data in match setup."
           action={
-            isAdmin ? (
+            isAuthenticated ? (
               <AppButton type="button" onClick={() => setShowForm(true)}>
                 Add First Team
               </AppButton>
@@ -420,7 +365,7 @@ export default function TeamsPage({
                 >
                   Manage Players
                 </AppButton>
-                {isAdmin ? (
+                {isAuthenticated ? (
                   <>
                     <AppButton
                       type="button"

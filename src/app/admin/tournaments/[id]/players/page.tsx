@@ -1,20 +1,20 @@
 'use client'
 
 import { use, useEffect, useState } from 'react'
-import Link from 'next/link'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import {
   AppBadge,
   AppButton,
   AppPage,
   EmptyState,
-  PageHeader,
   SurfaceCard,
 } from '@/components/shared/AppPrimitives'
 import type { Player } from '@/types/player'
 import type { TournamentTeamSummary } from '@/types/tournament'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+
+type Role = 'batsman' | 'bowler' | 'allrounder' | 'keeper'
 
 const ROLE_TONES: Record<string, 'neutral' | 'green' | 'blue' | 'amber'> = {
   batsman: 'blue',
@@ -63,62 +63,9 @@ export default function PlayersOverviewPage({
     load()
   }, [tournamentId])
 
-  const totalPlayers = teams.reduce((sum, team) => sum + team.players.length, 0)
-
   return (
     <AppPage className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <Link href="/" className="transition hover:text-slate-800">
-            Dashboard
-          </Link>
-          <span>/</span>
-          <Link href="/admin/tournaments" className="transition hover:text-slate-800">
-            Tournaments
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/admin/tournaments/${tournamentId}`}
-            className="transition hover:text-slate-800"
-          >
-            {tournamentName || 'Tournament'}
-          </Link>
-          <span>/</span>
-          <span className="text-slate-900">Players</span>
-        </div>
-
-        <TournamentNav tournamentId={tournamentId} activeSegment="players" />
-      </div>
-
-      <PageHeader
-        eyebrow="Tournament Rosters"
-        title="Players"
-        description="Review each squad and jump into per-team roster editing without changing the underlying player endpoints."
-      />
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Teams</p>
-          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-            {teams.length}
-          </p>
-          <p className="text-sm text-slate-500">Tournament teams with roster access.</p>
-        </SurfaceCard>
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Players</p>
-          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-            {totalPlayers}
-          </p>
-          <p className="text-sm text-slate-500">Combined roster count across this tournament.</p>
-        </SurfaceCard>
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Workflow</p>
-          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
-            Team-first editing
-          </p>
-          <p className="text-sm text-slate-500">Roster updates still happen inside the existing team player screen.</p>
-        </SurfaceCard>
-      </section>
+      <TournamentNav tournamentId={tournamentId} activeSegment="players" />
 
       {loading ? (
         <SurfaceCard className="py-16 text-center text-sm text-slate-500">
@@ -131,20 +78,21 @@ export default function PlayersOverviewPage({
           action={<AppButton href={`/admin/tournaments/${tournamentId}/teams`}>Add Teams</AppButton>}
         />
       ) : (
-        <section className="space-y-5">
+        <section className="space-y-8">
           {teams.map((team) => (
-            <SurfaceCard key={team.id} className="space-y-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div key={team.id} className="space-y-4">
+              {/* Team header card */}
+              <SurfaceCard className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
                   {team.logoCloudinaryId ? (
                     <img
-                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_72,h_72,f_webp/${team.logoCloudinaryId}`}
+                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_88,h_88,f_webp/${team.logoCloudinaryId}`}
                       alt={team.name}
-                      className="h-16 w-16 rounded-[1.3rem] object-cover"
+                      className="h-[4.5rem] w-[4.5rem] rounded-[1.35rem] object-cover"
                     />
                   ) : (
                     <div
-                      className="flex h-16 w-16 items-center justify-center rounded-[1.3rem] text-lg font-semibold tracking-[0.18em]"
+                      className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[1.35rem] text-lg font-semibold tracking-[0.16em]"
                       style={{
                         backgroundColor: `${team.primaryColor}22`,
                         color: team.primaryColor,
@@ -155,16 +103,12 @@ export default function PlayersOverviewPage({
                   )}
 
                   <div>
-                    <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                    <p className="app-kicker">Team</p>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                       {team.name}
                     </h2>
-                    <p
-                      className="text-sm font-semibold tracking-[0.18em]"
-                      style={{ color: team.primaryColor }}
-                    >
-                      {team.shortCode}
-                    </p>
-                    <div className="mt-2">
+                    <p className="mt-1 text-sm text-slate-500">{tournamentName}</p>
+                    <div className="mt-3">
                       <AppBadge tone="blue">{team.players.length} Players</AppBadge>
                     </div>
                   </div>
@@ -173,53 +117,66 @@ export default function PlayersOverviewPage({
                 <AppButton
                   href={`/admin/players?teamId=${team.id}&teamName=${encodeURIComponent(team.name)}&tournamentId=${tournamentId}&tournamentName=${encodeURIComponent(tournamentName)}`}
                 >
-                  Manage Team Players
+                  Manage Players
                 </AppButton>
-              </div>
+              </SurfaceCard>
 
+              {/* Player cards */}
               {team.players.length === 0 ? (
                 <div className="rounded-[1.5rem] bg-[#f4f7f2] px-5 py-8 text-center text-sm text-slate-500">
                   No players added yet.
                 </div>
               ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
                   {team.players.map((player) => (
-                    <div
-                      key={player.id}
-                      className="rounded-[1.4rem] border border-[#dbe2db] bg-[#f8faf7] p-4"
-                    >
+                    <SurfaceCard key={player.id} className="flex h-full flex-col gap-4">
                       <div className="flex items-start gap-3">
                         {player.headshotCloudinaryId ? (
                           <img
-                            src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_56,h_56,f_webp/${player.headshotCloudinaryId}`}
+                            src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_72,h_72,f_webp/${player.headshotCloudinaryId}`}
                             alt={player.displayName}
-                            className="h-14 w-14 rounded-2xl object-cover"
+                            className="h-16 w-16 rounded-2xl object-cover"
                           />
                         ) : (
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-base font-semibold text-slate-600">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eff4ee] text-lg font-semibold text-slate-600">
                             {player.displayName.charAt(0)}
                           </div>
                         )}
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-950">
-                            {player.displayName}
-                          </p>
-                          {player.displayName !== player.name ? (
-                            <p className="truncate text-xs text-slate-500">{player.name}</p>
-                          ) : null}
-                          <div className="mt-2">
-                            <AppBadge tone={ROLE_TONES[player.role] ?? 'neutral'}>
-                              {player.role}
-                            </AppBadge>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div>
+                            <h3 className="truncate text-lg font-semibold tracking-[-0.03em] text-slate-950">
+                              {player.displayName}
+                            </h3>
+                            {player.displayName !== player.name ? (
+                              <p className="truncate text-sm text-slate-500">{player.name}</p>
+                            ) : null}
                           </div>
+                          <AppBadge tone={ROLE_TONES[player.role as Role] ?? 'neutral'}>
+                            {player.role}
+                          </AppBadge>
                         </div>
                       </div>
-                    </div>
+
+                      <div className="grid gap-3 rounded-[1.4rem] bg-[#f4f7f2] p-4 text-sm text-slate-600 sm:grid-cols-2">
+                        <div>
+                          <p className="app-kicker">Batting</p>
+                          <p className="mt-1 font-medium text-slate-900">
+                            {player.battingStyle ?? 'Not set'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="app-kicker">Bowling</p>
+                          <p className="mt-1 font-medium text-slate-900">
+                            {player.bowlingStyle ?? 'Not set'}
+                          </p>
+                        </div>
+                      </div>
+                    </SurfaceCard>
                   ))}
                 </div>
               )}
-            </SurfaceCard>
+            </div>
           ))}
         </section>
       )}

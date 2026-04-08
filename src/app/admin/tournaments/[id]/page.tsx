@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Trophy, CalendarClock } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
-import { TournamentAccessSection } from '@/components/tournament/TournamentAccessSection'
 import {
   AppBadge,
   AppButton,
@@ -226,18 +225,42 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <AppPage className="max-w-7xl">
-      <PageHeader
-        eyebrow="Tournament overview"
-        title={tournament.name}
-        description={`${tournament.format} . ${tournament.totalOvers} overs${tournament.ballsPerOver !== 6 ? ` . ${tournament.ballsPerOver} balls per over` : ''}`}
-        actions={
-          <>
-            <AppBadge tone={tournamentTone[tournament.status] ?? 'neutral'}>{tournament.status.replace('_', ' ')}</AppBadge>
+      <TournamentNav tournamentId={tournamentId} />
+
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <SurfaceCard className="space-y-5">
+          {/* Header row: logo + info + status dropdown */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.25rem] border border-[#dfe6df] bg-[#f4f7f2] sm:h-20 sm:w-20 sm:rounded-[1.5rem]">
+                {tournament.logoCloudinaryId && CLOUD_NAME ? (
+                  <img
+                    src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_96,h_96,f_webp/${tournament.logoCloudinaryId}`}
+                    alt={tournament.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Trophy className="h-7 w-7 text-[#10994c] sm:h-8 sm:w-8" />
+                )}
+              </div>
+              <div className="min-w-0 space-y-1">
+                <p className="app-kicker">Tournament overview</p>
+                <h1 className="text-xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-2xl">{tournament.name}</h1>
+                <p className="text-sm text-slate-500">
+                  {tournament.format} · {tournament.totalOvers} overs{tournament.ballsPerOver !== 6 ? ` · ${tournament.ballsPerOver} balls/over` : ''}
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <AppBadge tone="neutral">{tournament.shortName}</AppBadge>
+                  <AppBadge tone="blue">{`TRN-${tournament.id.toString().padStart(3, '0')}`}</AppBadge>
+                  <AppBadge tone={tournamentTone[tournament.status] ?? 'neutral'}>{tournament.status.replace('_', ' ')}</AppBadge>
+                </div>
+              </div>
+            </div>
             {canManageTournament ? (
               <select
                 value={tournament.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                className={`${appInputClass} min-w-[180px]`}
+                className={`${appInputClass} w-full sm:w-auto sm:min-w-[160px] shrink-0`}
               >
                 <option value="upcoming">Upcoming</option>
                 <option value="group_stage">Group Stage</option>
@@ -245,38 +268,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <option value="complete">Complete</option>
               </select>
             ) : null}
-          </>
-        }
-      />
-
-      <TournamentNav tournamentId={tournamentId} />
-
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <SurfaceCard className="space-y-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.5rem] border border-[#dfe6df] bg-[#f4f7f2]">
-              {tournament.logoCloudinaryId && CLOUD_NAME ? (
-                <img
-                  src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_96,h_96,f_webp/${tournament.logoCloudinaryId}`}
-                  alt={tournament.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <Trophy className="h-8 w-8 text-[#10994c]" />
-              )}
-            </div>
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <AppBadge tone="neutral">{tournament.shortName}</AppBadge>
-                <AppBadge tone="blue">{`TRN-${tournament.id.toString().padStart(3, '0')}`}</AppBadge>
-              </div>
-              <p className="max-w-2xl text-sm text-slate-600">
-                Use this page to manage teams, fixtures, standings, and operator access with the updated responsive layout.
-              </p>
-            </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard label="Teams" value={tournament.teams.length} />
             <StatCard label="Matches" value={tournament.matches.length} />
             <StatCard label="Path" value={getStagePathLabel(stageStructure)} />
@@ -308,13 +302,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           ) : null}
         </SurfaceCard>
       </div>
-
-      <TournamentAccessSection
-        tournamentId={tournamentId}
-        initialOwner={tournament.owner}
-        initialOperators={tournament.operators}
-        canManage={canManageTournament}
-      />
 
       <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
         <SurfaceCard className="space-y-4">

@@ -14,6 +14,8 @@ export default auth((req) => {
   // Allow Google Search Console verification files and other static .html files
   if (path.endsWith('.html')) return NextResponse.next()
 
+  if (path === '/') return NextResponse.next()
+
   if (!isLoggedIn)
     return NextResponse.redirect(new URL('/login', req.url))
 

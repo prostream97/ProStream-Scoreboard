@@ -1,9 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState, Suspense } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { signIn, useSession } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import {
@@ -11,7 +10,6 @@ import {
   AppButton,
   AppPage,
   EmptyState,
-  PageHeader,
   SurfaceCard,
   appInputClass,
   appLabelClass,
@@ -281,104 +279,55 @@ function PlayersContent() {
     )
   }
 
-  const manageCallback = `/admin/players?teamId=${teamId}&teamName=${encodeURIComponent(teamName)}`
 
   return (
     <AppPage className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <Link href="/" className="transition hover:text-slate-800">
-            Dashboard
-          </Link>
-          <span>/</span>
-          <Link href="/admin/tournaments" className="transition hover:text-slate-800">
-            Tournaments
-          </Link>
-          {tournamentId ? (
-            <>
-              <span>/</span>
-              <Link
-                href={`/admin/tournaments/${tournamentId}`}
-                className="transition hover:text-slate-800"
-              >
-                {tournamentName}
-              </Link>
-            </>
+      {tournamentId ? (
+        <TournamentNav
+          tournamentId={parseInt(tournamentId, 10)}
+          activeSegment="players"
+        />
+      ) : null}
+
+      <SurfaceCard className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="app-kicker">Team</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+            {teamName}
+          </h2>
+          {tournamentName ? (
+            <p className="mt-1 text-sm text-slate-500">{tournamentName}</p>
           ) : null}
-          <span>/</span>
-          <span className="text-slate-900">{teamName}</span>
+          <div className="mt-3">
+            <AppBadge tone="blue">{loading ? '—' : `${players.length} Players`}</AppBadge>
+          </div>
         </div>
 
-        {tournamentId ? (
-          <TournamentNav
-            tournamentId={parseInt(tournamentId, 10)}
-            activeSegment="players"
-          />
-        ) : null}
-      </div>
-
-      <PageHeader
-        eyebrow="Team Roster"
-        title={teamName}
-        description="Manage every squad member, import players in bulk, and keep the roster ready for the operator and viewer experiences."
-        actions={
-          isAdmin ? (
-            <>
-              <AppButton
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setCsvMode((current) => !current)
-                  setShowForm(false)
-                }}
-              >
-                {csvMode ? 'Close CSV' : 'CSV Import'}
-              </AppButton>
-              <AppButton
-                type="button"
-                onClick={() => {
-                  setShowForm((current) => !current)
-                  setCsvMode(false)
-                  setAddError('')
-                }}
-              >
-                {showForm ? 'Close Form' : 'Add Player'}
-              </AppButton>
-            </>
-          ) : (
+        {isAuthenticated ? (
+          <div className="flex items-center gap-3">
             <AppButton
               type="button"
-              onClick={() => signIn(undefined, { callbackUrl: manageCallback })}
+              variant="secondary"
+              onClick={() => {
+                setCsvMode((current) => !current)
+                setShowForm(false)
+              }}
             >
-              Sign In to Manage
+              {csvMode ? 'Close CSV' : 'CSV Import'}
             </AppButton>
-          )
-        }
-      />
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Players</p>
-          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-            {players.length}
-          </p>
-          <p className="text-sm text-slate-500">Active roster entries available for match setup.</p>
-        </SurfaceCard>
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Editable</p>
-          <p className="text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-            {isAdmin ? 'Yes' : 'No'}
-          </p>
-          <p className="text-sm text-slate-500">Admin sign-in still controls write access.</p>
-        </SurfaceCard>
-        <SurfaceCard className="space-y-1">
-          <p className="app-kicker">Quick Path</p>
-          <p className="text-lg font-semibold tracking-[-0.03em] text-slate-950">
-            Bulk import or hand-edit
-          </p>
-          <p className="text-sm text-slate-500">Both flows continue to hit the existing team player APIs.</p>
-        </SurfaceCard>
-      </section>
+            <AppButton
+              type="button"
+              onClick={() => {
+                setShowForm((current) => !current)
+                setCsvMode(false)
+                setAddError('')
+              }}
+            >
+              {showForm ? 'Close Form' : 'Add Player'}
+            </AppButton>
+          </div>
+        ) : null}
+      </SurfaceCard>
 
       {addError ? (
         <SurfaceCard className="border-[#f4c3c1] bg-[#fff3f2] text-sm text-[#b94342]">
@@ -386,7 +335,7 @@ function PlayersContent() {
         </SurfaceCard>
       ) : null}
 
-      {showForm && isAdmin ? (
+      {showForm && isAuthenticated ? (
         <SurfaceCard className="space-y-5">
           <div>
             <p className="app-kicker">Manual Entry</p>
@@ -442,7 +391,7 @@ function PlayersContent() {
         </SurfaceCard>
       ) : null}
 
-      {csvMode && isAdmin ? (
+      {csvMode && isAuthenticated ? (
         <SurfaceCard className="space-y-4">
           <div>
             <p className="app-kicker">Bulk Import</p>
