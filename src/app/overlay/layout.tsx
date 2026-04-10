@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 export default function OverlayLayout({ children }: { children: ReactNode }) {
   return (
     <>
+      {/* Force html/body to transparent so OBS browser source shows no background */}
+      <style>{`html, body { background: transparent !important; }`}</style>
       {/* Lato font for innings summary overlay */}
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link

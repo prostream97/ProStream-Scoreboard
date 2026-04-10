@@ -246,6 +246,7 @@ export const deliveries = pgTable('deliveries', {
   extraType: extraTypeEnum('extra_type'),
   isWicket: boolean('is_wicket').notNull().default(false),
   dismissalType: dismissalTypeEnum('dismissal_type'),
+  dismissedBatterId: integer('dismissed_batter_id').references(() => players.id),
   fielder1Id: integer('fielder1_id').references(() => players.id),
   fielder2Id: integer('fielder2_id').references(() => players.id),
   timestamp: timestamp('timestamp').defaultNow().notNull(),
@@ -482,6 +483,7 @@ export type DeliveryBuffer = {
   extraType: 'wide' | 'noball' | 'bye' | 'legbye' | null
   isWicket: boolean
   dismissalType: string | null
+  dismissedBatterId?: number | null
   fielder1Id: number | null
   fielder2Id: number | null
   timestamp: string

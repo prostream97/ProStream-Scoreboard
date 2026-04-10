@@ -156,7 +156,7 @@ export function BowlerSelect() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm">{p.displayName}</span>
+                      <span className="font-semibold text-sm flex-1 min-w-0 truncate mr-2">{p.displayName}</span>
                       {stats && (
                         <span className="text-xs text-gray-400">
                           {stats.overs}.{stats.balls}–{stats.runs}–{stats.wickets}

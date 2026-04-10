@@ -16,7 +16,7 @@ import { PlayerEditModal } from './PlayerEditModal'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import type { MatchSnapshot } from '@/types/match'
-import type { DeliveryAddedPayload, OverCompletePayload } from '@/types/pusher'
+import type { DeliveryAddedPayload, OverCompletePayload, WicketPayload } from '@/types/pusher'
 
 type OCPLayoutProps = {
   initialSnapshot: MatchSnapshot
@@ -55,6 +55,13 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
       strikerId: data.strikerId,
       nonStrikerId: data.nonStrikerId,
     })
+  })
+
+  useEvent(`match-${initialSnapshot.matchId}`, 'wicket.fell', (_data: WicketPayload) => {
+    fetch(`/api/match/${initialSnapshot.matchId}/state`)
+      .then((r) => r.json())
+      .then((fresh: MatchSnapshot) => hydrate(fresh))
+      .catch((err) => { console.warn('[OCPLayout] Wicket state refetch failed:', err) })
   })
 
   useEvent(`match-${initialSnapshot.matchId}`, 'over.complete', (_data: OverCompletePayload) => {

@@ -1,50 +1,90 @@
 import { create } from 'zustand'
 import type { DeliveryInput, DeliveryRecord, MatchSnapshot, InningsState, BatterStats, BowlerStats, PlayerSummary } from '@/types/match'
 
+type WicketInput = {
+  runs: number
+  dismissalType: NonNullable<DeliveryInput['dismissalType']>
+  dismissedBatterId: number
+  incomingBatterId: number | null
+  fielder1Id: number | null
+  fielder2Id: number | null
+}
+
 // ─── Optimistic stat helpers ──────────────────────────────────────────────────
+
+function createEmptyBatter(playerId: number, battingTeamPlayers: PlayerSummary[]): BatterStats | null {
+  const player = battingTeamPlayers.find((p) => p.id === playerId)
+  if (!player) return null
+  return {
+    playerId,
+    playerName: player.name,
+    displayName: player.displayName,
+    runs: 0,
+    balls: 0,
+    fours: 0,
+    sixes: 0,
+    strikeRate: 0,
+    isStriker: false,
+    isOut: false,
+    dismissalType: null,
+  }
+}
 
 function updateBattersOptimistically(
   batters: BatterStats[],
-  strikerId: number,
+  facingBatterId: number,
   battingTeamPlayers: PlayerSummary[],
   input: DeliveryInput,
+  nextStrikerId: number | null,
+  nextNonStrikerId: number | null,
 ): BatterStats[] {
-  const existing = batters.find((b) => b.playerId === strikerId)
-  const player = battingTeamPlayers.find((p) => p.id === strikerId)
-  if (!existing && !player) return batters
+  const rows = new Map<number, BatterStats>(
+    batters.map((b) => [b.playerId, { ...b, isStriker: false }]),
+  )
 
-  if (!existing) {
-    const newBatter: BatterStats = {
-      playerId: strikerId,
-      playerName: player!.name,
-      displayName: player!.displayName,
-      runs: input.runs,
-      balls: input.isLegal ? 1 : 0,
-      fours: input.runs === 4 ? 1 : 0,
-      sixes: input.runs === 6 ? 1 : 0,
-      strikeRate: input.isLegal && input.runs > 0 ? input.runs * 100 : 0,
-      isStriker: true,
-      isOut: input.isWicket,
-      dismissalType: input.isWicket ? (input.dismissalType ?? null) : null,
-    }
-    return [...batters, newBatter]
+  const ensureBatter = (playerId: number | null): BatterStats | null => {
+    if (!playerId) return null
+    const existing = rows.get(playerId)
+    if (existing) return existing
+    const created = createEmptyBatter(playerId, battingTeamPlayers)
+    if (!created) return null
+    rows.set(playerId, created)
+    return created
   }
 
-  return batters.map((b) => {
-    if (b.playerId !== strikerId) return b
-    const newRuns = b.runs + input.runs
-    const newBalls = b.balls + (input.isLegal ? 1 : 0)
-    return {
-      ...b,
+  const facing = ensureBatter(facingBatterId)
+  if (facing) {
+    const newRuns = facing.runs + input.runs
+    const newBalls = facing.balls + (input.isLegal ? 1 : 0)
+    rows.set(facingBatterId, {
+      ...facing,
       runs: newRuns,
       balls: newBalls,
-      fours: b.fours + (input.runs === 4 ? 1 : 0),
-      sixes: b.sixes + (input.runs === 6 ? 1 : 0),
+      fours: facing.fours + (input.runs === 4 ? 1 : 0),
+      sixes: facing.sixes + (input.runs === 6 ? 1 : 0),
       strikeRate: newBalls > 0 ? Math.round((newRuns / newBalls) * 10000) / 100 : 0,
-      isOut: b.isOut || input.isWicket,
-      dismissalType: input.isWicket ? (input.dismissalType ?? null) : b.dismissalType,
+    })
+  }
+
+  const dismissedBatterId = input.isWicket ? (input.dismissedBatterId ?? facingBatterId) : null
+  if (dismissedBatterId) {
+    const dismissed = ensureBatter(dismissedBatterId)
+    if (dismissed) {
+      rows.set(dismissedBatterId, {
+        ...dismissed,
+        isOut: true,
+        dismissalType: input.dismissalType ?? dismissed.dismissalType ?? null,
+      })
     }
-  })
+  }
+
+  ensureBatter(nextStrikerId)
+  ensureBatter(nextNonStrikerId)
+
+  return Array.from(rows.values()).map((b) => ({
+    ...b,
+    isStriker: nextStrikerId != null && b.playerId === nextStrikerId,
+  }))
 }
 
 function updateBowlersOptimistically(
@@ -119,6 +159,7 @@ type MatchStore = {
   // Actions
   hydrate: (snapshot: MatchSnapshot) => void
   addDelivery: (input: DeliveryInput) => Promise<void>
+  recordWicket: (input: WicketInput) => Promise<void>
   undoDelivery: () => Promise<void>
   flushOverToNeon: () => Promise<void>
   setStatus: (status: MatchSnapshot['status']) => void
@@ -157,8 +198,77 @@ function shouldRotateStrike(runs: number, isWicket: boolean): boolean {
   return !isWicket && runs % 2 === 1
 }
 
+function rotatePairForCompletedRuns(
+  strikerId: number | null,
+  nonStrikerId: number | null,
+  runs: number,
+) {
+  if (runs % 2 === 1) {
+    return {
+      strikerId: nonStrikerId,
+      nonStrikerId: strikerId,
+    }
+  }
+
+  return { strikerId, nonStrikerId }
+}
+
+function computePostWicketPair(
+  snapshot: MatchSnapshot,
+  runs: number,
+  dismissedBatterId: number,
+  incomingBatterId: number | null,
+) {
+  if (!snapshot.strikerId) {
+    return { strikerId: null, nonStrikerId: null }
+  }
+
+  const rotated = rotatePairForCompletedRuns(snapshot.strikerId, snapshot.nonStrikerId, runs)
+  if (incomingBatterId == null) {
+    return { strikerId: null, nonStrikerId: null }
+  }
+
+  if (rotated.strikerId === dismissedBatterId) {
+    return {
+      strikerId: incomingBatterId,
+      nonStrikerId: rotated.nonStrikerId,
+    }
+  }
+
+  if (rotated.nonStrikerId === dismissedBatterId) {
+    return {
+      strikerId: rotated.strikerId,
+      nonStrikerId: incomingBatterId,
+    }
+  }
+
+  return {
+    strikerId: snapshot.strikerId === dismissedBatterId ? incomingBatterId : rotated.strikerId,
+    nonStrikerId: snapshot.nonStrikerId === dismissedBatterId ? incomingBatterId : rotated.nonStrikerId,
+  }
+}
+
 function computeInningsRuns(state: InningsState, runs: number, extraRuns: number): number {
   return state.totalRuns + runs + extraRuns
+}
+
+function hydrateCurrentOverBalls(snapshot: MatchSnapshot): DeliveryRecord[] {
+  return snapshot.currentOverBalls.map((ball, index) => ({
+    runs: ball.runs,
+    extraRuns: ball.extraRuns,
+    isLegal: ball.isLegal,
+    extraType: ball.extraType as DeliveryInput['extraType'],
+    isWicket: ball.isWicket,
+    dismissalType: null,
+    dismissedBatterId: null,
+    fielder1Id: null,
+    fielder2Id: null,
+    overNumber: snapshot.currentOver,
+    ballNumber: index,
+    batsmanId: snapshot.strikerId ?? 0,
+    bowlerId: snapshot.currentBowlerId ?? 0,
+    timestamp: '',
+  }))
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -174,7 +284,14 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   syncError: null,
 
   hydrate(snapshot) {
-    set({ snapshot })
+    const currentOverBalls = hydrateCurrentOverBalls(snapshot)
+    set({
+      snapshot,
+      currentOverBalls,
+      legalDeliveryCount: currentOverBalls.filter((ball) => ball.isLegal).length,
+      flushedBallCount: currentOverBalls.length,
+      lastFlushedDeliveryIds: [],
+    })
   },
 
   setStatus(status) {
@@ -190,6 +307,22 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   },
 
   async addDelivery(input) {
+    if (input.isWicket) {
+      if (!input.dismissalType) return
+      const snapshot = get().snapshot
+      if (!snapshot?.strikerId) return
+
+      await get().recordWicket({
+        runs: input.runs,
+        dismissalType: input.dismissalType,
+        dismissedBatterId: input.dismissedBatterId ?? snapshot.strikerId,
+        incomingBatterId: null,
+        fielder1Id: input.fielder1Id,
+        fielder2Id: input.fielder2Id,
+      })
+      return
+    }
+
     const { snapshot, currentOverBalls, legalDeliveryCount, isFlushing } = get()
     if (!snapshot || snapshot.status !== 'active') return
     if (!snapshot.strikerId || !snapshot.currentBowlerId) return
@@ -209,7 +342,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
 
     // Compute updated innings totals
     const newRuns = computeInningsRuns(innings, input.runs, input.extraRuns)
-    const newWickets = innings.wickets + (input.isWicket ? 1 : 0)
+    const newWickets = innings.wickets
     const newBalls = input.isLegal ? innings.balls + 1 : innings.balls
     const newOvers = newBalls >= bpo ? innings.overs + 1 : innings.overs
     const remainingBalls = newBalls >= bpo ? 0 : newBalls
@@ -255,6 +388,8 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       snapshot.strikerId,
       snapshot.battingTeamPlayers,
       input,
+      newStrikerId,
+      newNonStrikerId,
     )
     const updatedBowlers = updateBowlersOptimistically(
       snapshot.bowlers,
@@ -265,17 +400,17 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     )
 
     // Update partnership optimistically; reset to zero on wicket (new pair starts fresh)
-    const updatedPartnership = input.isWicket
-      ? { runs: 0, balls: 0, batter1Id: newStrikerId ?? 0, batter2Id: newNonStrikerId ?? 0 }
-      : {
-          runs: (snapshot.partnership?.runs ?? 0) + input.runs + input.extraRuns,
-          balls: (snapshot.partnership?.balls ?? 0) + (input.isLegal ? 1 : 0),
-          batter1Id: newStrikerId ?? snapshot.strikerId ?? 0,
-          batter2Id: newNonStrikerId ?? snapshot.nonStrikerId ?? 0,
-        }
+    const updatedPartnership = {
+      runs: (snapshot.partnership?.runs ?? 0) + input.runs + input.extraRuns,
+      balls: (snapshot.partnership?.balls ?? 0) + (input.isLegal ? 1 : 0),
+      batter1Id: newStrikerId ?? snapshot.strikerId ?? 0,
+      batter2Id: newNonStrikerId ?? snapshot.nonStrikerId ?? 0,
+    }
+
+    const updatedOverBalls = [...currentOverBalls, delivery]
 
     set({
-      currentOverBalls: [...currentOverBalls, delivery],
+      currentOverBalls: updatedOverBalls,
       legalDeliveryCount: newLegalCount,
       snapshot: {
         ...snapshot,
@@ -299,7 +434,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       currentBowlerId: snapshot.currentBowlerId,
       currentOver: newOvers,
       currentBalls: remainingBalls,
-      currentOverBuffer: currentOverBalls.slice(get().flushedBallCount).concat(delivery),
+      currentOverBuffer: updatedOverBalls,
     })
 
     // ── Win detection: batting team reaches target in 2nd innings ──────────────
@@ -318,15 +453,25 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
           body: JSON.stringify({ action: 'complete' }),
         })
         if (!r1.ok) throw new Error('Failed to close innings')
-        const r2 = await fetch(`/api/match/${snapshot.matchId}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'complete' }),
-        })
-        if (!r2.ok) throw new Error('Failed to update match status')
         set((s) => ({
           winDetected: true,
-          snapshot: s.snapshot ? { ...s.snapshot, status: 'complete' } : null,
+          snapshot: s.snapshot
+            ? (() => {
+                const nextSnapshot = s.snapshot
+                return {
+                  ...nextSnapshot,
+                  status: 'complete',
+                  innings: nextSnapshot.innings.map((inn) =>
+                    inn.inningsNumber === nextSnapshot.currentInnings
+                      ? { ...inn, status: 'complete' }
+                      : inn,
+                  ),
+                  currentInningsState: nextSnapshot.currentInningsState
+                    ? { ...nextSnapshot.currentInningsState, status: 'complete' }
+                    : null,
+                }
+              })()
+            : null,
         }))
       } catch (err) {
         console.error('[matchStore] Win detection save failed:', err)
@@ -344,8 +489,9 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       extraRuns: input.extraRuns,
       isLegal: input.isLegal,
       extraType: input.extraType,
-      isWicket: input.isWicket,
+      isWicket: false,
       batsmanId: snapshot.strikerId,
+      dismissedBatterId: null,
       bowlerId: snapshot.currentBowlerId,
       inningsRuns: newRuns,
       inningsWickets: newWickets,
@@ -355,52 +501,37 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       nonStrikerId: newNonStrikerId,
     })
 
-    if (input.isWicket) {
-      await triggerPusherEvent(snapshot.matchId, 'wicket.fell', {
-        matchId: snapshot.matchId,
-        batsmanId: snapshot.strikerId,
-        dismissalType: input.dismissalType!,
-        fielder1Id: input.fielder1Id,
-        fielder2Id: input.fielder2Id,
-        nextBatsmanId: 0, // set by WicketModal after selecting next batsman
-        inningsWickets: newWickets,
-      })
-    }
-
     // Flush conditions — guard against double-flush
     if (!isFlushing) {
       const shouldFlushOver = newLegalCount === bpo
       const shouldFlushSafety = newLegalCount > 0 && newLegalCount % 3 === 0 && !shouldFlushOver
-      const shouldFlushWicket = input.isWicket
-
-      if (shouldFlushOver || shouldFlushSafety || shouldFlushWicket) {
+      if (shouldFlushOver || shouldFlushSafety) {
         await get().flushOverToNeon()
 
         if (shouldFlushOver) {
-          // End of over: swap striker/non-striker ONLY if even runs on last ball
-          // (odd runs already rotated the strike in the optimistic update above)
-          const lastBallOddRuns = shouldRotateStrike(input.runs, input.isWicket)
           set((s) => ({
             legalDeliveryCount: 0,
             snapshot: s.snapshot
-              ? {
-                  ...s.snapshot,
-                  ...(lastBallOddRuns
-                    ? {}
-                    : {
-                        strikerId: s.snapshot.nonStrikerId,
-                        nonStrikerId: s.snapshot.strikerId,
-                      }),
-                  currentBalls: 0,
-                }
+              ? (() => {
+                  const nextStrikerId = s.snapshot.nonStrikerId
+                  return {
+                    ...s.snapshot,
+                    strikerId: nextStrikerId,
+                    nonStrikerId: s.snapshot.strikerId,
+                    batters: s.snapshot.batters.map((b) => ({
+                      ...b,
+                      isStriker: b.playerId === nextStrikerId,
+                    })),
+                    currentBalls: 0,
+                  }
+                })()
               : null,
           }))
 
           await triggerPusherEvent(snapshot.matchId, 'over.complete', {
             matchId: snapshot.matchId,
             overNumber,
-            overRuns: currentOverBalls
-              .concat(delivery)
+            overRuns: updatedOverBalls
               .reduce((sum, d) => sum + d.runs + d.extraRuns, 0),
             bowlerId: snapshot.currentBowlerId,
             maidens: 0, // calculated server-side on persist
@@ -410,11 +541,238 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     }
   },
 
+  async recordWicket(input) {
+    const { snapshot, currentOverBalls, legalDeliveryCount, isFlushing } = get()
+    if (!snapshot || snapshot.status !== 'active') return
+    if (!snapshot.strikerId || !snapshot.currentBowlerId) return
+
+    const innings = snapshot.currentInningsState
+    if (!innings) {
+      console.error('[matchStore] recordWicket called with no active innings state')
+      return
+    }
+
+    const overNumber = snapshot.currentOver
+    const ballNumber = currentOverBalls.length
+    const deliveryInput: DeliveryInput = {
+      runs: input.runs,
+      extraRuns: 0,
+      isLegal: true,
+      extraType: null,
+      isWicket: true,
+      dismissalType: input.dismissalType,
+      dismissedBatterId: input.dismissedBatterId,
+      fielder1Id: input.fielder1Id,
+      fielder2Id: input.fielder2Id,
+    }
+    const delivery = buildDeliveryRecord(deliveryInput, snapshot, overNumber, ballNumber)
+
+    const newLegalCount = legalDeliveryCount + 1
+    const bpo = snapshot.ballsPerOver ?? 6
+    const newRuns = computeInningsRuns(innings, input.runs, 0)
+    const newWickets = innings.wickets + 1
+    const newBalls = innings.balls + 1
+    const newOvers = newBalls >= bpo ? innings.overs + 1 : innings.overs
+    const remainingBalls = newBalls >= bpo ? 0 : newBalls
+    const postWicketPair = computePostWicketPair(
+      snapshot,
+      input.runs,
+      input.dismissedBatterId,
+      input.incomingBatterId,
+    )
+
+    const updatedInnings: InningsState = {
+      ...innings,
+      totalRuns: newRuns,
+      wickets: newWickets,
+      overs: newOvers,
+      balls: remainingBalls,
+    }
+
+    const updatedInningsList = snapshot.innings.map((i) =>
+      i.inningsNumber === snapshot.currentInnings ? updatedInnings : i,
+    )
+
+    const newTotalBalls = newOvers * bpo + remainingBalls
+    const newCurrentRunRate = newTotalBalls > 0
+      ? Math.round((newRuns / (newTotalBalls / bpo)) * 100) / 100
+      : 0
+
+    let newRequiredRunRate = snapshot.requiredRunRate
+    if (snapshot.currentInnings === 2 && innings.target) {
+      const remainingMatchBalls = snapshot.totalOvers * bpo - newTotalBalls
+      const runsNeeded = innings.target - newRuns
+      newRequiredRunRate = remainingMatchBalls > 0
+        ? Math.round((runsNeeded / (remainingMatchBalls / bpo)) * 100) / 100
+        : 0
+    }
+
+    const updatedBatters = updateBattersOptimistically(
+      snapshot.batters,
+      snapshot.strikerId,
+      snapshot.battingTeamPlayers,
+      deliveryInput,
+      postWicketPair.strikerId,
+      postWicketPair.nonStrikerId,
+    )
+    const updatedBowlers = updateBowlersOptimistically(
+      snapshot.bowlers,
+      snapshot.currentBowlerId,
+      snapshot.bowlingTeamPlayers,
+      deliveryInput,
+      bpo,
+    )
+
+    const updatedOverBalls = [...currentOverBalls, delivery]
+
+    set({
+      currentOverBalls: updatedOverBalls,
+      legalDeliveryCount: newLegalCount,
+      snapshot: {
+        ...snapshot,
+        strikerId: postWicketPair.strikerId,
+        nonStrikerId: postWicketPair.nonStrikerId,
+        currentBalls: remainingBalls,
+        currentOver: newOvers,
+        innings: updatedInningsList,
+        currentInningsState: updatedInnings,
+        batters: updatedBatters,
+        bowlers: updatedBowlers,
+        partnership: postWicketPair.strikerId && postWicketPair.nonStrikerId
+          ? {
+              runs: 0,
+              balls: 0,
+              batter1Id: postWicketPair.strikerId,
+              batter2Id: postWicketPair.nonStrikerId,
+            }
+          : null,
+        currentRunRate: newCurrentRunRate,
+        requiredRunRate: newRequiredRunRate,
+      },
+    })
+
+    await syncLiveMatchState(snapshot.matchId, {
+      strikerId: postWicketPair.strikerId,
+      nonStrikerId: postWicketPair.nonStrikerId,
+      currentBowlerId: snapshot.currentBowlerId,
+      currentOver: newOvers,
+      currentBalls: remainingBalls,
+      currentOverBuffer: updatedOverBalls,
+    })
+
+    const isMatchWon =
+      snapshot.currentInnings === 2 &&
+      innings.target != null &&
+      newRuns >= innings.target
+
+    if (isMatchWon) {
+      if (!isFlushing) await get().flushOverToNeon()
+      try {
+        const r1 = await fetch(`/api/match/${snapshot.matchId}/innings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'complete' }),
+        })
+        if (!r1.ok) throw new Error('Failed to close innings')
+        set((s) => ({
+          winDetected: true,
+          snapshot: s.snapshot
+            ? (() => {
+                const nextSnapshot = s.snapshot
+                return {
+                  ...nextSnapshot,
+                  status: 'complete',
+                  innings: nextSnapshot.innings.map((inn) =>
+                    inn.inningsNumber === nextSnapshot.currentInnings
+                      ? { ...inn, status: 'complete' }
+                      : inn,
+                  ),
+                  currentInningsState: nextSnapshot.currentInningsState
+                    ? { ...nextSnapshot.currentInningsState, status: 'complete' }
+                    : null,
+                }
+              })()
+            : null,
+        }))
+      } catch (err) {
+        console.error('[matchStore] Win detection save failed:', err)
+        set({ syncError: 'Failed to save match result. Please end the match manually.' })
+      }
+      return
+    }
+
+    await triggerPusherEvent(snapshot.matchId, 'delivery.added', {
+      matchId: snapshot.matchId,
+      overNumber,
+      ballNumber,
+      runs: input.runs,
+      extraRuns: 0,
+      isLegal: true,
+      extraType: null,
+      isWicket: true,
+      batsmanId: snapshot.strikerId,
+      dismissedBatterId: input.dismissedBatterId,
+      bowlerId: snapshot.currentBowlerId,
+      inningsRuns: newRuns,
+      inningsWickets: newWickets,
+      inningsOvers: newOvers,
+      inningsBalls: remainingBalls,
+      strikerId: postWicketPair.strikerId,
+      nonStrikerId: postWicketPair.nonStrikerId,
+    })
+
+    if (!isFlushing) {
+      const shouldFlushOver = newLegalCount === bpo
+
+      await get().flushOverToNeon()
+
+      if (shouldFlushOver) {
+        set((s) => ({
+          legalDeliveryCount: 0,
+          snapshot: s.snapshot
+            ? (() => {
+                const nextStrikerId = s.snapshot.nonStrikerId
+                return {
+                  ...s.snapshot,
+                  strikerId: nextStrikerId,
+                  nonStrikerId: s.snapshot.strikerId,
+                  batters: s.snapshot.batters.map((b) => ({
+                    ...b,
+                    isStriker: b.playerId === nextStrikerId,
+                  })),
+                  currentBalls: 0,
+                }
+              })()
+            : null,
+        }))
+
+        await triggerPusherEvent(snapshot.matchId, 'over.complete', {
+          matchId: snapshot.matchId,
+          overNumber,
+          overRuns: updatedOverBalls
+            .reduce((sum, d) => sum + d.runs + d.extraRuns, 0),
+          bowlerId: snapshot.currentBowlerId,
+          maidens: 0,
+        })
+      }
+    }
+
+    await triggerPusherEvent(snapshot.matchId, 'wicket.fell', {
+      matchId: snapshot.matchId,
+      dismissedBatterId: input.dismissedBatterId,
+      dismissalType: input.dismissalType,
+      fielder1Id: input.fielder1Id,
+      fielder2Id: input.fielder2Id,
+      incomingBatterId: input.incomingBatterId,
+      inningsWickets: newWickets,
+    })
+  },
+
   async undoDelivery() {
-    const { snapshot, currentOverBalls, legalDeliveryCount, lastFlushedDeliveryIds } = get()
+    const { snapshot, currentOverBalls, legalDeliveryCount, flushedBallCount, lastFlushedDeliveryIds } = get()
     if (!snapshot) return
 
-    if (currentOverBalls.length > 0) {
+    if (currentOverBalls.length > flushedBallCount) {
       // Undo in-buffer delivery (not yet persisted)
       const removed = currentOverBalls[currentOverBalls.length - 1]
       const newBalls = currentOverBalls.slice(0, -1)
@@ -455,7 +813,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       await syncLiveMatchState(snapshot.matchId, {
         currentOver: updatedInnings.overs,
         currentBalls: updatedInnings.balls,
-        currentOverBuffer: newBalls.slice(get().flushedBallCount),
+        currentOverBuffer: newBalls,
       })
     } else if (lastFlushedDeliveryIds.length > 0) {
       // Undo a flushed delivery — requires DB delete
@@ -515,14 +873,12 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   startNextOver() {
     set((s) => {
       if (!s.snapshot) return {}
-      const nextOver = s.snapshot.currentOver + 1
       return {
         currentOverBalls: [],
         legalDeliveryCount: 0,
         flushedBallCount: 0,
         snapshot: {
           ...s.snapshot,
-          currentOver: nextOver,
           currentBalls: 0,
           // Strike rotation already handled by addDelivery — don't swap again
           currentBowlerId: null, // cleared — BowlerSelect will set a new one
@@ -559,6 +915,10 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
           strikerId: snapshot.strikerId,
           nonStrikerId: snapshot.nonStrikerId,
           currentBowlerId: snapshot.currentBowlerId,
+          currentOver: snapshot.currentOver,
+          currentBalls: snapshot.currentBalls,
+          currentOverBuffer: isOverEnd ? [] : currentOverBalls,
+          isOverComplete: isOverEnd,
         }),
       })
 

@@ -13,7 +13,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { matchId, inningsId, deliveries: deliveryBuffer, overNumber, strikerId, nonStrikerId, currentBowlerId } = await req.json() as {
+  const {
+    matchId,
+    inningsId,
+    deliveries: deliveryBuffer,
+    overNumber,
+    strikerId,
+    nonStrikerId,
+    currentBowlerId,
+    currentOver,
+    currentBalls,
+    currentOverBuffer,
+    isOverComplete,
+  } = await req.json() as {
     matchId: number
     inningsId: number
     deliveries: DeliveryRecord[]
@@ -21,6 +33,10 @@ export async function POST(req: NextRequest) {
     strikerId?: number | null
     nonStrikerId?: number | null
     currentBowlerId?: number | null
+    currentOver?: number
+    currentBalls?: number
+    currentOverBuffer?: DeliveryRecord[]
+    isOverComplete?: boolean
   }
 
   if (!matchId || !inningsId || !deliveryBuffer?.length) {
@@ -51,6 +67,7 @@ export async function POST(req: NextRequest) {
           extraType: d.extraType,
           isWicket: d.isWicket,
           dismissalType: d.dismissalType,
+          dismissedBatterId: d.dismissedBatterId ?? null,
           fielder1Id: d.fielder1Id,
           fielder2Id: d.fielder2Id,
           timestamp: new Date(d.timestamp),
@@ -61,15 +78,20 @@ export async function POST(req: NextRequest) {
     const currentInnings = await db.query.innings.findFirst({ where: eq(innings.id, inningsId) })
 
     if (currentInnings) {
-      const newOvers = currentInnings.overs + Math.floor((currentInnings.balls + legalBalls) / bpo)
-      const newBalls = (currentInnings.balls + legalBalls) % bpo
+      const computedOvers = currentInnings.overs + Math.floor((currentInnings.balls + legalBalls) / bpo)
+      const computedBalls = (currentInnings.balls + legalBalls) % bpo
+      const authoritativeOvers = typeof currentOver === 'number' ? currentOver : computedOvers
+      const authoritativeBalls = typeof currentBalls === 'number' ? currentBalls : computedBalls
+      const authoritativeBuffer = isOverComplete
+        ? []
+        : (currentOverBuffer ?? deliveryBuffer)
 
       await db
         .update(matchState)
         .set({
-          currentOver: newOvers,
-          currentBalls: newBalls,
-          currentOverBuffer: [],
+          currentOver: authoritativeOvers,
+          currentBalls: authoritativeBalls,
+          currentOverBuffer: authoritativeBuffer,
           lastUpdated: new Date(),
           ...(strikerId !== undefined && { strikerId }),
           ...(nonStrikerId !== undefined && { nonStrikerId }),
@@ -82,17 +104,17 @@ export async function POST(req: NextRequest) {
         .set({
           totalRuns: currentInnings.totalRuns + totalRuns,
           wickets: currentInnings.wickets + totalWickets,
-          overs: newOvers,
-          balls: newBalls,
+          overs: authoritativeOvers,
+          balls: authoritativeBalls,
         })
         .where(eq(innings.id, inningsId))
     } else {
       await db
         .update(matchState)
         .set({
-          currentOver: overNumber,
-          currentBalls: legalBalls,
-          currentOverBuffer: [],
+          currentOver: typeof currentOver === 'number' ? currentOver : overNumber,
+          currentBalls: typeof currentBalls === 'number' ? currentBalls : legalBalls,
+          currentOverBuffer: isOverComplete ? [] : (currentOverBuffer ?? deliveryBuffer),
           lastUpdated: new Date(),
           ...(strikerId !== undefined && { strikerId }),
           ...(nonStrikerId !== undefined && { nonStrikerId }),

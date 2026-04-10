@@ -10,6 +10,7 @@ import { BoundaryAlert } from '@/components/overlay/BoundaryAlert'
 import { InningsSummaryOverlay } from '@/components/overlay/InningsSummaryOverlay'
 import { HeaderOverlay } from '@/components/overlay/HeaderOverlay'
 import { MostWicketsOverlay } from '@/components/overlay/MostWicketsOverlay'
+import { StandardTeamSummaryOverlay } from '@/components/overlay/StandardTeamSummaryOverlay'
 import { useOverlayState } from './useOverlayState'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import type { MatchSnapshot } from '@/types/match'
@@ -32,12 +33,15 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
     cardVisible,
     partnershipVisible,
     summaryVisible,
+    teamSummaryVisible,
+    activeSummaryTeamId,
+    activeSummaryView,
     mostWicketsVisible,
     inningsSummaries,
     mostWicketsData,
     battingTeam,
     bowlingTeam,
-  } = useOverlayState({ matchId, initialSnapshot, initialMostWickets })
+  } = useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme: 'standard' })
 
   const resolveCard = () => {
     const pid = activePlayerId ?? snapshot.strikerId
@@ -64,11 +68,28 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
     return null
   }
 
+  const resolvedSummaryView =
+    activeSummaryTeamId === snapshot.currentInningsState?.battingTeamId
+      ? 'batting'
+      : activeSummaryTeamId === snapshot.currentInningsState?.bowlingTeamId
+        ? 'bowling'
+        : activeSummaryView
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <AnimatePresence>
         {summaryVisible && (
           <InningsSummaryOverlay snapshot={snapshot} inningsSummaries={inningsSummaries} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {teamSummaryVisible && activeSummaryTeamId && resolvedSummaryView && (
+          <StandardTeamSummaryOverlay
+            snapshot={snapshot}
+            teamId={activeSummaryTeamId}
+            view={resolvedSummaryView}
+          />
         )}
       </AnimatePresence>
 

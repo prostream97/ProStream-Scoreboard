@@ -21,6 +21,11 @@ export function OCPTopBar() {
   const setStatus = useMatchStore((s) => s.setStatus)
   const flushOverToNeon = useMatchStore((s) => s.flushOverToNeon)
   const hydrate = useMatchStore((s) => s.hydrate)
+  const display = useUIStore((s) => s.display)
+  const activeSummaryTeamId = useUIStore((s) => s.activeSummaryTeamId)
+  const activeSummaryView = useUIStore((s) => s.activeSummaryView)
+  const showTeamSummary = useUIStore((s) => s.showTeamSummary)
+  const hideTeamSummary = useUIStore((s) => s.hideTeamSummary)
   const openBowlerSelect = useUIStore((s) => s.openBowlerSelect)
   const openSquadPanel = useUIStore((s) => s.openSquadPanel)
   const router = useRouter()
@@ -29,9 +34,11 @@ export function OCPTopBar() {
   if (!snapshot) return null
 
   const {
-    status, matchId, currentInnings,
+    status, matchId, currentInnings, tournamentId,
     homeTeam, awayTeam, currentInningsState, currentRunRate, requiredRunRate,
   } = snapshot
+
+  const backHref = tournamentId ? `/admin/tournaments/${tournamentId}` : '/'
 
   const innings = currentInningsState
   const scoreText = innings ? `${innings.totalRuns}/${innings.wickets}` : '0/0'
@@ -40,6 +47,11 @@ export function OCPTopBar() {
   const ratesReady = totalLegalBalls >= 6
   const battingTeam = innings?.battingTeamId === homeTeam.id ? homeTeam : awayTeam
   const bowlingTeam = innings?.bowlingTeamId === homeTeam.id ? homeTeam : awayTeam
+  const resolveSummaryView = (teamId: number) => {
+    if (innings?.battingTeamId === teamId) return 'batting'
+    if (innings?.bowlingTeamId === teamId) return 'bowling'
+    return activeSummaryView
+  }
 
   async function handleStart() {
     await updateMatchStatus(matchId, 'active')
@@ -109,11 +121,44 @@ export function OCPTopBar() {
     }
   }
 
+  async function toggleTeamSummary(teamId: number, view: 'batting' | 'bowling') {
+    const effectiveView = resolveSummaryView(teamId)
+    const isActive =
+      display.teamSummary &&
+      activeSummaryTeamId === teamId &&
+      effectiveView === view
+
+    if (isActive) {
+      hideTeamSummary()
+    } else {
+      showTeamSummary(teamId, view)
+    }
+
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId,
+        event: 'display.toggle',
+        payload: {
+          element: 'teamSummary',
+          visible: !isActive,
+          summaryTeamId: isActive ? undefined : teamId,
+          summaryView: isActive ? undefined : view,
+          themeScope: 'standard',
+        },
+      }),
+    })
+  }
+
   return (
     <section className="overflow-hidden rounded-[2rem] border border-[#d7ddd6] bg-white shadow-[0_24px_60px_rgba(26,36,32,0.08)]">
-      <div className="bg-[#151822] px-4 py-5 text-white">
+      <div className="px-4 py-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
+            <AppButton variant="secondary" onClick={() => router.push(backHref)}>
+              ← {tournamentId ? 'Tournament' : 'Home'}
+            </AppButton>
             {status === 'setup' ? <AppButton onClick={handleStart}>Start Match</AppButton> : null}
             {status === 'active' ? (
               <>
@@ -151,21 +196,41 @@ export function OCPTopBar() {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_auto_1fr_auto_1fr] xl:items-center">
-          <TeamLabel team={battingTeam} label="Batting" align="left" />
+        <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_auto_auto_1fr] xl:items-center">
+          <TeamLabel
+            team={battingTeam}
+            label="Batting"
+            align="left"
+            isSummaryActive={
+              display.teamSummary &&
+              activeSummaryTeamId === battingTeam.id &&
+              resolveSummaryView(battingTeam.id) === 'batting'
+            }
+            onSummaryToggle={() => toggleTeamSummary(battingTeam.id, 'batting')}
+          />
 
-          <div className="rounded-[1.7rem] bg-white px-6 py-4 text-center text-slate-950">
+          <div className="rounded-[1.7rem] border border-[#d7ddd6] bg-[#f4f7f2] px-6 py-4 text-center text-slate-950">
             <p className="text-5xl font-semibold leading-none tracking-[-0.06em]">{scoreText}</p>
             <p className="mt-2 text-sm font-medium text-slate-500">{oversText} ov</p>
             {innings?.target ? <p className="mt-2 text-sm font-semibold text-[#10994c]">Target {innings.target}</p> : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 rounded-[1.5rem] bg-white/7 px-4 py-4">
+          <div className="grid grid-cols-2 gap-3 rounded-[1.5rem] bg-[#f4f7f2] px-4 py-4">
             <RateCard label="CRR" value={ratesReady ? currentRunRate.toFixed(2) : '-'} />
             <RateCard label="RRR" value={requiredRunRate !== null && ratesReady ? requiredRunRate.toFixed(2) : '-'} />
           </div>
 
-          <TeamLabel team={bowlingTeam} label="Bowling" align="right" />
+          <TeamLabel
+            team={bowlingTeam}
+            label="Bowling"
+            align="right"
+            isSummaryActive={
+              display.teamSummary &&
+              activeSummaryTeamId === bowlingTeam.id &&
+              resolveSummaryView(bowlingTeam.id) === 'bowling'
+            }
+            onSummaryToggle={() => toggleTeamSummary(bowlingTeam.id, 'bowling')}
+          />
         </div>
       </div>
     </section>
@@ -176,18 +241,32 @@ function TeamLabel({
   team,
   label,
   align,
+  isSummaryActive,
+  onSummaryToggle,
 }: {
-  team: { logoCloudinaryId: string | null; primaryColor: string; shortCode: string; name: string }
+  team: { id: number; logoCloudinaryId: string | null; primaryColor: string; shortCode: string; name: string }
   label: string
   align: 'left' | 'right'
+  isSummaryActive: boolean
+  onSummaryToggle: () => void
 }) {
   return (
     <div className={`flex items-center gap-3 ${align === 'right' ? 'xl:justify-end' : ''}`}>
       {align === 'right' ? (
         <div className="text-right">
-          <p className="font-stats text-[0.72rem] uppercase tracking-[0.22em] text-white/45">{label}</p>
+          <p className="font-stats text-[0.72rem] uppercase tracking-[0.22em] text-slate-400">{label}</p>
           <p className="mt-1 text-xl font-semibold" style={{ color: team.primaryColor }}>{team.shortCode}</p>
-          <p className="text-sm text-white/65">{team.name}</p>
+          <p className="text-sm text-slate-600">{team.name}</p>
+          <button
+            onClick={onSummaryToggle}
+            className={`mt-3 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              isSummaryActive
+                ? 'border-[#f5c6c4] bg-[#fff1f0] text-[#c54e4c] hover:bg-[#ffe5e3]'
+                : 'border-[#b8e4cc] bg-[#eef8f1] text-[#10994c] hover:bg-[#dff0e4]'
+            }`}
+          >
+            {isSummaryActive ? 'Hide' : 'Show'}
+          </button>
         </div>
       ) : null}
       {team.logoCloudinaryId ? (
@@ -201,9 +280,19 @@ function TeamLabel({
       )}
       {align === 'left' ? (
         <div>
-          <p className="font-stats text-[0.72rem] uppercase tracking-[0.22em] text-white/45">{label}</p>
+          <p className="font-stats text-[0.72rem] uppercase tracking-[0.22em] text-slate-400">{label}</p>
           <p className="mt-1 text-xl font-semibold" style={{ color: team.primaryColor }}>{team.shortCode}</p>
-          <p className="text-sm text-white/65">{team.name}</p>
+          <p className="text-sm text-slate-600">{team.name}</p>
+          <button
+            onClick={onSummaryToggle}
+            className={`mt-3 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              isSummaryActive
+                ? 'border-[#f5c6c4] bg-[#fff1f0] text-[#c54e4c] hover:bg-[#ffe5e3]'
+                : 'border-[#b8e4cc] bg-[#eef8f1] text-[#10994c] hover:bg-[#dff0e4]'
+            }`}
+          >
+            {isSummaryActive ? 'Hide' : 'Show'}
+          </button>
         </div>
       ) : null}
     </div>

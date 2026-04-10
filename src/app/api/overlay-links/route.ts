@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth/config'
+import { getTournamentPermissionContext } from '@/lib/auth/access'
 import { isAdminSession } from '@/lib/auth/utils'
 import { db } from '@/lib/db'
 import { overlayLinks, matches, tournaments, wallets, walletTransactions, pricingConfig } from '@/lib/db/schema'
@@ -22,10 +23,19 @@ export async function GET(req: NextRequest) {
 
   const isAdmin = isAdminSession(session)
 
+  if (!isAdmin && tournamentId && !Number.isNaN(tournamentId)) {
+    const permissionContext = await getTournamentPermissionContext(session, tournamentId)
+    if (!permissionContext?.canAccessTournament) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
   const rows = await db.query.overlayLinks.findMany({
     where: (t, { and: $and, eq: $eq, isNull }) => {
       const conditions = []
-      if (!isAdmin) conditions.push($eq(t.userId, userId))
+      if (!isAdmin && !(tournamentId && !Number.isNaN(tournamentId))) {
+        conditions.push($eq(t.userId, userId))
+      }
       if (matchId && !isNaN(matchId)) conditions.push($eq(t.matchId, matchId))
       if (tournamentId && !isNaN(tournamentId)) {
         conditions.push($eq(t.tournamentId, tournamentId))

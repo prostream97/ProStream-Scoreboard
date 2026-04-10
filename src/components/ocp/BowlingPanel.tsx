@@ -4,13 +4,46 @@ import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 import { EditIcon } from '@/components/shared/EditIcon'
 
+
+
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!
 
 export function BowlingPanel() {
   const snapshot = useMatchStore((s) => s.snapshot)
   const currentOverBalls = useMatchStore((s) => s.currentOverBalls)
   const openPlayerEdit = useUIStore((s) => s.openPlayerEdit)
+  const setDisplay = useUIStore((s) => s.setDisplay)
+  const activePlayerId = useUIStore((s) => s.activePlayerId)
+  const setActivePlayer = useUIStore((s) => s.setActivePlayer)
   if (!snapshot) return null
+
+  async function showPlayerCard(playerId: number) {
+    setDisplay('playerCard', true)
+    setActivePlayer(playerId)
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot!.matchId,
+        event: 'display.toggle',
+        payload: { element: 'playerCard', visible: true, playerId },
+      }),
+    })
+  }
+
+  async function hidePlayerCard() {
+    setDisplay('playerCard', false)
+    setActivePlayer(null)
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot!.matchId,
+        event: 'display.toggle',
+        payload: { element: 'playerCard', visible: false },
+      }),
+    })
+  }
 
   const currentBowlerId = snapshot.currentBowlerId
   const bowlingTeamId = snapshot.currentInningsState?.bowlingTeamId
@@ -60,15 +93,34 @@ export function BowlingPanel() {
                   <p className="font-semibold text-slate-950">{currentBowler.displayName}</p>
                   <p className="text-sm text-slate-500">Current bowler</p>
                 </div>
-                {bowlingTeamId ? (
-                  <button
-                    onClick={() => openPlayerEdit(currentBowler.playerId, bowlingTeamId)}
-                    className="rounded-full bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]"
-                    title="Edit player"
-                  >
-                    <EditIcon className="h-4 w-4" />
-                  </button>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  {activePlayerId === currentBowler.playerId ? (
+                    <button
+                      onClick={hidePlayerCard}
+                      className="rounded-full border border-[#f5c6c4] bg-[#fff1f0] px-3 py-1.5 text-xs font-semibold text-[#c54e4c] transition hover:bg-[#ffe5e3]"
+                      title="Hide player card"
+                    >
+                      Hide
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => showPlayerCard(currentBowler.playerId)}
+                      className="rounded-full border border-[#b8e4cc] bg-[#eef8f1] px-3 py-1.5 text-xs font-semibold text-[#10994c] transition hover:bg-[#dff0e4]"
+                      title="Show player card on overlay"
+                    >
+                      Show
+                    </button>
+                  )}
+                  {bowlingTeamId ? (
+                    <button
+                      onClick={() => openPlayerEdit(currentBowler.playerId, bowlingTeamId)}
+                      className="rounded-full bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]"
+                      title="Edit player"
+                    >
+                      <EditIcon className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-4 grid grid-cols-4 gap-3">
@@ -108,7 +160,7 @@ export function BowlingPanel() {
           <div className="mt-2 space-y-2">
             {snapshot.bowlers.filter((b) => !b.isCurrent).map((b) => (
               <div key={b.playerId} className="flex items-center justify-between rounded-[1.2rem] border border-[#e1e7df] bg-[#f8faf7] px-4 py-3 text-sm">
-                <span className="font-medium text-slate-900">{b.displayName}</span>
+                <span className="flex-1 min-w-0 truncate mr-2 font-medium text-slate-900">{b.displayName}</span>
                 <span className="text-slate-500">{b.overs}.{b.balls}-{b.runs}-{b.wickets}</span>
               </div>
             ))}

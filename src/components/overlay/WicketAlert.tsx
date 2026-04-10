@@ -37,7 +37,7 @@ export function WicketAlert({ wicket, snapshot }: Props) {
   }, [wicket])
 
   const outBatter = shown
-    ? snapshot.battingTeamPlayers.find((p) => p.id === shown.batsmanId) ?? snapshot.bowlingTeamPlayers.find((p) => p.id === shown.batsmanId)
+    ? snapshot.battingTeamPlayers.find((p) => p.id === shown.dismissedBatterId) ?? snapshot.bowlingTeamPlayers.find((p) => p.id === shown.dismissedBatterId)
     : null
 
   const battingTeam =

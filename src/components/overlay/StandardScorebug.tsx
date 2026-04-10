@@ -56,20 +56,20 @@ export function StandardScorebug({ snapshot }: Props) {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 150, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 15 }}
-      // the container has absolute bottom positioning for standard OBS use
-      className="absolute bottom-[60px] left-0 w-full flex justify-center"
+      // the scorebug should sit 5px above the OBS frame with a near full-width layout
+      className="absolute bottom-[5px] left-[5px] right-[5px]"
     >
-      <div data-layer="ScoreBug" className="Scorebug" style={{ paddingLeft: 100, paddingRight: 100, paddingTop: 13, paddingBottom: 13, justifyContent: 'flex-start', alignItems: 'center', gap: 13, display: 'inline-flex' }}>
+      <div data-layer="ScoreBug" className="Scorebug" style={{ width: '100%', paddingLeft: 14, paddingRight: 14, paddingTop: 13, paddingBottom: 0, justifyContent: 'space-between', alignItems: 'flex-end', gap: 0, display: 'flex', boxSizing: 'border-box' }}>
 
         {/* Batting Team Flag */}
-        <div data-layer="Flag Left Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <div data-layer="Flag Left Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'flex-end' }}>
           {/* Pill */}
-          <div data-layer="Flag Left" className="FlagLeft" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 92, paddingRight: 16 }}>
+          <div data-layer="Flag Left" className="FlagLeft" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 92, paddingRight: 16 }}>
             <div data-layer="Gradient" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(270deg, ${batting.primaryColor}55 0%, transparent 100%)` }} />
             <div data-layer="TeamName" style={{ maxWidth: 110, color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{batting.name}</div>
           </div>
           {/* Floating logo */}
-          <div data-layer="Avatar" style={{ position: 'absolute', left: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div data-layer="Avatar" style={{ position: 'absolute', left: -14, bottom: 0, width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {batting.logoCloudinaryId ? (
               <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_78,h_78,f_webp/${batting.logoCloudinaryId}`} alt={batting.name} width={78} height={78} className="object-cover" />
             ) : (
@@ -186,14 +186,14 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Bowling Team Flag */}
-        <div data-layer="Flag Right Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <div data-layer="Flag Right Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'flex-end' }}>
           {/* Pill */}
-          <div data-layer="Flag Right" className="FlagRight" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 92, justifyContent: 'flex-end' }}>
+          <div data-layer="Flag Right" className="FlagRight" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 92, justifyContent: 'flex-end' }}>
             <div data-layer="Gradient" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(90deg, ${bowling.primaryColor}55 0%, transparent 100%)` }} />
             <div data-layer="TeamName" style={{ maxWidth: 110, textAlign: 'right', color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{bowling.name}</div>
           </div>
           {/* Floating logo */}
-          <div data-layer="Avatar" style={{ position: 'absolute', right: -14, top: '50%', transform: 'translateY(-50%)', width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div data-layer="Avatar" style={{ position: 'absolute', right: -14, bottom: 0, width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {bowling.logoCloudinaryId ? (
               <Image src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_78,h_78,f_webp/${bowling.logoCloudinaryId}`} alt={bowling.name} width={78} height={78} className="object-cover" />
             ) : (

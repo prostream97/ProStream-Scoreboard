@@ -9,6 +9,9 @@ const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!
 export function BattingPanel() {
   const snapshot = useMatchStore((s) => s.snapshot)
   const openPlayerEdit = useUIStore((s) => s.openPlayerEdit)
+  const setDisplay = useUIStore((s) => s.setDisplay)
+  const activePlayerId = useUIStore((s) => s.activePlayerId)
+  const setActivePlayer = useUIStore((s) => s.setActivePlayer)
   if (!snapshot) return null
 
   const { batters, strikerId, nonStrikerId, partnership, battingTeamPlayers, currentInningsState } = snapshot
@@ -27,6 +30,34 @@ export function BattingPanel() {
       runs: 0, balls: 0, fours: 0, sixes: 0, strikeRate: 0,
       isStriker, isOut: false, dismissalType: null as null,
     }
+  }
+
+  async function showPlayerCard(playerId: number) {
+    setDisplay('playerCard', true)
+    setActivePlayer(playerId)
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot!.matchId,
+        event: 'display.toggle',
+        payload: { element: 'playerCard', visible: true, playerId },
+      }),
+    })
+  }
+
+  async function hidePlayerCard() {
+    setDisplay('playerCard', false)
+    setActivePlayer(null)
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot!.matchId,
+        event: 'display.toggle',
+        payload: { element: 'playerCard', visible: false },
+      }),
+    })
   }
 
   const striker = resolveOrSynth(strikerId, true)
@@ -48,12 +79,18 @@ export function BattingPanel() {
           isStriker
           headshotId={strikerId ? battingTeamPlayers.find((p) => p.id === strikerId)?.headshotCloudinaryId ?? null : null}
           onEdit={strikerId && battingTeamId ? () => openPlayerEdit(strikerId, battingTeamId) : undefined}
+          onShow={strikerId ? () => showPlayerCard(strikerId) : undefined}
+          onHide={hidePlayerCard}
+          isActive={strikerId !== null && activePlayerId === strikerId}
         />
         <BatterRow
           batter={nonStriker}
           isStriker={false}
           headshotId={nonStrikerId ? battingTeamPlayers.find((p) => p.id === nonStrikerId)?.headshotCloudinaryId ?? null : null}
           onEdit={nonStrikerId && battingTeamId ? () => openPlayerEdit(nonStrikerId, battingTeamId) : undefined}
+          onShow={nonStrikerId ? () => showPlayerCard(nonStrikerId) : undefined}
+          onHide={hidePlayerCard}
+          isActive={nonStrikerId !== null && activePlayerId === nonStrikerId}
         />
       </div>
     </section>
@@ -65,11 +102,17 @@ function BatterRow({
   isStriker,
   headshotId,
   onEdit,
+  onShow,
+  onHide,
+  isActive,
 }: {
   batter: ReturnType<typeof useMatchStore.getState>['snapshot'] extends null ? undefined : NonNullable<ReturnType<typeof useMatchStore.getState>['snapshot']>['batters'][number] | undefined
   isStriker: boolean
   headshotId: string | null
   onEdit?: () => void
+  onShow?: () => void
+  onHide?: () => void
+  isActive?: boolean
 }) {
   if (!batter) {
     return (
@@ -102,6 +145,23 @@ function BatterRow({
               <p className="text-sm text-slate-500">{batter.isOut ? `b. ${batter.dismissalType}` : 'Not out'}</p>
             </div>
             <div className="flex items-center gap-2">
+              {isActive ? (
+                <button
+                  onClick={onHide}
+                  className="rounded-full border border-[#f5c6c4] bg-[#fff1f0] px-3 py-1.5 text-xs font-semibold text-[#c54e4c] transition hover:bg-[#ffe5e3]"
+                  title="Hide player card"
+                >
+                  Hide
+                </button>
+              ) : onShow ? (
+                <button
+                  onClick={onShow}
+                  className="rounded-full border border-[#b8e4cc] bg-[#eef8f1] px-3 py-1.5 text-xs font-semibold text-[#10994c] transition hover:bg-[#dff0e4]"
+                  title="Show player card on overlay"
+                >
+                  Show
+                </button>
+              ) : null}
               {onEdit ? (
                 <button onClick={onEdit} className="rounded-full bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]" title="Edit player">
                   <EditIcon className="h-4 w-4" />

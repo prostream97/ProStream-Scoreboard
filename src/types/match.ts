@@ -46,6 +46,7 @@ export type DeliveryInput = {
   extraType: ExtraType | null
   isWicket: boolean
   dismissalType: DismissalType | null
+  dismissedBatterId?: number | null
   fielder1Id: number | null
   fielder2Id: number | null
 }
@@ -87,6 +88,7 @@ export type BatterStats = {
   isStriker: boolean
   isOut: boolean
   dismissalType: DismissalType | null
+  dismissalText?: string | null
 }
 
 // ─── Bowler Stats (computed) ──────────────────────────────────────────────────

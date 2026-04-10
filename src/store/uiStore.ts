@@ -7,6 +7,7 @@ type DisplayElements = {
   partnership: boolean
   ticker: boolean
   summary: boolean
+  teamSummary: boolean
   header: boolean
   mostWickets: boolean
 }
@@ -20,6 +21,8 @@ export type PlayerEditCtx = {
 type UIStore = {
   display: DisplayElements
   activePlayerId: number | null
+  activeSummaryTeamId: number | null
+  activeSummaryView: 'batting' | 'bowling' | null
   isWicketModalOpen: boolean
   isBowlerSelectOpen: boolean
   isSquadPanelOpen: boolean
@@ -28,6 +31,8 @@ type UIStore = {
   toggleDisplay: (element: keyof DisplayElements) => void
   setDisplay: (element: keyof DisplayElements, visible: boolean) => void
   setActivePlayer: (id: number | null) => void
+  showTeamSummary: (teamId: number, view: 'batting' | 'bowling') => void
+  hideTeamSummary: () => void
   openWicketModal: () => void
   closeWicketModal: () => void
   openBowlerSelect: () => void
@@ -47,10 +52,13 @@ export const useUIStore = create<UIStore>((set) => ({
     partnership: false,
     ticker: false,
     summary: false,
+    teamSummary: false,
     header: false,
     mostWickets: false,
   },
   activePlayerId: null,
+  activeSummaryTeamId: null,
+  activeSummaryView: null,
   isWicketModalOpen: false,
   isBowlerSelectOpen: false,
   isSquadPanelOpen: false,
@@ -71,6 +79,22 @@ export const useUIStore = create<UIStore>((set) => ({
 
   setActivePlayer(id) {
     set({ activePlayerId: id })
+  },
+
+  showTeamSummary(teamId, view) {
+    set((s) => ({
+      display: { ...s.display, teamSummary: true },
+      activeSummaryTeamId: teamId,
+      activeSummaryView: view,
+    }))
+  },
+
+  hideTeamSummary() {
+    set((s) => ({
+      display: { ...s.display, teamSummary: false },
+      activeSummaryTeamId: null,
+      activeSummaryView: null,
+    }))
   },
 
   openWicketModal() {

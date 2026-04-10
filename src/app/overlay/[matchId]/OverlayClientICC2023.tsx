@@ -37,7 +37,7 @@ function OverlayInnerICC2023({ matchId, initialSnapshot, initialMostWickets }: P
     mostWicketsData,
     battingTeam,
     bowlingTeam,
-  } = useOverlayState({ matchId, initialSnapshot, initialMostWickets })
+  } = useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme: 'icc2023' })
 
   const resolveCard = () => {
     const pid = activePlayerId ?? snapshot.strikerId

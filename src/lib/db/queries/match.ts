@@ -46,8 +46,8 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     bowlingTeamId: i.bowlingTeamId,
     totalRuns: i.totalRuns,
     wickets: i.wickets,
-    overs: i.overs,
-    balls: i.balls,
+    overs: i.inningsNumber === currentInningsNum ? (state?.currentOver ?? i.overs) : i.overs,
+    balls: i.inningsNumber === currentInningsNum ? (state?.currentBalls ?? i.balls) : i.balls,
     target: i.target,
     status: i.status,
   }))
@@ -153,8 +153,6 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
       balls: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isLegal} = true)`.as('balls'),
       fours: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.runs} = 4)`.as('fours'),
       sixes: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.runs} = 6)`.as('sixes'),
-      isWicket: sql<boolean>`BOOL_OR(${deliveries.isWicket})`.as('is_out'),
-      dismissalType: sql<string | null>`MAX(${deliveries.dismissalType})`.as('dismissal_type'),
       playerName: players.name,
       displayName: players.displayName,
     })
@@ -163,22 +161,142 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
     .where(eq(deliveries.inningsId, inningsId))
     .groupBy(deliveries.batsmanId, players.name, players.displayName)
 
-  return rows.map((r) => ({
-    playerId: r.playerId,
-    playerName: r.playerName,
-    displayName: r.displayName,
-    runs: Number(r.runs) || 0,
-    balls: Number(r.balls) || 0,
-    fours: Number(r.fours) || 0,
-    sixes: Number(r.sixes) || 0,
-    strikeRate:
-      Number(r.balls) > 0
-        ? Math.round((Number(r.runs) / Number(r.balls)) * 10000) / 100
-        : 0,
-    isStriker: r.playerId === strikerId,
-    isOut: Boolean(r.isWicket),
-    dismissalType: r.dismissalType as BatterStats['dismissalType'],
-  }))
+  const wicketRows = await db
+    .select({
+      id: deliveries.id,
+      batsmanId: deliveries.batsmanId,
+      dismissedBatterId: deliveries.dismissedBatterId,
+      bowlerId: deliveries.bowlerId,
+      dismissalType: deliveries.dismissalType,
+      fielder1Id: deliveries.fielder1Id,
+      fielder2Id: deliveries.fielder2Id,
+    })
+    .from(deliveries)
+    .where(and(eq(deliveries.inningsId, inningsId), eq(deliveries.isWicket, true)))
+    .orderBy(desc(deliveries.id))
+
+  const latestWicketByBatter = new Map<number, (typeof wicketRows)[number]>()
+  for (const wicket of wicketRows) {
+    const dismissedBatterId = wicket.dismissedBatterId ?? wicket.batsmanId
+    if (!latestWicketByBatter.has(dismissedBatterId)) {
+      latestWicketByBatter.set(dismissedBatterId, wicket)
+    }
+  }
+
+  const battingRowByPlayerId = new Map(
+    rows.map((row) => [row.playerId, row]),
+  )
+
+  const dismissedOnlyPlayerIds = [...latestWicketByBatter.keys()].filter(
+    (playerId) => !battingRowByPlayerId.has(playerId),
+  )
+
+  const dismissedOnlyPlayers = dismissedOnlyPlayerIds.length
+    ? await db
+        .select({
+          id: players.id,
+          name: players.name,
+          displayName: players.displayName,
+        })
+        .from(players)
+        .where(inArray(players.id, dismissedOnlyPlayerIds))
+    : []
+
+  const dismissedOnlyPlayerMap = new Map(
+    dismissedOnlyPlayers.map((player) => [player.id, player]),
+  )
+
+  const dismissalPlayerIds = [...new Set(
+    wicketRows.flatMap((wicket) => [
+      wicket.bowlerId,
+      wicket.fielder1Id,
+      wicket.fielder2Id,
+    ]).filter((id): id is number => id !== null),
+  )]
+
+  const dismissalPlayers = dismissalPlayerIds.length
+    ? await db
+        .select({
+          id: players.id,
+          displayName: players.displayName,
+        })
+        .from(players)
+        .where(inArray(players.id, dismissalPlayerIds))
+    : []
+
+  const dismissalPlayerMap = new Map(
+    dismissalPlayers.map((player) => [player.id, player.displayName]),
+  )
+
+  function formatDismissalText(batterId: number, dismissalType: BatterStats['dismissalType']) {
+    if (!dismissalType) return null
+
+    const wicket = latestWicketByBatter.get(batterId)
+    if (!wicket) return null
+
+    const bowlerName = dismissalPlayerMap.get(wicket.bowlerId) ?? 'Unknown'
+    const fielder1Name = wicket.fielder1Id ? dismissalPlayerMap.get(wicket.fielder1Id) ?? 'Unknown' : null
+    const fielder2Name = wicket.fielder2Id ? dismissalPlayerMap.get(wicket.fielder2Id) ?? 'Unknown' : null
+
+    switch (dismissalType) {
+      case 'bowled':
+        return `b ${bowlerName}`
+      case 'lbw':
+        return `lbw b ${bowlerName}`
+      case 'caught':
+        return fielder1Name ? `c ${fielder1Name} b ${bowlerName}` : `c b ${bowlerName}`
+      case 'stumped':
+        return fielder1Name ? `st ${fielder1Name} b ${bowlerName}` : `st b ${bowlerName}`
+      case 'runout':
+        if (fielder1Name && fielder2Name) return `run out (${fielder1Name}/${fielder2Name})`
+        if (fielder1Name) return `run out (${fielder1Name})`
+        return 'run out'
+      case 'hitwicket':
+        return 'hit wicket'
+      case 'obstructingfield':
+        return 'obstructing the field'
+      case 'handledball':
+        return 'handled the ball'
+      case 'timedout':
+        return 'timed out'
+      default:
+        return dismissalType
+    }
+  }
+
+  const orderedPlayerIds = [
+    ...rows.map((row) => row.playerId),
+    ...dismissedOnlyPlayerIds,
+  ]
+
+  return orderedPlayerIds.flatMap((playerId) => {
+    const battingRow = battingRowByPlayerId.get(playerId)
+    const dismissedOnlyPlayer = dismissedOnlyPlayerMap.get(playerId)
+    const wicket = latestWicketByBatter.get(playerId)
+    const dismissalType = wicket?.dismissalType as BatterStats['dismissalType'] | undefined
+
+    const playerName = battingRow?.playerName ?? dismissedOnlyPlayer?.name
+    const displayName = battingRow?.displayName ?? dismissedOnlyPlayer?.displayName
+    if (!playerName || !displayName) return []
+
+    const runs = Number(battingRow?.runs) || 0
+    const balls = Number(battingRow?.balls) || 0
+
+    return [{
+      playerId,
+      playerName,
+      displayName,
+      runs,
+      balls,
+      fours: Number(battingRow?.fours) || 0,
+      sixes: Number(battingRow?.sixes) || 0,
+      strikeRate: balls > 0 ? Math.round((runs / balls) * 10000) / 100 : 0,
+      isStriker: playerId === strikerId,
+      isOut: latestWicketByBatter.has(playerId),
+      dismissalType: dismissalType ?? null,
+      dismissalText: dismissalType ? formatDismissalText(playerId, dismissalType) : null,
+    }]
+  })
 }
 
 async function getBowlerStats(inningsId: number, currentBowlerId: number | null, bpo = 6): Promise<BowlerStats[]> {

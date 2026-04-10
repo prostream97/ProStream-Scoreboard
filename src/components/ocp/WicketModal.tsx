@@ -30,25 +30,25 @@ const DISMISSALS: DismissalOption[] = [
 export function WicketModal() {
   const isOpen = useUIStore((s) => s.isWicketModalOpen)
   const closeWicketModal = useUIStore((s) => s.closeWicketModal)
-  const openBowlerSelect = useUIStore((s) => s.openBowlerSelect)
 
   const snapshot = useMatchStore((s) => s.snapshot)
-  const addDelivery = useMatchStore((s) => s.addDelivery)
-  const setStriker = useMatchStore((s) => s.setStriker)
+  const recordWicket = useMatchStore((s) => s.recordWicket)
 
   const [step, setStep] = useState<Step>('dismissal')
   const [selectedDismissal, setSelectedDismissal] = useState<DismissalOption | null>(null)
   const [fielder1Id, setFielder1Id] = useState<number | null>(null)
   const [fielder2Id, setFielder2Id] = useState<number | null>(null)
   const [runs, setRuns] = useState(0)
+  const [dismissedBatterId, setDismissedBatterId] = useState<number | null>(null)
 
   if (!isOpen || !snapshot) return null
+  const matchSnapshot = snapshot
 
-  const bowlingPlayers = snapshot.bowlingTeamPlayers
-  const battingPlayers = snapshot.battingTeamPlayers
+  const bowlingPlayers = matchSnapshot.bowlingTeamPlayers
+  const battingPlayers = matchSnapshot.battingTeamPlayers
 
   // Remaining batters (not currently in, not already out)
-  const battedIds = new Set(snapshot.batters.filter((b) => b.isOut || b.playerId === snapshot.strikerId || b.playerId === snapshot.nonStrikerId).map((b) => b.playerId))
+  const battedIds = new Set(matchSnapshot.batters.filter((b) => b.isOut || b.playerId === matchSnapshot.strikerId || b.playerId === matchSnapshot.nonStrikerId).map((b) => b.playerId))
   const remainingBatters = battingPlayers.filter((p) => !battedIds.has(p.id))
 
   function reset() {
@@ -57,6 +57,7 @@ export function WicketModal() {
     setFielder1Id(null)
     setFielder2Id(null)
     setRuns(0)
+    setDismissedBatterId(null)
   }
 
   function handleClose() {
@@ -66,6 +67,7 @@ export function WicketModal() {
 
   function handleDismissalSelect(d: DismissalOption) {
     setSelectedDismissal(d)
+    setDismissedBatterId(matchSnapshot.strikerId)
     if (d.needsFielder) {
       setStep('fielder')
     } else {
@@ -78,19 +80,20 @@ export function WicketModal() {
     setStep('batsman')
   }
 
-  async function handleBatsmanSelect(nextBatsmanId: number) {
-    if (!selectedDismissal) return
+  async function handleBatsmanSelect(nextBatsmanId: number | null) {
+    if (!selectedDismissal || !matchSnapshot.strikerId) return
 
-    // Set the incoming batsman as striker
-    setStriker(nextBatsmanId)
+    const selectedDismissedBatterId = selectedDismissal.type === 'runout'
+      ? dismissedBatterId
+      : matchSnapshot.strikerId
 
-    await addDelivery({
+    if (!selectedDismissedBatterId) return
+
+    await recordWicket({
       runs,
-      extraRuns: 0,
-      isLegal: true,
-      extraType: null,
-      isWicket: true,
       dismissalType: selectedDismissal.type,
+      dismissedBatterId: selectedDismissedBatterId,
+      incomingBatterId: nextBatsmanId,
       fielder1Id,
       fielder2Id,
     })
@@ -179,7 +182,7 @@ export function WicketModal() {
                  'Fielder(s) involved:'}
               </p>
 
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
                 {bowlingPlayers.map((p) => {
                   const isF1 = fielder1Id === p.id
                   const isF2 = fielder2Id === p.id
@@ -241,19 +244,49 @@ export function WicketModal() {
 
               <p className="font-stats text-sm text-gray-400 mb-3">Incoming batsman:</p>
 
+              {dismissalInfo?.type === 'runout' && (
+                <div className="mb-4">
+                  <p className="font-stats text-sm text-gray-400 mb-2">Who is out?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: matchSnapshot.strikerId, label: 'Striker' },
+                      { id: matchSnapshot.nonStrikerId, label: 'Non-striker' },
+                    ]
+                      .filter((option): option is { id: number; label: string } => option.id != null)
+                      .map((option) => {
+                        const player = battingPlayers.find((p) => p.id === option.id)
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => setDismissedBatterId(option.id)}
+                            className={`rounded-lg border px-3 py-2 text-left font-stats text-sm transition-colors ${
+                              dismissedBatterId === option.id
+                                ? 'border-primary bg-primary/20 text-white'
+                                : 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
+                            }`}
+                          >
+                            <div>{option.label}</div>
+                            <div className="text-xs text-gray-500">{player?.displayName ?? 'Unknown player'}</div>
+                          </button>
+                        )
+                      })}
+                  </div>
+                </div>
+              )}
+
               {remainingBatters.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="font-stats text-gray-400 mb-2">All Out!</p>
                   <p className="font-stats text-sm text-gray-500">No batsmen remaining</p>
                   <button
-                    onClick={() => handleBatsmanSelect(-1)}
+                    onClick={() => handleBatsmanSelect(null)}
                     className="mt-4 px-6 py-2.5 bg-red-600 text-white font-stats font-semibold rounded-lg hover:bg-red-700 transition-colors"
                   >
                     Confirm — Innings Over
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
                   {remainingBatters.map((p) => (
                     <button
                       key={p.id}

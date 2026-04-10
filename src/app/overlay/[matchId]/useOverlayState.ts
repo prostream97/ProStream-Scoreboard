@@ -16,9 +16,10 @@ type Props = {
   matchId: number
   initialSnapshot: MatchSnapshot
   initialMostWickets: TournamentMostWicketsData | null
+  overlayTheme: 'standard' | 'icc2023'
 }
 
-export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }: Props) {
+export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme }: Props) {
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(initialSnapshot)
   const [lastWicket, setLastWicket] = useState<WicketPayload | null>(null)
   const [lastBoundary, setLastBoundary] = useState<{ id: number; runs: 4 | 6 } | null>(null)
@@ -29,6 +30,9 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
   const [cardVisible, setCardVisible] = useState(false)
   const [partnershipVisible, setPartnershipVisible] = useState(false)
   const [summaryVisible, setSummaryVisible] = useState(false)
+  const [teamSummaryVisible, setTeamSummaryVisible] = useState(false)
+  const [activeSummaryTeamId, setActiveSummaryTeamId] = useState<number | null>(null)
+  const [activeSummaryView, setActiveSummaryView] = useState<'batting' | 'bowling' | null>(null)
   const [mostWicketsVisible, setMostWicketsVisible] = useState(false)
   const [inningsSummaries, setInningsSummaries] = useState<InningsSummaryData[]>([])
   const [mostWicketsData, setMostWicketsData] = useState<TournamentMostWicketsData | null>(initialMostWickets)
@@ -75,6 +79,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
     if (mostWicketsVisible) fetchMostWickets()
 
     setSnapshot((s) => {
+      const dismissedBatterId = data.isWicket ? (data.dismissedBatterId ?? data.batsmanId) : null
       const updatedInnings: InningsState[] = s.innings.map((inn) =>
         inn.inningsNumber === s.currentInnings
           ? { ...inn, totalRuns: data.inningsRuns, wickets: data.inningsWickets, overs: data.inningsOvers, balls: data.inningsBalls }
@@ -102,9 +107,12 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
             fours: b.fours + (data.runs === 4 ? 1 : 0),
             sixes: b.sixes + (data.runs === 6 ? 1 : 0),
             strikeRate: newBalls > 0 ? Math.round((newRuns / newBalls) * 10000) / 100 : 0,
-            isOut: b.isOut || data.isWicket,
+            isOut: b.isOut || dismissedBatterId === data.batsmanId,
             isStriker: b.playerId === data.strikerId,
           }
+        }
+        if (dismissedBatterId != null && b.playerId === dismissedBatterId) {
+          return { ...b, isOut: true, isStriker: false }
         }
         if (b.playerId === data.strikerId || b.playerId === data.nonStrikerId) {
           return { ...b, isStriker: b.playerId === data.strikerId }
@@ -112,7 +120,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
         return b
       })
       const batterExists = s.batters.some((b) => b.playerId === data.batsmanId)
-      const finalBatters = batterExists ? updatedBatters : [
+      let finalBatters = batterExists ? updatedBatters : [
         ...updatedBatters,
         {
           playerId: data.batsmanId,
@@ -124,10 +132,28 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
           sixes: data.runs === 6 ? 1 : 0,
           strikeRate: 0,
           isStriker: data.batsmanId === data.strikerId,
-          isOut: data.isWicket,
+          isOut: dismissedBatterId === data.batsmanId,
           dismissalType: null,
         },
       ]
+      if (dismissedBatterId != null && dismissedBatterId !== data.batsmanId && !finalBatters.some((b) => b.playerId === dismissedBatterId)) {
+        finalBatters = [
+          ...finalBatters,
+          {
+            playerId: dismissedBatterId,
+            playerName: '',
+            displayName: s.battingTeamPlayers.find((p) => p.id === dismissedBatterId)?.displayName ?? '',
+            runs: 0,
+            balls: 0,
+            fours: 0,
+            sixes: 0,
+            strikeRate: 0,
+            isStriker: false,
+            isOut: true,
+            dismissalType: null,
+          },
+        ]
+      }
 
       const updatedBowlers = s.bowlers.map((b) => {
         if (b.playerId !== data.bowlerId) return { ...b, isCurrent: false }
@@ -162,6 +188,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
           isCurrent: true,
         },
       ]
+      const hasCurrentPair = data.strikerId != null && data.nonStrikerId != null
 
       return {
         ...s,
@@ -175,14 +202,23 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
         currentOverBalls,
         batters: finalBatters,
         bowlers: finalBowlers,
-        partnership: s.strikerId && s.nonStrikerId
-          ? {
-              runs: (s.partnership?.runs ?? 0) + data.runs + data.extraRuns,
-              balls: (s.partnership?.balls ?? 0) + (data.isLegal ? 1 : 0),
-              batter1Id: data.strikerId,
-              batter2Id: data.nonStrikerId,
-            }
-          : s.partnership,
+        partnership: data.isWicket
+          ? (hasCurrentPair
+              ? {
+                  runs: 0,
+                  balls: 0,
+                  batter1Id: data.strikerId!,
+                  batter2Id: data.nonStrikerId!,
+                }
+              : null)
+          : (hasCurrentPair
+              ? {
+                  runs: (s.partnership?.runs ?? 0) + data.runs + data.extraRuns,
+                  balls: (s.partnership?.balls ?? 0) + (data.isLegal ? 1 : 0),
+                  batter1Id: data.strikerId!,
+                  batter2Id: data.nonStrikerId!,
+                }
+              : s.partnership),
       }
     })
   })
@@ -193,14 +229,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
     if (mostWicketsVisible) fetchMostWickets()
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
-      .then((fresh: MatchSnapshot) => {
-        setSnapshot((prev) => ({
-          ...fresh,
-          currentOverBalls: fresh.currentOverBalls.length > 0
-            ? fresh.currentOverBalls
-            : prev.currentOverBalls,
-        }))
-      })
+      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
       .catch((err) => { console.warn('[useOverlayState] Wicket state refetch failed:', err) })
   })
 
@@ -214,6 +243,9 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
   })
 
   useEvent(`match-${matchId}`, 'display.toggle', (data: DisplayTogglePayload) => {
+    const themeScope = data.themeScope ?? 'all'
+    if (themeScope !== 'all' && themeScope !== overlayTheme) return
+
     if (data.element === 'scorebug') setScorebugVisible(data.visible)
     if (data.element === 'header') setHeaderVisible(data.visible)
     if (data.element === 'playerCard') {
@@ -222,6 +254,16 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
     }
     if (data.element === 'partnership') setPartnershipVisible(data.visible)
     if (data.element === 'summary') setSummaryVisible(data.visible)
+    if (data.element === 'teamSummary') {
+      setTeamSummaryVisible(data.visible)
+      if (data.visible) {
+        setActiveSummaryTeamId(data.summaryTeamId ?? null)
+        setActiveSummaryView(data.summaryView ?? null)
+      } else {
+        setActiveSummaryTeamId(null)
+        setActiveSummaryView(null)
+      }
+    }
     if (data.element === 'mostWickets') setMostWicketsVisible(data.visible)
   })
 
@@ -244,6 +286,9 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets }
     cardVisible,
     partnershipVisible,
     summaryVisible,
+    teamSummaryVisible,
+    activeSummaryTeamId,
+    activeSummaryView,
     mostWicketsVisible,
     inningsSummaries,
     mostWicketsData,

@@ -79,19 +79,19 @@ export function ICC2023Scorebug({ snapshot }: Props) {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 150, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 15 }}
-      style={{ position: 'absolute', bottom: 0, left: 0, width: '100%' }}
+      style={{ position: 'absolute', bottom: 5, left: 5, right: 5 }}
     >
       <div style={{
         width: '100%',
         background: ICC.cream,
         paddingTop: 4,
-        paddingBottom: 4,
-        paddingLeft: 24,
-        paddingRight: 24,
+        paddingBottom: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        gap: 0,
         boxSizing: 'border-box',
       }}>
 

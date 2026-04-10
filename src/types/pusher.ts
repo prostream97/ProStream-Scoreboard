@@ -12,22 +12,23 @@ export type DeliveryAddedPayload = {
   extraType: string | null
   isWicket: boolean
   batsmanId: number
+  dismissedBatterId?: number | null
   bowlerId: number
   inningsRuns: number
   inningsWickets: number
   inningsOvers: number
   inningsBalls: number
-  strikerId: number
-  nonStrikerId: number
+  strikerId: number | null
+  nonStrikerId: number | null
 }
 
 export type WicketPayload = {
   matchId: number
-  batsmanId: number
+  dismissedBatterId: number
   dismissalType: DismissalType
   fielder1Id: number | null
   fielder2Id: number | null
-  nextBatsmanId: number
+  incomingBatterId: number | null
   inningsWickets: number
 }
 
@@ -50,9 +51,12 @@ export type InningsChangePayload = {
 }
 
 export type DisplayTogglePayload = {
-  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'header' | 'mostWickets'
+  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'teamSummary' | 'header' | 'mostWickets'
   visible: boolean
   playerId?: number
+  summaryTeamId?: number
+  summaryView?: 'batting' | 'bowling'
+  themeScope?: 'all' | 'standard' | 'icc2023'
 }
 
 export type DlsUpdatePayload = {

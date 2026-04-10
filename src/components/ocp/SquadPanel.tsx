@@ -58,7 +58,7 @@ export function SquadPanel() {
       />
 
       {/* Slide-over panel */}
-      <div className="fixed right-0 top-[5.5rem] h-[calc(100vh-5.5rem)] w-[440px] z-40 bg-gray-900 border-l border-gray-800 flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-[5.5rem] h-[calc(100vh-5.5rem)] w-full sm:w-[440px] z-40 bg-gray-900 border-l border-gray-800 flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h2 className="font-stats font-semibold text-white text-base">Squad Management</h2>
