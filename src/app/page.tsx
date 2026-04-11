@@ -36,6 +36,9 @@ type LiveMatch = {
     logoCloudinaryId: string | null
   }
   innings: InningsSummary[]
+  resultWinnerId: number | null
+  resultMargin: number | null
+  resultType: string | null
 }
 
 function teamScore(innings: InningsSummary[], teamId: number) {
@@ -48,13 +51,41 @@ function teamScore(innings: InningsSummary[], teamId: number) {
   }
 }
 
-function TeamLogo({
-  team,
-  size = 'md',
-}: {
-  team: LiveMatch['homeTeam']
-  size?: 'md'
-}) {
+function resultLine(match: LiveMatch): string | null {
+  if (match.status !== 'complete') return null
+
+  const { resultWinnerId, resultMargin, resultType, homeTeam, awayTeam } = match
+
+  if (resultType === 'tie') return 'Match tied'
+
+  if (!resultWinnerId || resultMargin === null) {
+    // Fallback: derive winner from innings scores if result columns not set
+    const inn1 = match.innings.find((i) => i.inningsNumber === 1)
+    const inn2 = match.innings.find((i) => i.inningsNumber === 2)
+    if (!inn1 || !inn2) return 'Match completed'
+    if (inn2.totalRuns > inn1.totalRuns) {
+      const winner = inn2.battingTeamId === homeTeam.id ? homeTeam : awayTeam
+      return `${winner.name} won`
+    }
+    if (inn1.totalRuns > inn2.totalRuns) {
+      const winner = inn1.battingTeamId === homeTeam.id ? homeTeam : awayTeam
+      return `${winner.name} won`
+    }
+    return 'Match tied'
+  }
+
+  const winnerTeam = resultWinnerId === homeTeam.id ? homeTeam : awayTeam
+
+  if (resultType === 'wickets') {
+    return `${winnerTeam.name} won by ${resultMargin} wicket${resultMargin === 1 ? '' : 's'}`
+  }
+  if (resultType === 'runs') {
+    return `${winnerTeam.name} won by ${resultMargin} run${resultMargin === 1 ? '' : 's'}`
+  }
+  return `${winnerTeam.name} won`
+}
+
+function TeamLogo({ team }: { team: LiveMatch['homeTeam'] }) {
   if (team.logoCloudinaryId) {
     return (
       <img
@@ -74,9 +105,40 @@ function TeamLogo({
   )
 }
 
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'active') {
+    return (
+      <span className="flex items-center gap-1.5 rounded bg-[#d9d9d9]/[0.38] px-2 py-[3px]">
+        <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-[#FF0B0B]" />
+        <span className="text-[8px] font-normal uppercase text-black/[0.71]">LIVE</span>
+      </span>
+    )
+  }
+  if (status === 'paused' || status === 'break') {
+    return (
+      <span className="flex items-center gap-1.5 rounded bg-amber-100 px-2 py-[3px]">
+        <span className="h-[5px] w-[5px] rounded-full bg-amber-500" />
+        <span className="text-[8px] font-normal uppercase text-amber-700">
+          {status === 'break' ? 'BREAK' : 'PAUSED'}
+        </span>
+      </span>
+    )
+  }
+  if (status === 'complete') {
+    return (
+      <span className="flex items-center gap-1.5 rounded bg-slate-100 px-2 py-[3px]">
+        <span className="text-[8px] font-normal uppercase text-slate-500">RESULT</span>
+      </span>
+    )
+  }
+  return null
+}
+
 function MatchCard({ match }: { match: LiveMatch }) {
   const homeScore = teamScore(match.innings, match.homeTeam.id)
   const awayScore = teamScore(match.innings, match.awayTeam.id)
+  const result = resultLine(match)
+  const isComplete = match.status === 'complete'
 
   return (
     <div
@@ -85,11 +147,10 @@ function MatchCard({ match }: { match: LiveMatch }) {
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[18px] font-semibold capitalize leading-tight">Live Match</span>
-        <span className="flex items-center gap-1.5 rounded bg-[#d9d9d9]/[0.38] px-2 py-[3px]">
-          <span className="h-[5px] w-[5px] rounded-full bg-[#FF0B0B]" />
-          <span className="text-[8px] font-normal uppercase text-black/[0.71]">LIVE</span>
+        <span className="text-[18px] font-semibold capitalize leading-tight">
+          {isComplete ? 'Completed' : 'Live Match'}
         </span>
+        <StatusBadge status={match.status} />
       </div>
 
       {match.tournament ? (
@@ -146,6 +207,13 @@ function MatchCard({ match }: { match: LiveMatch }) {
           )}
         </p>
       </div>
+
+      {/* Result line */}
+      {result ? (
+        <p className="mt-3 border-t border-black/[0.06] pt-3 text-center text-[13px] font-semibold text-[#10994c]">
+          {result}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -200,36 +268,66 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [])
 
+  const liveMatches = matches.filter((m) => m.status !== 'complete')
+  const completedMatches = matches.filter((m) => m.status === 'complete')
+
   return (
     <div className="min-h-screen bg-[#f4f7f2] px-4 py-10 sm:px-6 lg:px-8">
-      {/* Hero */}
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">
-          Live Matches
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Ongoing cricket matches across all tournaments
-        </p>
-      </div>
-
-      {/* Grid */}
       {loading ? (
-        <div className="flex flex-wrap justify-center gap-6">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
+        <>
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">Live Matches</h1>
+          </div>
+          <div className="flex flex-wrap justify-center gap-6">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </>
       ) : matches.length === 0 ? (
-        <div className="mx-auto mt-16 max-w-sm text-center">
-          <p className="text-2xl">🏏</p>
-          <p className="mt-3 text-lg font-semibold text-slate-800">No live matches right now</p>
-          <p className="mt-1 text-sm text-slate-500">Check back soon — matches will appear here automatically.</p>
-        </div>
+        <>
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">Live Matches</h1>
+            <p className="mt-2 text-sm text-slate-500">Ongoing cricket matches across all tournaments</p>
+          </div>
+          <div className="mx-auto mt-16 max-w-sm text-center">
+            <p className="text-2xl">🏏</p>
+            <p className="mt-3 text-lg font-semibold text-slate-800">No live matches right now</p>
+            <p className="mt-1 text-sm text-slate-500">Check back soon — matches will appear here automatically.</p>
+          </div>
+        </>
       ) : (
-        <div className="flex flex-wrap justify-center gap-6">
-          {matches.map((match) => (
-            <MatchCard key={match.id} match={match} />
-          ))}
+        <div className="space-y-10">
+          {liveMatches.length > 0 && (
+            <section>
+              <div className="mb-6 text-center">
+                <h1 className="text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-4xl">Live Matches</h1>
+                <p className="mt-2 text-sm text-slate-500">Ongoing cricket matches across all tournaments</p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-6">
+                {liveMatches.map((match) => (
+                  <MatchCard key={match.id} match={match} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {completedMatches.length > 0 && (
+            <section>
+              <div className="mb-6 text-center">
+                <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  {liveMatches.length === 0 ? 'Recent Results' : 'Recent Results'}
+                </h2>
+                {liveMatches.length === 0 && (
+                  <p className="mt-2 text-sm text-slate-500">No live matches right now</p>
+                )}
+              </div>
+              <div className="flex flex-wrap justify-center gap-6">
+                {completedMatches.map((match) => (
+                  <MatchCard key={match.id} match={match} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

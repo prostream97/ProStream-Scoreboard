@@ -32,6 +32,7 @@ export function WicketModal() {
   const closeWicketModal = useUIStore((s) => s.closeWicketModal)
 
   const snapshot = useMatchStore((s) => s.snapshot)
+  const currentOverBalls = useMatchStore((s) => s.currentOverBalls)
   const recordWicket = useMatchStore((s) => s.recordWicket)
 
   const [step, setStep] = useState<Step>('dismissal')
@@ -47,9 +48,19 @@ export function WicketModal() {
   const bowlingPlayers = matchSnapshot.bowlingTeamPlayers
   const battingPlayers = matchSnapshot.battingTeamPlayers
 
-  // Remaining batters (not currently in, not already out)
-  const battedIds = new Set(matchSnapshot.batters.filter((b) => b.isOut || b.playerId === matchSnapshot.strikerId || b.playerId === matchSnapshot.nonStrikerId).map((b) => b.playerId))
-  const remainingBatters = battingPlayers.filter((p) => !battedIds.has(p.id))
+  // Exclude anyone who has already appeared in the batting card, anyone currently in,
+  // and any batter dismissed in the live over buffer before the DB snapshot catches up.
+  const unavailableBatterIds = new Set<number>(
+    [
+      ...matchSnapshot.batters.map((b) => b.playerId),
+      ...currentOverBalls
+        .filter((ball) => ball.isWicket)
+        .map((ball) => ball.dismissedBatterId ?? ball.batsmanId),
+      matchSnapshot.strikerId,
+      matchSnapshot.nonStrikerId,
+    ].filter((playerId): playerId is number => playerId != null),
+  )
+  const remainingBatters = battingPlayers.filter((p) => !unavailableBatterIds.has(p.id))
 
   function reset() {
     setStep('dismissal')

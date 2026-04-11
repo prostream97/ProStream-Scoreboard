@@ -125,6 +125,9 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
       extraType: d.extraType,
       isWicket: d.isWicket,
     })),
+    resultWinnerId: matchRow.resultWinnerId ?? null,
+    resultMargin: matchRow.resultMargin ?? null,
+    resultType: (matchRow.resultType ?? null) as 'wickets' | 'runs' | 'tie' | null,
   }
 }
 
@@ -606,7 +609,7 @@ export async function getMatchList() {
 
 export async function getLiveMatches() {
   return db.query.matches.findMany({
-    where: inArray(matches.status, ['active', 'paused', 'break']),
+    where: inArray(matches.status, ['active', 'paused', 'break', 'complete']),
     with: {
       homeTeam: true,
       awayTeam: true,

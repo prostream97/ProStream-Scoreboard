@@ -43,6 +43,13 @@
       "when": 1775472853421,
       "tag": "0005_wandering_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775804007718,
+      "tag": "0006_match_result",
+      "breakpoints": true
     }
   ]
 }

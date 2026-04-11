@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { innings, matches, matchState } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { pusher } from '@/lib/pusher/server'
+import { maybeAdvanceTournamentStatus } from '@/lib/db/queries/tournament'
 
 export const runtime = 'nodejs'
 
@@ -19,7 +20,8 @@ export async function POST(
 
   const { matchId } = await params
   const id = parseInt(matchId, 10)
-  const { action, strikerId, nonStrikerId, bowlerId } = await req.json()
+  const body = await req.json()
+  const { action, strikerId, nonStrikerId, bowlerId, resultWinnerId, resultMargin, resultType } = body
 
   try {
     if (action === 'end') {
@@ -88,12 +90,33 @@ export async function POST(
     }
 
     if (action === 'complete') {
-      // Mark match as complete
-      await db.update(matches).set({ status: 'complete' }).where(eq(matches.id, id))
+
+      // Mark match as complete with result
+      await db
+        .update(matches)
+        .set({
+          status: 'complete',
+          resultWinnerId: resultWinnerId ?? null,
+          resultMargin: resultMargin ?? null,
+          resultType: resultType ?? null,
+        })
+        .where(eq(matches.id, id))
+
       await db
         .update(innings)
         .set({ status: 'complete' })
         .where(and(eq(innings.matchId, id), eq(innings.inningsNumber, 2)))
+
+      // Auto-advance tournament status if this match belongs to a tournament
+      await maybeAdvanceTournamentStatus(id)
+
+      // Notify all viewers of match completion
+      await pusher.trigger(`match-${id}`, 'match.complete', {
+        matchId: id,
+        resultWinnerId: resultWinnerId ?? null,
+        resultMargin: resultMargin ?? null,
+        resultType: resultType ?? null,
+      })
 
       return NextResponse.json({ ok: true })
     }

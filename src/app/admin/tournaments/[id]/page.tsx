@@ -66,6 +66,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const isAdmin = isAuthenticated && session?.user?.role === 'admin'
 
   const [tournament, setTournament] = useState<TournamentWithDetails | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [standings, setStandings] = useState<StandingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showMatchForm, setShowMatchForm] = useState(false)
@@ -74,6 +75,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [matchError, setMatchError] = useState('')
 
   async function load() {
+    setLoadError(null)
     const [tRes, sRes] = await Promise.all([
       fetch(`/api/tournaments/${tournamentId}`),
       fetch(`/api/tournaments/${tournamentId}/standings`),
@@ -82,6 +84,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     if (tRes.ok) {
       const tournamentData = await tRes.json() as TournamentWithDetails
       setTournament(tournamentData)
+    } else if (tRes.status === 401) {
+      setLoadError('You must be logged in to view this tournament.')
+    } else if (tRes.status === 403) {
+      setLoadError('You do not have access to this tournament.')
+    } else if (tRes.status === 404) {
+      setLoadError(null) // handled by !tournament check below
+    } else {
+      const body = await tRes.json().catch(() => ({})) as { error?: string }
+      setLoadError(body.error ?? `Failed to load tournament (${tRes.status})`)
     }
 
     if (sRes.ok) {
@@ -189,12 +200,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     )
   }
 
-  if (!tournament) {
+  if (loadError || !tournament) {
     return (
       <AppPage className="max-w-5xl">
         <EmptyState
-          title="Tournament not found"
-          description="The requested tournament could not be loaded."
+          title={loadError ? 'Could not load tournament' : 'Tournament not found'}
+          description={loadError ?? 'This tournament does not exist or may have been removed.'}
           action={<AppButton href="/admin/tournaments">Back to tournaments</AppButton>}
         />
       </AppPage>

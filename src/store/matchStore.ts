@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { DeliveryInput, DeliveryRecord, MatchSnapshot, InningsState, BatterStats, BowlerStats, PlayerSummary } from '@/types/match'
+import { computeMatchResult, toResultPayload } from '@/lib/match/result'
 
 type WicketInput = {
   runs: number
@@ -133,6 +134,42 @@ function updateBowlersOptimistically(
   })
 }
 
+function ensureCurrentBowler(
+  bowlers: BowlerStats[],
+  bowlerId: number,
+  bowlingTeamPlayers: PlayerSummary[],
+): BowlerStats[] {
+  const existing = bowlers.find((b) => b.playerId === bowlerId)
+
+  if (existing) {
+    return bowlers.map((b) => ({
+      ...b,
+      isCurrent: b.playerId === bowlerId,
+    }))
+  }
+
+  const player = bowlingTeamPlayers.find((p) => p.id === bowlerId)
+  if (!player) {
+    return bowlers.map((b) => ({ ...b, isCurrent: false }))
+  }
+
+  return [
+    ...bowlers.map((b) => ({ ...b, isCurrent: false })),
+    {
+      playerId: bowlerId,
+      playerName: player.name,
+      displayName: player.displayName,
+      overs: 0,
+      balls: 0,
+      maidens: 0,
+      runs: 0,
+      wickets: 0,
+      economy: 0,
+      isCurrent: true,
+    },
+  ]
+}
+
 // ─── State Shape ──────────────────────────────────────────────────────────────
 
 type MatchStore = {
@@ -153,6 +190,9 @@ type MatchStore = {
   // Set when batting team reaches the target mid-delivery (auto-win)
   winDetected: boolean
 
+  // Set when innings 1 ends automatically (all-out / overs exhausted); prompts "Start Innings 2" modal
+  inningsEndDetected: boolean
+
   // Set when a sync/flush operation fails — cleared by the UI after displaying to the user
   syncError: string | null
 
@@ -166,9 +206,11 @@ type MatchStore = {
   updateFromPusher: (partial: Partial<MatchSnapshot>) => void
   setStriker: (batsmanId: number) => void
   setNonStriker: (batsmanId: number) => void
+  swapStrike: () => Promise<void>
   setBowler: (bowlerId: number) => void
   startNextOver: () => void
   clearWinDetected: () => void
+  clearInningsEndDetected: () => void
   clearSyncError: () => void
   updateTeamLogo: (teamId: number, logoCloudinaryId: string) => void
   updatePlayerInSquad: (teamId: number, playerId: number, data: Partial<PlayerSummary>) => void
@@ -225,7 +267,7 @@ function computePostWicketPair(
 
   const rotated = rotatePairForCompletedRuns(snapshot.strikerId, snapshot.nonStrikerId, runs)
   if (incomingBatterId == null) {
-    return { strikerId: null, nonStrikerId: null }
+    return rotated
   }
 
   if (rotated.strikerId === dismissedBatterId) {
@@ -281,6 +323,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
   flushedBallCount: 0,
   lastFlushedDeliveryIds: [],
   winDetected: false,
+  inningsEndDetected: false,
   syncError: null,
 
   hydrate(snapshot) {
@@ -437,20 +480,43 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       currentOverBuffer: updatedOverBalls,
     })
 
-    // ── Win detection: batting team reaches target in 2nd innings ──────────────
-    const isMatchWon =
-      snapshot.currentInnings === 2 &&
-      innings.target != null &&
-      newRuns >= innings.target
+    // ── Auto end-of-innings / win detection ────────────────────────────────────
+    const currentInningsState = snapshot.innings.find((i) => i.inningsNumber === snapshot.currentInnings)
+    const matchResult = computeMatchResult({
+      inningsNumber: snapshot.currentInnings as 1 | 2,
+      totalRuns: newRuns,
+      wickets: newWickets,
+      target: currentInningsState?.target ?? null,
+      totalOvers: snapshot.totalOvers,
+      newOvers,
+      remainingBalls,
+      battingTeamId: currentInningsState?.battingTeamId ?? 0,
+      bowlingTeamId: currentInningsState?.bowlingTeamId ?? 0,
+    })
 
-    if (isMatchWon) {
-      // Flush any unflushed deliveries, then mark the match complete
+    if (matchResult.outcome === 'innings_end') {
+      // Innings 1 ended (all-out or overs exhausted) — flush and signal UI to open innings 2 modal
       if (!isFlushing) await get().flushOverToNeon()
+      set((s) => ({
+        inningsEndDetected: true,
+        snapshot: s.snapshot ? { ...s.snapshot, status: 'break' } : null,
+      }))
+      await triggerPusherEvent(snapshot.matchId, 'innings.ended', { matchId: snapshot.matchId })
+      return
+    }
+
+    if (
+      matchResult.outcome === 'match_won_by_wickets' ||
+      matchResult.outcome === 'match_won_by_runs' ||
+      matchResult.outcome === 'tie'
+    ) {
+      if (!isFlushing) await get().flushOverToNeon()
+      const payload = toResultPayload(matchResult)
       try {
         const r1 = await fetch(`/api/match/${snapshot.matchId}/innings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'complete' }),
+          body: JSON.stringify({ action: 'complete', ...payload }),
         })
         if (!r1.ok) throw new Error('Failed to close innings')
         set((s) => ({
@@ -461,6 +527,9 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
                 return {
                   ...nextSnapshot,
                   status: 'complete',
+                  resultWinnerId: payload?.resultWinnerId ?? null,
+                  resultMargin: payload?.resultMargin ?? null,
+                  resultType: payload?.resultType ?? null,
                   innings: nextSnapshot.innings.map((inn) =>
                     inn.inningsNumber === nextSnapshot.currentInnings
                       ? { ...inn, status: 'complete' }
@@ -638,7 +707,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         currentInningsState: updatedInnings,
         batters: updatedBatters,
         bowlers: updatedBowlers,
-        partnership: postWicketPair.strikerId && postWicketPair.nonStrikerId
+        partnership: input.incomingBatterId != null && postWicketPair.strikerId && postWicketPair.nonStrikerId
           ? {
               runs: 0,
               balls: 0,
@@ -660,18 +729,42 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       currentOverBuffer: updatedOverBalls,
     })
 
-    const isMatchWon =
-      snapshot.currentInnings === 2 &&
-      innings.target != null &&
-      newRuns >= innings.target
+    // ── Auto end-of-innings / win detection ────────────────────────────────────
+    const wicketInningsState = snapshot.innings.find((i) => i.inningsNumber === snapshot.currentInnings)
+    const wicketMatchResult = computeMatchResult({
+      inningsNumber: snapshot.currentInnings as 1 | 2,
+      totalRuns: newRuns,
+      wickets: newWickets,
+      target: wicketInningsState?.target ?? null,
+      totalOvers: snapshot.totalOvers,
+      newOvers,
+      remainingBalls,
+      battingTeamId: wicketInningsState?.battingTeamId ?? 0,
+      bowlingTeamId: wicketInningsState?.bowlingTeamId ?? 0,
+    })
 
-    if (isMatchWon) {
+    if (wicketMatchResult.outcome === 'innings_end') {
       if (!isFlushing) await get().flushOverToNeon()
+      set((s) => ({
+        inningsEndDetected: true,
+        snapshot: s.snapshot ? { ...s.snapshot, status: 'break' } : null,
+      }))
+      await triggerPusherEvent(snapshot.matchId, 'innings.ended', { matchId: snapshot.matchId })
+      return
+    }
+
+    if (
+      wicketMatchResult.outcome === 'match_won_by_wickets' ||
+      wicketMatchResult.outcome === 'match_won_by_runs' ||
+      wicketMatchResult.outcome === 'tie'
+    ) {
+      if (!isFlushing) await get().flushOverToNeon()
+      const wicketPayload = toResultPayload(wicketMatchResult)
       try {
         const r1 = await fetch(`/api/match/${snapshot.matchId}/innings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'complete' }),
+          body: JSON.stringify({ action: 'complete', ...wicketPayload }),
         })
         if (!r1.ok) throw new Error('Failed to close innings')
         set((s) => ({
@@ -682,6 +775,9 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
                 return {
                   ...nextSnapshot,
                   status: 'complete',
+                  resultWinnerId: wicketPayload?.resultWinnerId ?? null,
+                  resultMargin: wicketPayload?.resultMargin ?? null,
+                  resultType: wicketPayload?.resultType ?? null,
                   innings: nextSnapshot.innings.map((inn) =>
                     inn.inningsNumber === nextSnapshot.currentInnings
                       ? { ...inn, status: 'complete' }
@@ -864,10 +960,58 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     })
   },
 
+  async swapStrike() {
+    const snapshot = get().snapshot
+    if (!snapshot?.strikerId || !snapshot.nonStrikerId) return
+
+    const nextStrikerId = snapshot.nonStrikerId
+    const nextNonStrikerId = snapshot.strikerId
+
+    set((s) => {
+      if (!s.snapshot) return {}
+
+      return {
+        snapshot: {
+          ...s.snapshot,
+          strikerId: nextStrikerId,
+          nonStrikerId: nextNonStrikerId,
+          batters: s.snapshot.batters.map((b) => ({
+            ...b,
+            isStriker: b.playerId === nextStrikerId,
+          })),
+          partnership: s.snapshot.partnership
+            ? {
+                ...s.snapshot.partnership,
+                batter1Id: nextStrikerId,
+                batter2Id: nextNonStrikerId,
+              }
+            : null,
+        },
+      }
+    })
+
+    await syncLiveMatchState(snapshot.matchId, {
+      strikerId: nextStrikerId,
+      nonStrikerId: nextNonStrikerId,
+    })
+  },
+
   setBowler(bowlerId) {
-    set((s) => ({
-      snapshot: s.snapshot ? { ...s.snapshot, currentBowlerId: bowlerId } : null,
-    }))
+    set((s) => {
+      if (!s.snapshot) return {}
+
+      return {
+        snapshot: {
+          ...s.snapshot,
+          currentBowlerId: bowlerId,
+          bowlers: ensureCurrentBowler(
+            s.snapshot.bowlers,
+            bowlerId,
+            s.snapshot.bowlingTeamPlayers,
+          ),
+        },
+      }
+    })
   },
 
   startNextOver() {
@@ -946,6 +1090,10 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
 
   clearWinDetected() {
     set({ winDetected: false })
+  },
+
+  clearInningsEndDetected() {
+    set({ inningsEndDetected: false })
   },
 
   clearSyncError() {

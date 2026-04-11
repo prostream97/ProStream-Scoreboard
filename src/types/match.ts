@@ -159,4 +159,9 @@ export type MatchSnapshot = {
 
   // In-progress over balls (from currentOverBuffer, not yet flushed to deliveries table)
   currentOverBalls: { runs: number; extraRuns: number; isLegal: boolean; extraType: string | null; isWicket: boolean }[]
+
+  // Match result (populated when status === 'complete')
+  resultWinnerId: number | null
+  resultMargin: number | null
+  resultType: 'wickets' | 'runs' | 'tie' | null
 }

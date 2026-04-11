@@ -197,6 +197,9 @@ export const matches = pgTable('matches', {
   tournamentId: integer('tournament_id').references(() => tournaments.id, { onDelete: 'set null' }),
   matchStage: matchStageEnum('match_stage'),
   matchLabel: varchar('match_label', { length: 20 }),
+  resultWinnerId: integer('result_winner_id').references(() => teams.id),
+  resultMargin: integer('result_margin'),
+  resultType: text('result_type').$type<'wickets' | 'runs' | 'tie'>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 

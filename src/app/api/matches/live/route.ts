@@ -39,6 +39,9 @@ export async function GET() {
           overs: i.overs,
           balls: i.balls,
         })),
+        resultWinnerId: m.resultWinnerId ?? null,
+        resultMargin: m.resultMargin ?? null,
+        resultType: m.resultType ?? null,
       })),
     )
   } catch {

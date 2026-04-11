@@ -89,6 +89,16 @@ const statements = [
 
   `CREATE UNIQUE INDEX IF NOT EXISTS "tournament_access_user_tournament_idx"
     ON "tournament_access" ("user_id", "tournament_id")`,
+
+  // ── Match result tracking ─────────────────────────────────────────────────
+  `ALTER TABLE "matches" ADD COLUMN IF NOT EXISTS "result_winner_id" integer REFERENCES "teams"("id")`,
+  `ALTER TABLE "matches" ADD COLUMN IF NOT EXISTS "result_margin" integer`,
+  `ALTER TABLE "matches" ADD COLUMN IF NOT EXISTS "result_type" text`,
+
+  // ── overlay_links: make match_id nullable + add tournament_id ─────────────
+  `ALTER TABLE "overlay_links" ALTER COLUMN "match_id" DROP NOT NULL`,
+  `ALTER TABLE "overlay_links" ADD COLUMN IF NOT EXISTS "tournament_id" integer REFERENCES "tournaments"("id") ON DELETE CASCADE`,
+  `ALTER TABLE "overlay_links" ALTER COLUMN "mode" SET DEFAULT 'standard'`,
 ]
 
 for (const stmt of statements) {

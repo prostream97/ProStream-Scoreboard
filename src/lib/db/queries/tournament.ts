@@ -310,3 +310,59 @@ export async function getTournamentStandings(
 
   return rows.sort((a, b) => b.points - a.points || b.nrr - a.nrr)
 }
+
+// ─── Tournament Status Auto-Transition ────────────────────────────────────────
+
+import type { TournamentStatus } from '@/types/tournament'
+
+function deriveDesiredTournamentStatus(
+  allMatches: { matchStage: string | null; status: string }[],
+): TournamentStatus {
+  const groupMatches = allMatches.filter((m) => (m.matchStage ?? 'group') === 'group')
+  const knockoutMatches = allMatches.filter((m) => m.matchStage !== null && m.matchStage !== 'group')
+  const finalMatch = allMatches.find((m) => m.matchStage === 'final')
+
+  // Final match complete → tournament done
+  if (finalMatch?.status === 'complete') return 'complete'
+
+  // Any knockout match created → knockout phase
+  if (knockoutMatches.length > 0) return 'knockout'
+
+  // Any group match created → group stage
+  if (groupMatches.length > 0) return 'group_stage'
+
+  return 'upcoming'
+}
+
+/**
+ * Called after a match is created or completed.
+ * Advances the tournament status if the current state of all matches warrants it.
+ */
+export async function maybeAdvanceTournamentStatus(matchId: number): Promise<void> {
+  // Load the match to get its tournamentId
+  const match = await db.query.matches.findFirst({
+    where: eq(matches.id, matchId),
+    columns: { tournamentId: true },
+  })
+  if (!match?.tournamentId) return
+
+  const tournamentId = match.tournamentId
+
+  // Load current tournament status
+  const tournament = await db.query.tournaments.findFirst({
+    where: eq(tournaments.id, tournamentId),
+    columns: { status: true },
+  })
+  if (!tournament) return
+
+  // Load all matches in this tournament
+  const allMatches = await db
+    .select({ matchStage: matches.matchStage, status: matches.status })
+    .from(matches)
+    .where(eq(matches.tournamentId, tournamentId))
+
+  const desired = deriveDesiredTournamentStatus(allMatches)
+  if (desired !== tournament.status) {
+    await db.update(tournaments).set({ status: desired }).where(eq(tournaments.id, tournamentId))
+  }
+}

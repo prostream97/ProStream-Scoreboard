@@ -7,6 +7,7 @@ import { matches, matchState, innings, tournaments, teams } from '@/lib/db/schem
 import { count, eq } from 'drizzle-orm'
 import type { MatchStage } from '@/types/tournament'
 import { buildTournamentStageStructure, MATCH_STAGE_ORDER } from '@/lib/tournament/stageRules'
+import { maybeAdvanceTournamentStatus } from '@/lib/db/queries/tournament'
 
 export const runtime = 'nodejs'
 
@@ -159,6 +160,9 @@ export async function POST(
       currentBalls: 0,
       currentOverBuffer: [],
     })
+
+    // Advance tournament status if needed (e.g. upcoming → group_stage, group_stage → knockout)
+    await maybeAdvanceTournamentStatus(match.id)
 
     return NextResponse.json({ match, innings: inningsRow }, { status: 201 })
   } catch (err) {

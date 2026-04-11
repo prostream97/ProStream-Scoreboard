@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowUpDown } from 'lucide-react'
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 import { EditIcon } from '@/components/shared/EditIcon'
@@ -8,6 +9,7 @@ const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!
 
 export function BattingPanel() {
   const snapshot = useMatchStore((s) => s.snapshot)
+  const swapStrike = useMatchStore((s) => s.swapStrike)
   const openPlayerEdit = useUIStore((s) => s.openPlayerEdit)
   const setDisplay = useUIStore((s) => s.setDisplay)
   const activePlayerId = useUIStore((s) => s.activePlayerId)
@@ -62,6 +64,7 @@ export function BattingPanel() {
 
   const striker = resolveOrSynth(strikerId, true)
   const nonStriker = resolveOrSynth(nonStrikerId, false)
+  const canSwapStrike = Boolean(strikerId && nonStrikerId)
 
   return (
     <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
@@ -83,6 +86,18 @@ export function BattingPanel() {
           onHide={hidePlayerCard}
           isActive={strikerId !== null && activePlayerId === strikerId}
         />
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => { void swapStrike() }}
+            disabled={!canSwapStrike}
+            className="inline-flex items-center gap-2 rounded-full border border-[#d7ddd6] bg-[#f8faf7] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 transition hover:border-[#b8e4cc] hover:bg-[#eef8f1] hover:text-[#10994c] disabled:cursor-not-allowed disabled:opacity-40"
+            title="Swap striker and non-striker manually"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            Swap Strike
+          </button>
+        </div>
         <BatterRow
           batter={nonStriker}
           isStriker={false}
