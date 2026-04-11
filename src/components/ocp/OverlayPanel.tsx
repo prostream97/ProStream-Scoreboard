@@ -3,13 +3,14 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'header' | 'mostWickets'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'tossResult' | 'header' | 'mostWickets'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'header', label: 'Header' },
   { key: 'scorebug', label: 'Scorebug' },
   { key: 'partnership', label: 'Partnership' },
   { key: 'summary', label: 'Innings Summary' },
+  { key: 'tossResult', label: 'Toss Result' },
   { key: 'mostWickets', label: 'Most Wickets' },
   { key: 'ticker', label: 'Ticker' },
 ]
@@ -29,12 +30,12 @@ export function OverlayPanel() {
     await fetch('/api/pusher/trigger', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        matchId: snapshot.matchId,
-        event: 'display.toggle',
-        payload: { element, visible: newVisible },
-      }),
-    })
+        body: JSON.stringify({
+          matchId: snapshot.matchId,
+          event: 'display.toggle',
+          payload: { element, visible: newVisible, themeScope: element === 'tossResult' ? 'standard' : 'all' },
+        }),
+      })
   }
 
 

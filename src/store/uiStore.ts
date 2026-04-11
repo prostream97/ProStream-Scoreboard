@@ -8,8 +8,10 @@ type DisplayElements = {
   ticker: boolean
   summary: boolean
   teamSummary: boolean
+  tossResult: boolean
   header: boolean
   mostWickets: boolean
+  mostBoundaries: boolean
 }
 
 // null teamId = add-new mode not yet targeted; set teamId before opening
@@ -53,8 +55,10 @@ export const useUIStore = create<UIStore>((set) => ({
     ticker: false,
     summary: false,
     teamSummary: false,
+    tossResult: false,
     header: false,
     mostWickets: false,
+    mostBoundaries: false,
   },
   activePlayerId: null,
   activeSummaryTeamId: null,

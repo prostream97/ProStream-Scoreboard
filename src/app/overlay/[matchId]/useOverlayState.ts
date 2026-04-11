@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useEvent } from '@/components/shared/PusherProvider'
 import type { MatchSnapshot, InningsState } from '@/types/match'
-import type { InningsSummaryData, TournamentMostWicketsData } from '@/lib/db/queries/match'
+import type { InningsSummaryData, TournamentMostWicketsData, TournamentMostBoundariesData } from '@/lib/db/queries/match'
 import type {
   DeliveryAddedPayload,
   WicketPayload,
@@ -31,11 +31,14 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
   const [partnershipVisible, setPartnershipVisible] = useState(false)
   const [summaryVisible, setSummaryVisible] = useState(false)
   const [teamSummaryVisible, setTeamSummaryVisible] = useState(false)
+  const [tossResultVisible, setTossResultVisible] = useState(false)
   const [activeSummaryTeamId, setActiveSummaryTeamId] = useState<number | null>(null)
   const [activeSummaryView, setActiveSummaryView] = useState<'batting' | 'bowling' | null>(null)
   const [mostWicketsVisible, setMostWicketsVisible] = useState(false)
+  const [mostBoundariesVisible, setMostBoundariesVisible] = useState(false)
   const [inningsSummaries, setInningsSummaries] = useState<InningsSummaryData[]>([])
   const [mostWicketsData, setMostWicketsData] = useState<TournamentMostWicketsData | null>(initialMostWickets)
+  const [mostBoundariesData, setMostBoundariesData] = useState<TournamentMostBoundariesData | null>(null)
 
   const fetchSummaries = useCallback(() => {
     fetch(`/api/match/${matchId}/innings-summary`)
@@ -58,6 +61,20 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
       .catch((err) => { console.warn('[useOverlayState] fetchMostWickets failed:', err) })
   }, [matchId, snapshot.tournamentId])
 
+  const fetchMostBoundaries = useCallback(() => {
+    if (!snapshot.tournamentId) {
+      setMostBoundariesData(null)
+      return
+    }
+    fetch(`/api/match/${matchId}/tournament-most-boundaries`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Failed to fetch most boundaries')
+        return r.json()
+      })
+      .then((data: TournamentMostBoundariesData) => setMostBoundariesData(data))
+      .catch((err) => { console.warn('[useOverlayState] fetchMostBoundaries failed:', err) })
+  }, [matchId, snapshot.tournamentId])
+
   // Reconnect recovery
   useEffect(() => {
     fetch(`/api/match/${matchId}/state`)
@@ -72,11 +89,16 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     if (mostWicketsVisible) fetchMostWickets()
   }, [mostWicketsVisible, fetchMostWickets])
 
+  useEffect(() => {
+    if (mostBoundariesVisible) fetchMostBoundaries()
+  }, [mostBoundariesVisible, fetchMostBoundaries])
+
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
     if (data.runs === 4 || data.runs === 6) {
       setLastBoundary({ id: Date.now(), runs: data.runs as 4 | 6 })
     }
     if (mostWicketsVisible) fetchMostWickets()
+    if (mostBoundariesVisible) fetchMostBoundaries()
 
     setSnapshot((s) => {
       const dismissedBatterId = data.isWicket ? (data.dismissedBatterId ?? data.batsmanId) : null
@@ -227,6 +249,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     setLastWicket(data)
     setActivePlayerId(null)
     if (mostWicketsVisible) fetchMostWickets()
+    if (mostBoundariesVisible) fetchMostBoundaries()
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => setSnapshot(fresh))
@@ -240,6 +263,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
       .catch((err) => { console.warn('[useOverlayState] Innings change state refetch failed:', err) })
     fetchSummaries()
     if (mostWicketsVisible) fetchMostWickets()
+    if (mostBoundariesVisible) fetchMostBoundaries()
   })
 
   useEvent(`match-${matchId}`, 'display.toggle', (data: DisplayTogglePayload) => {
@@ -254,6 +278,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     }
     if (data.element === 'partnership') setPartnershipVisible(data.visible)
     if (data.element === 'summary') setSummaryVisible(data.visible)
+    if (data.element === 'tossResult') setTossResultVisible(data.visible)
     if (data.element === 'teamSummary') {
       setTeamSummaryVisible(data.visible)
       if (data.visible) {
@@ -265,6 +290,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
       }
     }
     if (data.element === 'mostWickets') setMostWicketsVisible(data.visible)
+    if (data.element === 'mostBoundaries') setMostBoundariesVisible(data.visible)
   })
 
   useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
@@ -287,11 +313,14 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     partnershipVisible,
     summaryVisible,
     teamSummaryVisible,
+    tossResultVisible,
     activeSummaryTeamId,
     activeSummaryView,
     mostWicketsVisible,
+    mostBoundariesVisible,
     inningsSummaries,
     mostWicketsData,
+    mostBoundariesData,
     inn,
     battingTeam,
     bowlingTeam,

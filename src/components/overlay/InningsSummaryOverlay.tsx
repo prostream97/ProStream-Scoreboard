@@ -381,7 +381,7 @@ export function InningsSummaryOverlay({ snapshot, inningsSummaries }: Props) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 140, damping: 20 }}
-      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      className="absolute inset-x-0 top-0 bottom-[100px] flex items-center justify-center pointer-events-none"
     >
       {/*
         .wc-table-wrapper equivalent:

@@ -418,6 +418,34 @@ export type TournamentMostWicketsData = {
   rows: TournamentMostWicketsRow[]
 }
 
+export type TournamentMostBoundariesRow = {
+  rank: number
+  batterId: number
+  batterName: string
+  teamName: string
+  innings: number
+  fours: number
+  sixes: number
+  boundaries: number
+}
+
+export type TournamentMostBoundariesData = {
+  tournament: {
+    id: number
+    name: string
+    shortName: string
+    logoCloudinaryId: string | null
+  }
+  owner: {
+    id: number
+    displayName: string
+    photoCloudinaryId: string | null
+  } | null
+  rows: TournamentMostBoundariesRow[]
+}
+
+type MutableMostBoundariesRow = Omit<TournamentMostBoundariesRow, 'rank'>
+
 type MutableMostWicketsRow = Omit<TournamentMostWicketsRow, 'rank'>
 
 function isBowlerCreditedDismissal(dismissalType: string | null | undefined): boolean {
@@ -551,6 +579,133 @@ export async function getTournamentMostWickets(matchId: number): Promise<Tournam
       rank: index + 1,
       ...row,
     }))
+
+  return {
+    tournament: {
+      id: matchRow.tournament.id,
+      name: matchRow.tournament.name,
+      shortName: matchRow.tournament.shortName,
+      logoCloudinaryId: matchRow.tournament.logoCloudinaryId ?? null,
+    },
+    owner: owner ?? null,
+    rows,
+  }
+}
+
+function sortMostBoundariesRows(a: MutableMostBoundariesRow, b: MutableMostBoundariesRow): number {
+  return (
+    b.boundaries - a.boundaries ||
+    b.sixes - a.sixes ||
+    a.innings - b.innings ||
+    a.batterName.localeCompare(b.batterName)
+  )
+}
+
+export async function getTournamentMostBoundaries(matchId: number): Promise<TournamentMostBoundariesData | null> {
+  const matchRow = await db.query.matches.findFirst({
+    where: eq(matches.id, matchId),
+    with: {
+      tournament: true,
+      state: true,
+      innings: true,
+    },
+  })
+
+  if (!matchRow?.tournamentId || !matchRow.tournament) return null
+
+  const owner = matchRow.tournament.createdBy
+    ? await db.query.users.findFirst({
+        where: eq(users.id, matchRow.tournament.createdBy),
+        columns: { id: true, displayName: true, photoCloudinaryId: true },
+      })
+    : null
+
+  const persistedRows = await db
+    .select({
+      batterId: deliveries.batsmanId,
+      batterName: players.displayName,
+      teamName: teams.name,
+      innings: sql<number>`COUNT(DISTINCT ${deliveries.inningsId})`.as('innings'),
+      fours: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.runs} = 4 AND ${deliveries.extraType} IS NULL)`.as('fours'),
+      sixes: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.runs} = 6 AND ${deliveries.extraType} IS NULL)`.as('sixes'),
+    })
+    .from(deliveries)
+    .innerJoin(innings, eq(deliveries.inningsId, innings.id))
+    .innerJoin(matches, eq(innings.matchId, matches.id))
+    .innerJoin(players, eq(deliveries.batsmanId, players.id))
+    .innerJoin(teams, eq(players.teamId, teams.id))
+    .where(eq(matches.tournamentId, matchRow.tournamentId))
+    .groupBy(deliveries.batsmanId, players.displayName, teams.name)
+
+  const rowsByBatter = new Map<number, MutableMostBoundariesRow>(
+    persistedRows.map((row) => [
+      row.batterId,
+      {
+        batterId: row.batterId,
+        batterName: row.batterName,
+        teamName: row.teamName,
+        innings: Number(row.innings) || 0,
+        fours: Number(row.fours) || 0,
+        sixes: Number(row.sixes) || 0,
+        boundaries: (Number(row.fours) || 0) + (Number(row.sixes) || 0),
+      },
+    ]),
+  )
+
+  const currentInningsRow = matchRow.innings.find(
+    (inn) => inn.inningsNumber === (matchRow.state?.currentInnings ?? 1),
+  )
+  const liveBuffer = matchRow.state?.currentOverBuffer ?? []
+
+  if (currentInningsRow && liveBuffer.length > 0) {
+    const [bufferMetaRows, currentInningsBatterRows] = await Promise.all([
+      db
+        .select({ id: players.id, batterName: players.displayName, teamName: teams.name })
+        .from(players)
+        .innerJoin(teams, eq(players.teamId, teams.id))
+        .where(inArray(players.id, [...new Set(liveBuffer.map((d) => d.batsmanId))])),
+      db
+        .select({ batterId: deliveries.batsmanId })
+        .from(deliveries)
+        .where(eq(deliveries.inningsId, currentInningsRow.id))
+        .groupBy(deliveries.batsmanId),
+    ])
+
+    const bufferMetaByBatter = new Map(bufferMetaRows.map((r) => [r.id, r]))
+    const currentInningsBatters = new Set(currentInningsBatterRows.map((r) => r.batterId))
+    const liveAdditions = new Map<number, { fours: number; sixes: number }>()
+
+    for (const delivery of liveBuffer) {
+      const agg = liveAdditions.get(delivery.batsmanId) ?? { fours: 0, sixes: 0 }
+      if (delivery.runs === 4 && !delivery.extraType) agg.fours += 1
+      if (delivery.runs === 6 && !delivery.extraType) agg.sixes += 1
+      liveAdditions.set(delivery.batsmanId, agg)
+    }
+
+    for (const [batterId, addition] of liveAdditions) {
+      const existing = rowsByBatter.get(batterId)
+      const meta = existing ? null : bufferMetaByBatter.get(batterId)
+      if (!existing && !meta) continue
+
+      const newFours = (existing?.fours ?? 0) + addition.fours
+      const newSixes = (existing?.sixes ?? 0) + addition.sixes
+      rowsByBatter.set(batterId, {
+        batterId,
+        batterName: existing?.batterName ?? meta?.batterName ?? '',
+        teamName: existing?.teamName ?? meta?.teamName ?? '',
+        innings: (existing?.innings ?? 0) + (currentInningsBatters.has(batterId) ? 0 : 1),
+        fours: newFours,
+        sixes: newSixes,
+        boundaries: newFours + newSixes,
+      })
+    }
+  }
+
+  const rows = [...rowsByBatter.values()]
+    .filter((row) => row.boundaries > 0)
+    .sort(sortMostBoundariesRows)
+    .slice(0, 10)
+    .map((row, index) => ({ rank: index + 1, ...row }))
 
   return {
     tournament: {

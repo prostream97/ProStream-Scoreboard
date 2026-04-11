@@ -164,6 +164,8 @@ export async function getTournamentWithDetails(
     totalOvers: m.totalOvers,
     matchStage: m.matchStage ?? null,
     matchLabel: m.matchLabel ?? null,
+    tossWinnerId: m.tossWinnerId ?? null,
+    tossDecision: m.tossDecision ?? null,
     homeTeam: {
       id: m.homeTeam.id,
       name: m.homeTeam.name,

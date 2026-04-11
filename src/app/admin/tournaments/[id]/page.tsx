@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { Trophy, CalendarClock } from 'lucide-react'
+import { Trophy, CalendarClock, Pencil, X } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import {
   AppBadge,
@@ -507,7 +507,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 </div>
                 <div className="grid gap-3 xl:grid-cols-2">
                   {group.matches.map((match) => (
-                    <MatchCard key={match.id} match={match} />
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      canManage={canManageTournament}
+                      teams={tournament.teams}
+                      stageStructure={stageStructure}
+                      onEdited={load}
+                    />
                   ))}
                 </div>
               </div>
@@ -537,30 +544,249 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function MatchCard({ match }: { match: TournamentMatch }) {
+function MatchCard({
+  match,
+  canManage,
+  teams,
+  stageStructure,
+  onEdited,
+}: {
+  match: TournamentMatch
+  canManage: boolean
+  teams: TournamentWithDetails['teams']
+  stageStructure: TournamentStageStructure
+  onEdited: () => void
+}) {
   const stage = match.matchStage ?? 'group'
   const stageLabel = MATCH_STAGE_LABELS[stage]
+  const [showEdit, setShowEdit] = useState(false)
 
   return (
-    <div className="rounded-[1.5rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <AppBadge tone="neutral">{stageLabel}</AppBadge>
-        {match.matchLabel ? <AppBadge tone="blue">{match.matchLabel}</AppBadge> : null}
-        <AppBadge tone={match.status === 'active' ? 'green' : match.status === 'break' || match.status === 'paused' ? 'amber' : 'neutral'}>
-          {match.status}
-        </AppBadge>
+    <>
+      <div className="rounded-[1.5rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <AppBadge tone="neutral">{stageLabel}</AppBadge>
+            {match.matchLabel ? <AppBadge tone="blue">{match.matchLabel}</AppBadge> : null}
+            <AppBadge tone={match.status === 'active' ? 'green' : match.status === 'break' || match.status === 'paused' ? 'amber' : 'neutral'}>
+              {match.status}
+            </AppBadge>
+          </div>
+          {canManage ? (
+            <button
+              onClick={() => setShowEdit(true)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dfe6df] bg-white text-slate-400 transition hover:border-[#b8d7c0] hover:text-slate-700"
+              title="Edit match"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-4 text-lg font-semibold tracking-[-0.03em] text-slate-950">
+          <span style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
+          <span className="mx-2 text-slate-300">vs</span>
+          <span style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
+        </p>
+        <p className="mt-1 text-sm text-slate-500">
+          {match.venue ?? 'Venue TBD'} · {new Date(match.date).toLocaleDateString()}
+        </p>
+        {match.tossWinnerId ? (
+          <p className="mt-1 text-xs text-slate-400">
+            Toss: {teams.find((t) => t.id === match.tossWinnerId)?.shortCode ?? '?'} elected to {match.tossDecision}
+          </p>
+        ) : null}
+        <div className="mt-4 flex gap-2">
+          <AppButton href={`/viewer/${match.id}`} variant="secondary" className="h-9 px-3 text-xs">View</AppButton>
+          <AppButton href={`/match/${match.id}/operator`} className="h-9 px-3 text-xs">Score</AppButton>
+        </div>
       </div>
-      <p className="mt-4 text-lg font-semibold tracking-[-0.03em] text-slate-950">
-        <span style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
-        <span className="mx-2 text-slate-300">vs</span>
-        <span style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
-      </p>
-      <p className="mt-1 text-sm text-slate-500">
-        {match.venue ?? 'Venue TBD'} . {new Date(match.date).toLocaleDateString()}
-      </p>
-      <div className="mt-4 flex gap-2">
-        <AppButton href={`/viewer/${match.id}`} variant="secondary" className="h-9 px-3 text-xs">View</AppButton>
-        <AppButton href={`/match/${match.id}/operator`} className="h-9 px-3 text-xs">Score</AppButton>
+
+      {showEdit ? (
+        <MatchEditModal
+          match={match}
+          teams={teams}
+          stageStructure={stageStructure}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => { setShowEdit(false); onEdited() }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function MatchEditModal({
+  match,
+  teams,
+  stageStructure,
+  onClose,
+  onSaved,
+}: {
+  match: TournamentMatch
+  teams: TournamentWithDetails['teams']
+  stageStructure: TournamentStageStructure
+  onClose: () => void
+  onSaved: () => void
+}) {
+  // Convert ISO date string to datetime-local format (YYYY-MM-DDTHH:mm)
+  const toDatetimeLocal = (iso: string) => {
+    try { return new Date(iso).toISOString().slice(0, 16) } catch { return '' }
+  }
+
+  const [form, setForm] = useState({
+    venue: match.venue ?? '',
+    date: toDatetimeLocal(match.date),
+    tossWinnerId: match.tossWinnerId ? String(match.tossWinnerId) : '',
+    tossDecision: match.tossDecision ?? '' as 'bat' | 'field' | '',
+    matchStage: match.matchStage ?? 'group',
+    matchLabel: match.matchLabel ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/match/${match.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          venue: form.venue || null,
+          date: form.date || null,
+          tossWinnerId: form.tossWinnerId ? parseInt(form.tossWinnerId, 10) : null,
+          tossDecision: form.tossDecision || null,
+          matchStage: form.matchStage || null,
+          matchLabel: form.matchLabel || null,
+        }),
+      })
+      if (res.ok) {
+        onSaved()
+      } else {
+        const data = await res.json() as { error?: string }
+        setError(data.error ?? 'Failed to save changes')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tossTeams = [
+    ...(form.tossWinnerId
+      ? teams.filter((t) => t.id === parseInt(form.tossWinnerId, 10))
+      : []),
+    ...teams.filter((t) => t.id === match.homeTeam.id || t.id === match.awayTeam.id),
+  ].filter((t, i, arr) => arr.findIndex((x) => x.id === t.id) === i)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-lg rounded-t-[2rem] bg-[#f8faf7] sm:rounded-[2rem] shadow-[0_24px_70px_rgba(10,14,18,0.22)]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#dfe6df] px-6 py-5">
+          <div>
+            <p className="app-kicker">Edit fixture</p>
+            <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+              <span style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
+              <span className="mx-2 text-slate-300">vs</span>
+              <span style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400 transition hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          {error ? (
+            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Match Stage">
+              <select name="matchStage" value={form.matchStage} onChange={handleChange} className={appInputClass}>
+                {MATCH_STAGE_ORDER.map((s) => (
+                  <option
+                    key={s}
+                    value={s}
+                    disabled={s !== match.matchStage && !stageStructure.allowedStages.includes(s)}
+                  >
+                    {MATCH_STAGE_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Match Label">
+              <input
+                name="matchLabel"
+                value={form.matchLabel}
+                onChange={handleChange}
+                className={appInputClass}
+                placeholder="e.g. M1, QF1"
+                maxLength={20}
+              />
+            </Field>
+          </div>
+
+          <Field label="Venue">
+            <input
+              name="venue"
+              value={form.venue}
+              onChange={handleChange}
+              className={appInputClass}
+              placeholder="Stadium name"
+            />
+          </Field>
+
+          <Field label="Date & Time">
+            <input
+              type="datetime-local"
+              name="date"
+              value={form.date}
+              onChange={handleChange}
+              className={appInputClass}
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Toss Winner">
+              <select name="tossWinnerId" value={form.tossWinnerId} onChange={handleChange} className={appInputClass}>
+                <option value="">— TBD</option>
+                {tossTeams.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Elected To">
+              <select name="tossDecision" value={form.tossDecision} onChange={handleChange} className={appInputClass}>
+                <option value="">— TBD</option>
+                <option value="bat">Bat</option>
+                <option value="field">Field</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <AppButton type="button" variant="secondary" onClick={onClose} className="flex-1">
+              Cancel
+            </AppButton>
+            <AppButton type="submit" disabled={saving} className="flex-1">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </AppButton>
+          </div>
+        </form>
       </div>
     </div>
   )

@@ -52,6 +52,8 @@ export type TournamentMatch = {
   totalOvers: number
   matchStage: MatchStage | null
   matchLabel: string | null
+  tossWinnerId: number | null
+  tossDecision: 'bat' | 'field' | null
   homeTeam: { id: number; name: string; shortCode: string; primaryColor: string }
   awayTeam: { id: number; name: string; shortCode: string; primaryColor: string }
 }

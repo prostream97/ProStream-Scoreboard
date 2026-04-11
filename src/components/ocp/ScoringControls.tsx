@@ -20,10 +20,10 @@ function ballDotColor(ball: DeliveryRecord): string {
 
 function ballDotLabel(ball: DeliveryRecord): string {
   if (ball.isWicket) return 'W'
-  if (ball.extraType === 'wide') return 'Wd'
-  if (ball.extraType === 'noball') return 'Nb'
-  if (ball.extraType === 'bye') return 'B'
-  if (ball.extraType === 'legbye') return 'Lb'
+  if (ball.extraType === 'wide') return ball.extraRuns > 1 ? `Wd${ball.extraRuns}` : 'Wd'
+  if (ball.extraType === 'noball') return ball.runs > 0 ? `${ball.runs}nb` : 'Nb'
+  if (ball.extraType === 'bye') return ball.runs > 0 ? `${ball.runs}B` : 'B'
+  if (ball.extraType === 'legbye') return ball.runs > 0 ? `${ball.runs}Lb` : 'Lb'
   return String(ball.runs)
 }
 

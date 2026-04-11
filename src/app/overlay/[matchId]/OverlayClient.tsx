@@ -11,6 +11,8 @@ import { InningsSummaryOverlay } from '@/components/overlay/InningsSummaryOverla
 import { HeaderOverlay } from '@/components/overlay/HeaderOverlay'
 import { MostWicketsOverlay } from '@/components/overlay/MostWicketsOverlay'
 import { StandardTeamSummaryOverlay } from '@/components/overlay/StandardTeamSummaryOverlay'
+import { StandardTossResultOverlay } from '@/components/overlay/StandardTossResultOverlay'
+import { MostBoundariesOverlay } from '@/components/overlay/MostBoundariesOverlay'
 import { useOverlayState } from './useOverlayState'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import type { MatchSnapshot } from '@/types/match'
@@ -34,11 +36,14 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
     partnershipVisible,
     summaryVisible,
     teamSummaryVisible,
+    tossResultVisible,
     activeSummaryTeamId,
     activeSummaryView,
     mostWicketsVisible,
+    mostBoundariesVisible,
     inningsSummaries,
     mostWicketsData,
+    mostBoundariesData,
     battingTeam,
     bowlingTeam,
   } = useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme: 'standard' })
@@ -94,8 +99,20 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
       </AnimatePresence>
 
       <AnimatePresence>
+        {tossResultVisible && (
+          <StandardTossResultOverlay snapshot={snapshot} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {mostWicketsVisible && mostWicketsData && (
           <MostWicketsOverlay data={mostWicketsData} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mostBoundariesVisible && mostBoundariesData && (
+          <MostBoundariesOverlay data={mostBoundariesData} />
         )}
       </AnimatePresence>
 

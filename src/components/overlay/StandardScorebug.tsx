@@ -57,7 +57,7 @@ export function StandardScorebug({ snapshot }: Props) {
       exit={{ y: 150, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 15 }}
       // the scorebug should sit 5px above the OBS frame with a near full-width layout
-      className="absolute bottom-[5px] left-[5px] right-[5px]"
+      className="absolute bottom-[5px] left-[5px] right-[5px] z-[20]"
     >
       <div data-layer="ScoreBug" className="Scorebug" style={{ width: '100%', paddingLeft: 14, paddingRight: 14, paddingTop: 13, paddingBottom: 0, justifyContent: 'space-between', alignItems: 'flex-end', gap: 0, display: 'flex', boxSizing: 'border-box' }}>
 
@@ -167,8 +167,8 @@ export function StandardScorebug({ snapshot }: Props) {
                   let bg = '#DDDDDD'
                   let label = '·'
                   if (ball.isWicket) { bg = '#FF2222'; label = 'W' }
-                  else if (!ball.isLegal && ball.extraType === 'wide') { bg = '#3B82F6'; label = 'Wd' }
-                  else if (!ball.isLegal && ball.extraType === 'noball') { bg = '#F97316'; label = 'Nb' }
+                  else if (!ball.isLegal && ball.extraType === 'wide') { bg = '#3B82F6'; label = ball.extraRuns > 1 ? `Wd${ball.extraRuns}` : 'Wd' }
+                  else if (!ball.isLegal && ball.extraType === 'noball') { bg = '#F97316'; label = ball.runs > 0 ? `${ball.runs}nb` : 'Nb' }
                   else if (ball.runs === 6) { bg = '#FF00E5'; label = '6' }
                   else if (ball.runs === 4) { bg = '#10B981'; label = '4' }
                   else if (ball.runs > 0) { bg = '#2A0066'; label = String(ball.runs) }

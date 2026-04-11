@@ -179,7 +179,7 @@ function BallDot({ ball }: { ball: { runs: number; isWicket: boolean; extraType:
     return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff5e7] text-xs font-semibold text-[#c98010]">Wd</div>
   }
   if (ball.extraType === 'noball') {
-    return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff1ec] text-xs font-semibold text-[#d07b2b]">Nb</div>
+    return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff1ec] text-xs font-semibold text-[#d07b2b]">{ball.runs > 0 ? `${ball.runs}nb` : 'Nb'}</div>
   }
   if (ball.runs === 4) {
     return <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8f7ee] text-sm font-semibold text-[#10994c]">4</div>

@@ -177,8 +177,12 @@ function BottomBar({
 
 // ─── Shared cell helpers ──────────────────────────────────────────────────────
 
-const TABLE_TOP  = 260
-const ROW_HEIGHT = 57
+const TABLE_TOP    = 260
+const ROW_HEIGHT   = 57
+const BOTTOM_BAR_H = 90
+const BOTTOM_GAP   = 20
+const FRAME_H      = 930
+const MAX_TABLE_H  = FRAME_H - TABLE_TOP - BOTTOM_GAP - BOTTOM_BAR_H  // 560
 
 function cellBase(isActive: boolean): React.CSSProperties {
   return {
@@ -226,8 +230,10 @@ function BattingScorecard({ snapshot }: { snapshot: MatchSnapshot }) {
   const streamerLabel = (snapshot.tournamentName ?? 'ProStream').toUpperCase()
   const logoId        = snapshot.tournamentLogoCloudinaryId ?? null
   const logoFb        = snapshot.tournamentName ? snapshot.tournamentName.slice(0, 2).toUpperCase() : battingTeam.shortCode.slice(0, 2)
-  const tableHeight   = rows.length * ROW_HEIGHT
-  const bottomBarTop  = TABLE_TOP + tableHeight + 20
+  const effectiveRowH   = rows.length > 0 ? Math.min(ROW_HEIGHT, Math.floor(MAX_TABLE_H / rows.length)) : ROW_HEIGHT
+  const effectiveFontSz = Math.round(30.70 * effectiveRowH / ROW_HEIGHT)
+  const tableHeight     = rows.length * effectiveRowH
+  const bottomBarTop    = TABLE_TOP + tableHeight + BOTTOM_GAP
 
   return (
     <OverlayShell>
@@ -250,25 +256,25 @@ function BattingScorecard({ snapshot }: { snapshot: MatchSnapshot }) {
             const color = hi ? WHITE : BLUE
             return (
               <div key={row.id} style={{
-                width: 1300, height: ROW_HEIGHT,
-                left: 0, top: i * ROW_HEIGHT,
+                width: 1300, height: effectiveRowH,
+                left: 0, top: i * effectiveRowH,
                 position: 'absolute',
                 ...(hi ? { background: `linear-gradient(90deg, ${RED} 0%, ${BLUE} 100%)`, borderRadius: 37 } : {}),
               }}>
-                <div style={{ ...cellBase(hi), left: 19.5, width: 481 }}>
-                  <div style={{ ...textStyle(color), left: 15, top: 10 }}>{row.name}</div>
+                <div style={{ ...cellBase(hi), left: 19.5, width: 481, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 15, top: 10 }) }}>{row.name}</div>
                 </div>
-                <div style={{ ...cellBase(hi), left: 500.5, width: 300, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color), left: 15, top: 10 }}>{row.left}</div>
+                <div style={{ ...cellBase(hi), left: 500.5, width: 300, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 15, top: 10 }) }}>{row.left}</div>
                 </div>
-                <div style={{ ...cellBase(hi), left: 800.5, width: 300 }}>
-                  <div style={{ ...textStyle(color), left: 15, top: 10 }}>{row.right}</div>
+                <div style={{ ...cellBase(hi), left: 800.5, width: 300, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 15, top: 10 }) }}>{row.right}</div>
                 </div>
-                <div style={{ ...numCell(hi), left: 1100.5, width: 90, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color, 700, { left: 26.98, top: 10, textAlign: 'center' }) }}>{row.runs !== null ? row.runs : ''}</div>
+                <div style={{ ...numCell(hi), left: 1100.5, width: 90, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 26.98, top: 10, textAlign: 'center' }) }}>{row.runs !== null ? row.runs : ''}</div>
                 </div>
-                <div style={{ ...numCell(hi), left: 1190.5, width: 90, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color, 400, { left: 27.51, top: 10, textAlign: 'center' }) }}>{row.balls !== null ? row.balls : ''}</div>
+                <div style={{ ...numCell(hi), left: 1190.5, width: 90, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 400, { fontSize: effectiveFontSz, left: 27.51, top: 10, textAlign: 'center' }) }}>{row.balls !== null ? row.balls : ''}</div>
                 </div>
               </div>
             )
@@ -295,8 +301,10 @@ function BowlingScorecard({ snapshot }: { snapshot: MatchSnapshot }) {
   const streamerLabel = (snapshot.tournamentName ?? 'ProStream').toUpperCase()
   const logoId        = snapshot.tournamentLogoCloudinaryId ?? null
   const logoFb        = snapshot.tournamentName ? snapshot.tournamentName.slice(0, 2).toUpperCase() : bowlingTeam.shortCode.slice(0, 2)
-  const tableHeight   = rows.length * ROW_HEIGHT
-  const bottomBarTop  = TABLE_TOP + tableHeight + 20
+  const effectiveRowH   = rows.length > 0 ? Math.min(ROW_HEIGHT, Math.floor(MAX_TABLE_H / rows.length)) : ROW_HEIGHT
+  const effectiveFontSz = Math.round(30.70 * effectiveRowH / ROW_HEIGHT)
+  const tableHeight     = rows.length * effectiveRowH
+  const bottomBarTop    = TABLE_TOP + tableHeight + BOTTOM_GAP
 
   // Column x-positions for bowling (5 cols within 1300px)
   const COL = {
@@ -328,30 +336,30 @@ function BowlingScorecard({ snapshot }: { snapshot: MatchSnapshot }) {
             const color = hi ? WHITE : BLUE
             return (
               <div key={row.playerId} style={{
-                width: 1300, height: ROW_HEIGHT,
-                left: 0, top: i * ROW_HEIGHT,
+                width: 1300, height: effectiveRowH,
+                left: 0, top: i * effectiveRowH,
                 position: 'absolute',
                 ...(hi ? { background: `linear-gradient(90deg, ${RED} 0%, ${BLUE} 100%)`, borderRadius: 37 } : {}),
               }}>
                 {/* name */}
-                <div style={{ ...cellBase(hi), ...COL.name }}>
-                  <div style={{ ...textStyle(color), left: 15, top: 10 }}>{row.displayName}</div>
+                <div style={{ ...cellBase(hi), ...COL.name, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 15, top: 10 }) }}>{row.displayName}</div>
                 </div>
                 {/* overs */}
-                <div style={{ ...numCell(hi), ...COL.overs, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color, 700, { left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.overs}.{row.balls}</div>
+                <div style={{ ...numCell(hi), ...COL.overs, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.overs}.{row.balls}</div>
                 </div>
                 {/* runs */}
-                <div style={{ ...numCell(hi), ...COL.runs, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color, 700, { left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.runs}</div>
+                <div style={{ ...numCell(hi), ...COL.runs, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.runs}</div>
                 </div>
                 {/* wickets */}
-                <div style={{ ...numCell(hi), ...COL.wickets, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color, 700, { left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.wickets}</div>
+                <div style={{ ...numCell(hi), ...COL.wickets, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 700, { fontSize: effectiveFontSz, left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.wickets}</div>
                 </div>
                 {/* economy */}
-                <div style={{ ...numCell(hi), ...COL.economy, borderLeft: `2px solid ${RED}` }}>
-                  <div style={{ ...textStyle(color, 400, { left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.economy.toFixed(1)}</div>
+                <div style={{ ...numCell(hi), ...COL.economy, borderLeft: `2px solid ${RED}`, height: effectiveRowH }}>
+                  <div style={{ ...textStyle(color, 400, { fontSize: effectiveFontSz, left: 0, top: 10, width: '100%', textAlign: 'center' }) }}>{row.economy.toFixed(1)}</div>
                 </div>
               </div>
             )

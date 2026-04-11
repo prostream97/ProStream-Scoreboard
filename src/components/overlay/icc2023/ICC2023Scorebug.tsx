@@ -45,8 +45,8 @@ export function ICC2023Scorebug({ snapshot }: Props) {
 
   const getBallStyle = (ball: typeof overBalls[0]): { bg: string; label: string } => {
     if (ball.isWicket) return { bg: '#FF2222', label: 'W' }
-    if (!ball.isLegal && ball.extraType === 'wide') return { bg: ICC.purple, label: 'Wd' }
-    if (!ball.isLegal && ball.extraType === 'noball') return { bg: ICC.purple, label: 'Nb' }
+    if (!ball.isLegal && ball.extraType === 'wide') return { bg: ICC.purple, label: ball.extraRuns > 1 ? `Wd${ball.extraRuns}` : 'Wd' }
+    if (!ball.isLegal && ball.extraType === 'noball') return { bg: ICC.purple, label: ball.runs > 0 ? `${ball.runs}nb` : 'Nb' }
     if (ball.runs === 6) return { bg: ICC.blue, label: '6' }
     if (ball.runs === 4) return { bg: ICC.pink, label: '4' }
     if (ball.runs > 0) return { bg: ICC.purple, label: String(ball.runs) }
@@ -79,7 +79,7 @@ export function ICC2023Scorebug({ snapshot }: Props) {
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 150, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 15 }}
-      style={{ position: 'absolute', bottom: 5, left: 5, right: 5 }}
+      style={{ position: 'absolute', bottom: 5, left: 5, right: 5, zIndex: 20 }}
     >
       <div style={{
         width: '100%',

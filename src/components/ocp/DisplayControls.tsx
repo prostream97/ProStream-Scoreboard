@@ -3,13 +3,15 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'mostWickets'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'tossResult' | 'mostWickets' | 'mostBoundaries'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'scorebug', label: 'Scorebug' },
   { key: 'playerCard', label: 'Player Card' },
   { key: 'partnership', label: 'Partnership' },
+  { key: 'tossResult', label: 'Toss Result' },
   { key: 'mostWickets', label: 'Most Wickets' },
+  { key: 'mostBoundaries', label: 'Most Boundaries' },
   { key: 'ticker', label: 'Ticker' },
 ]
 
@@ -28,12 +30,12 @@ export function DisplayControls() {
     await fetch('/api/pusher/trigger', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        matchId: snapshot.matchId,
-        event: 'display.toggle',
-        payload: { element, visible: newVisible },
-      }),
-    })
+        body: JSON.stringify({
+          matchId: snapshot.matchId,
+          event: 'display.toggle',
+          payload: { element, visible: newVisible, themeScope: element === 'tossResult' ? 'standard' : 'all' },
+        }),
+      })
   }
 
   async function showPlayerCard(playerId: number) {
@@ -58,7 +60,7 @@ export function DisplayControls() {
     ?? snapshot.bowlingTeamPlayers.find((p) => p.id === snapshot.currentBowlerId)
   const visibleElements = snapshot.tournamentId
     ? ELEMENTS
-    : ELEMENTS.filter(({ key }) => key !== 'mostWickets')
+    : ELEMENTS.filter(({ key }) => key !== 'mostWickets' && key !== 'mostBoundaries')
 
   return (
     <div className="bg-gray-900 border-t border-gray-800 px-6 py-3">
