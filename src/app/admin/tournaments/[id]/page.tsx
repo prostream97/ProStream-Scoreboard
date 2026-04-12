@@ -70,6 +70,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [standings, setStandings] = useState<StandingRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showMatchForm, setShowMatchForm] = useState(false)
+  const [showTournamentEdit, setShowTournamentEdit] = useState(false)
   const [matchForm, setMatchForm] = useState(() => createEmptyMatchForm())
   const [addingMatch, setAddingMatch] = useState(false)
   const [matchError, setMatchError] = useState('')
@@ -235,6 +236,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     .filter((group) => group.matches.length > 0)
 
   return (
+    <>
     <AppPage className="max-w-7xl">
       <TournamentNav tournamentId={tournamentId} />
 
@@ -268,16 +270,27 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
             {canManageTournament ? (
-              <select
-                value={tournament.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className={`${appInputClass} w-full sm:w-auto sm:min-w-[160px] shrink-0`}
-              >
-                <option value="upcoming">Upcoming</option>
-                <option value="group_stage">Group Stage</option>
-                <option value="knockout">Knockout</option>
-                <option value="complete">Complete</option>
-              </select>
+              <div className="flex items-center gap-2 shrink-0">
+                {tournament.status !== 'complete' ? (
+                  <button
+                    onClick={() => setShowTournamentEdit(true)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#dfe6df] bg-white text-slate-400 transition hover:border-[#b8d7c0] hover:text-slate-700"
+                    title="Edit tournament"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+                <select
+                  value={tournament.status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className={`${appInputClass} w-full sm:w-auto sm:min-w-[160px]`}
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="group_stage">Group Stage</option>
+                  <option value="knockout">Knockout</option>
+                  <option value="complete">Complete</option>
+                </select>
+              </div>
             ) : null}
           </div>
 
@@ -523,6 +536,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         )}
       </SurfaceCard>
     </AppPage>
+
+    {showTournamentEdit ? (
+      <TournamentEditModal
+        tournament={tournament}
+        isAdmin={isAdmin}
+        onClose={() => setShowTournamentEdit(false)}
+        onSaved={() => { setShowTournamentEdit(false); void load() }}
+      />
+    ) : null}
+    </>
   )
 }
 
@@ -781,6 +804,191 @@ function MatchEditModal({
               </select>
             </Field>
           </div>
+
+          <div className="flex gap-3 pt-1">
+            <AppButton type="button" variant="secondary" onClick={onClose} className="flex-1">
+              Cancel
+            </AppButton>
+            <AppButton type="submit" disabled={saving} className="flex-1">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </AppButton>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function TournamentEditModal({
+  tournament,
+  isAdmin,
+  onClose,
+  onSaved,
+}: {
+  tournament: TournamentWithDetails
+  isAdmin: boolean
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [form, setForm] = useState({
+    name: tournament.name,
+    shortName: tournament.shortName,
+    format: tournament.format,
+    totalOvers: String(tournament.totalOvers),
+    ballsPerOver: String(tournament.ballsPerOver),
+    matchDaysFrom: tournament.matchDaysFrom ?? '',
+    matchDaysTo: tournament.matchDaysTo ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          shortName: form.shortName.trim(),
+          format: form.format,
+          totalOvers: parseInt(form.totalOvers, 10),
+          ballsPerOver: parseInt(form.ballsPerOver, 10),
+          ...(isAdmin && {
+            matchDaysFrom: form.matchDaysFrom || null,
+            matchDaysTo: form.matchDaysTo || null,
+          }),
+        }),
+      })
+      if (res.ok) {
+        onSaved()
+      } else {
+        const data = await res.json() as { error?: string }
+        setError(data.error ?? 'Failed to save changes')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative w-full max-w-lg rounded-t-[2rem] bg-[#f8faf7] sm:rounded-[2rem] shadow-[0_24px_70px_rgba(10,14,18,0.22)]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#dfe6df] px-6 py-5">
+          <div>
+            <p className="app-kicker">Edit tournament</p>
+            <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{tournament.name}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400 transition hover:text-slate-700"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          {error ? (
+            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+          ) : null}
+
+          <Field label="Tournament Name">
+            <input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              className={appInputClass}
+              placeholder="e.g. ProStream Invitational 2026"
+              required
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Short Name">
+              <input
+                name="shortName"
+                value={form.shortName}
+                onChange={handleChange}
+                className={appInputClass}
+                placeholder="e.g. PSI26"
+                maxLength={20}
+                required
+              />
+            </Field>
+            <Field label="Format">
+              <select name="format" value={form.format} onChange={handleChange} className={appInputClass}>
+                <option value="T20">T20</option>
+                <option value="ODI">ODI</option>
+                <option value="T10">T10</option>
+                <option value="custom">Custom</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Total Overs">
+              <input
+                type="number"
+                name="totalOvers"
+                value={form.totalOvers}
+                onChange={handleChange}
+                className={appInputClass}
+                min={1}
+                required
+              />
+            </Field>
+            <Field label="Balls per Over">
+              <input
+                type="number"
+                name="ballsPerOver"
+                value={form.ballsPerOver}
+                onChange={handleChange}
+                className={appInputClass}
+                min={4}
+                max={8}
+                required
+              />
+            </Field>
+          </div>
+
+          {/* Match dates — admin only */}
+          {isAdmin ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Match Days From">
+                <input
+                  type="date"
+                  name="matchDaysFrom"
+                  value={form.matchDaysFrom}
+                  onChange={handleChange}
+                  className={appInputClass}
+                />
+              </Field>
+              <Field label="Match Days To">
+                <input
+                  type="date"
+                  name="matchDaysTo"
+                  value={form.matchDaysTo}
+                  onChange={handleChange}
+                  className={appInputClass}
+                />
+              </Field>
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-[#dfe6df] bg-[#f4f7f2] px-4 py-3 text-sm text-slate-500">
+              Match dates can only be changed by an admin.
+            </p>
+          )}
 
           <div className="flex gap-3 pt-1">
             <AppButton type="button" variant="secondary" onClick={onClose} className="flex-1">

@@ -21,6 +21,7 @@ function isLegacyEnvAdminToken(token: {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       name: 'Operator Login',

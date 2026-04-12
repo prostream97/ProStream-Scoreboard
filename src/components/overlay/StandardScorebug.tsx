@@ -59,14 +59,14 @@ export function StandardScorebug({ snapshot }: Props) {
       // the scorebug should sit 5px above the OBS frame with a near full-width layout
       className="absolute bottom-[5px] left-[5px] right-[5px] z-[20]"
     >
-      <div data-layer="ScoreBug" className="Scorebug" style={{ width: '100%', paddingLeft: 14, paddingRight: 14, paddingTop: 13, paddingBottom: 0, justifyContent: 'space-between', alignItems: 'flex-end', gap: 0, display: 'flex', boxSizing: 'border-box' }}>
+      <div data-layer="ScoreBug" className="Scorebug" style={{ width: '100%', paddingLeft: 14, paddingRight: 14, paddingTop: 13, paddingBottom: 0, alignItems: 'flex-end', gap: 5, display: 'flex', boxSizing: 'border-box' }}>
 
         {/* Batting Team Flag */}
-        <div data-layer="Flag Left Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'flex-end' }}>
+        <div data-layer="Flag Left Wrapper" style={{ width: 230, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'flex-end' }}>
           {/* Pill */}
           <div data-layer="Flag Left" className="FlagLeft" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 92, paddingRight: 16 }}>
             <div data-layer="Gradient" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(270deg, ${batting.primaryColor}55 0%, transparent 100%)` }} />
-            <div data-layer="TeamName" style={{ maxWidth: 110, color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{batting.name}</div>
+            <div data-layer="TeamName" style={{ maxWidth: 125, color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{batting.name}</div>
           </div>
           {/* Floating logo */}
           <div data-layer="Avatar" style={{ position: 'absolute', left: -14, bottom: 0, width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -79,14 +79,14 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Batters */}
-        <div data-layer="Batters" className="Batters" style={{ width: 450, height: 65, paddingLeft: 24, paddingRight: 24, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 3, display: 'inline-flex' }}>
+        <div data-layer="Batters" className="Batters" style={{ width: 510, height: 65, paddingLeft: 24, paddingRight: 24, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 3, display: 'inline-flex' }}>
           {batter1 ? (
-            <div data-layer="Container" className="Container" style={{ width: 175, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }}>
+            <div data-layer="Container" className="Container" style={{ width: 220, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }}>
               <div data-layer="Container" className="Container" style={{ justifyContent: 'flex-start', alignItems: 'center', gap: 5, display: 'flex' }}>
                 <div data-layer="Container" className="Container" style={{ width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter1.isStriker ? 1 : 0 }}>
                   <div data-layer="▶" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>▶</div>
                 </div>
-                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>{batter1.displayName}</div>
+                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 145 }}>{batter1.displayName}</div>
               </div>
               <div data-layer="Paragraph" className="Paragraph" style={{ justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex' }}>
                 <div data-layer="Runs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{batter1.runs} </div>
@@ -94,16 +94,16 @@ export function StandardScorebug({ snapshot }: Props) {
               </div>
             </div>
           ) : (
-            <div data-layer="Container" className="Container" style={{ width: 175, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }} />
+            <div data-layer="Container" className="Container" style={{ width: 220, justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }} />
           )}
 
           {batter2 ? (
-            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{ width: 175, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }}>
+            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{ width: 220, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }}>
               <div data-layer="Container" className="Container" style={{ justifyContent: 'flex-start', alignItems: 'center', gap: 5, display: 'flex' }}>
                 <div data-layer="Container" className="Container" style={{ width: 8, height: 11, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'inline-flex', opacity: batter2.isStriker ? 1 : 0 }}>
                   <div data-layer="▶" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 8, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word' }}>▶</div>
                 </div>
-                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>{batter2.displayName}</div>
+                <div data-layer="BatterName" className="BatterName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 145 }}>{batter2.displayName}</div>
               </div>
               <div data-layer="Paragraph" className="Paragraph" style={{ justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'flex' }}>
                 <div data-layer="Runs" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#FF00E5', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{batter2.runs} </div>
@@ -111,12 +111,12 @@ export function StandardScorebug({ snapshot }: Props) {
               </div>
             </div>
           ) : (
-            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{ width: 175, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }} />
+            <div data-layer="HorizontalBorder" className="Horizontalborder" style={{ width: 220, paddingTop: 3, borderTop: '1px #EEEEEE solid', justifyContent: 'space-between', alignItems: 'center', display: 'inline-flex' }} />
           )}
         </div>
 
         {/* Center Score */}
-        <div data-layer="Center Score" className="CenterScore" style={{ width: 350, height: 70, background: 'linear-gradient(169deg, #2A0066 0%, #4B0082 100%)', boxShadow: '0px 0px 20px rgba(255, 0, 229, 0.30)', overflow: 'hidden', borderRadius: 50, outline: '2px #FF00E5 solid', outlineOffset: '-2px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+        <div data-layer="Center Score" className="CenterScore" style={{ width: 392, height: 70, background: 'linear-gradient(169deg, #2A0066 0%, #4B0082 100%)', boxShadow: '0px 0px 20px rgba(255, 0, 229, 0.30)', overflow: 'hidden', borderRadius: 50, outline: '2px #FF00E5 solid', outlineOffset: '-2px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
           {/* Score row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <div style={{ color: 'white', fontSize: 15, fontFamily: 'Inter', fontWeight: '600' }}>
@@ -150,12 +150,12 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Bowler */}
-        <div data-layer="Bowler" className="Bowler" style={{ width: 450, height: 65, paddingLeft: 22, paddingRight: 22, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, justifyContent: 'space-between', alignItems: 'center', display: 'flex' }}>
+        <div data-layer="Bowler" className="Bowler" style={{ width: 510, height: 65, paddingLeft: 22, paddingRight: 22, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, justifyContent: 'space-between', alignItems: 'center', display: 'flex' }}>
           {currentBowler ? (
             <>
               <div data-layer="Container" className="Container" style={{ flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 1, display: 'inline-flex' }}>
                 <div data-layer="Container" className="Container" style={{ alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', display: 'flex' }}>
-                  <div data-layer="BowlerName" className="BowlerName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110 }}>{currentBowler.displayName}</div>
+                  <div data-layer="BowlerName" className="BowlerName" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '800', textTransform: 'uppercase', wordWrap: 'break-word', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 145 }}>{currentBowler.displayName}</div>
                 </div>
                 <div data-layer="Paragraph" className="Paragraph" style={{ alignSelf: 'stretch', justifyContent: 'flex-start', alignItems: 'flex-end', gap: 3, display: 'inline-flex' }}>
                   <div data-layer="WicketsRuns" className="WicketsRuns" style={{ justifyContent: 'center', display: 'flex', flexDirection: 'column', color: '#2A0066', fontSize: 13.30, fontFamily: 'Inter', fontWeight: '700', wordWrap: 'break-word' }}>{currentBowler.wickets}-{currentBowler.runs}  </div>
@@ -186,11 +186,11 @@ export function StandardScorebug({ snapshot }: Props) {
         </div>
 
         {/* Bowling Team Flag */}
-        <div data-layer="Flag Right Wrapper" style={{ width: 220, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'flex-end' }}>
+        <div data-layer="Flag Right Wrapper" style={{ width: 230, height: 90, position: 'relative', display: 'inline-flex', alignItems: 'flex-end' }}>
           {/* Pill */}
           <div data-layer="Flag Right" className="FlagRight" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 65, background: 'white', boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.25)', overflow: 'hidden', borderRadius: 50, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 92, justifyContent: 'flex-end' }}>
             <div data-layer="Gradient" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 50, background: `linear-gradient(90deg, ${bowling.primaryColor}55 0%, transparent 100%)` }} />
-            <div data-layer="TeamName" style={{ maxWidth: 110, textAlign: 'right', color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{bowling.name}</div>
+            <div data-layer="TeamName" style={{ maxWidth: 125, textAlign: 'right', color: '#666666', fontSize: 13, fontFamily: 'Inter', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.50, lineHeight: 1.25, wordBreak: 'break-word', zIndex: 1 }}>{bowling.name}</div>
           </div>
           {/* Floating logo */}
           <div data-layer="Avatar" style={{ position: 'absolute', right: -14, bottom: 0, width: 78, height: 78, borderRadius: 9999, overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 16px rgba(0,0,0,0.20)', background: 'white', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

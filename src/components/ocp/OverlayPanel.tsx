@@ -3,7 +3,7 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'tossResult' | 'header' | 'mostWickets'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'header', label: 'Header' },
@@ -12,6 +12,7 @@ const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'summary', label: 'Innings Summary' },
   { key: 'tossResult', label: 'Toss Result' },
   { key: 'mostWickets', label: 'Most Wickets' },
+  { key: 'mostBoundaries', label: 'Most Boundaries' },
   { key: 'ticker', label: 'Ticker' },
 ]
 
@@ -41,7 +42,7 @@ export function OverlayPanel() {
 
   const visibleElements = snapshot.tournamentId
     ? ELEMENTS
-    : ELEMENTS.filter(({ key }) => key !== 'mostWickets')
+    : ELEMENTS.filter(({ key }) => key !== 'mostWickets' && key !== 'mostBoundaries')
 
   return (
     <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
