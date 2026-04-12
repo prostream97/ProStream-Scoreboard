@@ -21,7 +21,6 @@ const emptyForm = {
   name: '',
   shortCode: '',
   primaryColor: '#1e3a8a',
-  secondaryColor: '#17b45b',
   logoCloudinaryId: '',
 }
 
@@ -86,7 +85,6 @@ export default function TeamsPage({
           name: form.name,
           shortCode: form.shortCode,
           primaryColor: form.primaryColor,
-          secondaryColor: form.secondaryColor,
           logoCloudinaryId: form.logoCloudinaryId || null,
         }),
       })
@@ -109,7 +107,6 @@ export default function TeamsPage({
       name: team.name,
       shortCode: team.shortCode,
       primaryColor: team.primaryColor,
-      secondaryColor: team.secondaryColor,
       logoCloudinaryId: team.logoCloudinaryId ?? '',
     })
     setEditError('')
@@ -131,7 +128,6 @@ export default function TeamsPage({
           name: editForm.name,
           shortCode: editForm.shortCode,
           primaryColor: editForm.primaryColor,
-          secondaryColor: editForm.secondaryColor,
           logoCloudinaryId: editForm.logoCloudinaryId || null,
         }),
       })
@@ -229,7 +225,7 @@ export default function TeamsPage({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className={appLabelClass}>Primary Color</label>
+                <label className={appLabelClass}>Team Color</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
@@ -241,24 +237,6 @@ export default function TeamsPage({
                   <input
                     name="primaryColor"
                     value={form.primaryColor}
-                    onChange={handleAddChange}
-                    className={appInputClass}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className={appLabelClass}>Secondary Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    name="secondaryColor"
-                    value={form.secondaryColor}
-                    onChange={handleAddChange}
-                    className="h-11 w-14 rounded-2xl border border-[#d7ddd6] bg-white p-1"
-                  />
-                  <input
-                    name="secondaryColor"
-                    value={form.secondaryColor}
                     onChange={handleAddChange}
                     className={appInputClass}
                   />
@@ -330,9 +308,9 @@ export default function TeamsPage({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 rounded-[1.4rem] bg-[#f4f7f2] p-4">
+              <div className="rounded-[1.4rem] bg-[#f4f7f2] p-4">
                 <div>
-                  <p className="app-kicker">Primary</p>
+                  <p className="app-kicker">Team Color</p>
                   <div className="mt-2 flex items-center gap-2">
                     <span
                       className="h-4 w-4 rounded-full border border-white"
@@ -340,18 +318,6 @@ export default function TeamsPage({
                     />
                     <span className="text-sm font-medium text-slate-900">
                       {team.primaryColor}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <p className="app-kicker">Secondary</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className="h-4 w-4 rounded-full border border-white"
-                      style={{ backgroundColor: team.secondaryColor }}
-                    />
-                    <span className="text-sm font-medium text-slate-900">
-                      {team.secondaryColor}
                     </span>
                   </div>
                 </div>
@@ -460,7 +426,7 @@ export default function TeamsPage({
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className={appLabelClass}>Primary Color</label>
+                  <label className={appLabelClass}>Team Color</label>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
@@ -472,24 +438,6 @@ export default function TeamsPage({
                     <input
                       name="primaryColor"
                       value={editForm.primaryColor}
-                      onChange={handleEditChange}
-                      className={appInputClass}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={appLabelClass}>Secondary Color</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      name="secondaryColor"
-                      value={editForm.secondaryColor}
-                      onChange={handleEditChange}
-                      className="h-11 w-14 rounded-2xl border border-[#d7ddd6] bg-white p-1"
-                    />
-                    <input
-                      name="secondaryColor"
-                      value={editForm.secondaryColor}
                       onChange={handleEditChange}
                       className={appInputClass}
                     />

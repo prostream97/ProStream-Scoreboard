@@ -32,7 +32,7 @@ export async function PATCH(
   const body = await req.json() as Record<string, unknown>
 
   const allowed: (keyof typeof teams.$inferInsert)[] = [
-    'name', 'shortCode', 'primaryColor', 'secondaryColor', 'logoCloudinaryId',
+    'name', 'shortCode', 'primaryColor', 'logoCloudinaryId',
   ]
   const patch: Partial<typeof teams.$inferInsert> = {}
   for (const key of allowed) {

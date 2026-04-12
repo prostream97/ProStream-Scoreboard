@@ -155,7 +155,6 @@ export const teams = pgTable('teams', {
   name: text('name').notNull(),
   shortCode: char('short_code', { length: 3 }).notNull(),
   primaryColor: varchar('primary_color', { length: 7 }).notNull().default('#4F46E5'),
-  secondaryColor: varchar('secondary_color', { length: 7 }).notNull().default('#10B981'),
   logoCloudinaryId: text('logo_cloudinary_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })

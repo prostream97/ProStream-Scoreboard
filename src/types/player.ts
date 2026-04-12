@@ -27,7 +27,6 @@ export type Team = {
   name: string
   shortCode: string
   primaryColor: string
-  secondaryColor: string
   logoCloudinaryId: string | null
   players?: Player[]
 }

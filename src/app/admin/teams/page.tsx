@@ -24,7 +24,6 @@ const emptyForm = {
   name: '',
   shortCode: '',
   primaryColor: '#1e3a8a',
-  secondaryColor: '#17b45b',
   logoCloudinaryId: '',
 }
 
@@ -105,7 +104,6 @@ export default function TeamsPage() {
       name: team.name,
       shortCode: team.shortCode,
       primaryColor: team.primaryColor,
-      secondaryColor: team.secondaryColor,
       logoCloudinaryId: team.logoCloudinaryId ?? '',
     })
     setEditError('')
@@ -204,7 +202,7 @@ export default function TeamsPage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className={appLabelClass}>Primary Color</label>
+            <label className={appLabelClass}>Team Color</label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
@@ -219,25 +217,6 @@ export default function TeamsPage() {
                 onChange={onChange}
                 className={appInputClass}
                 placeholder="#1e3a8a"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={appLabelClass}>Secondary Color</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                name="secondaryColor"
-                value={value.secondaryColor}
-                onChange={onChange}
-                className="h-11 w-14 rounded-2xl border border-[#d7ddd6] bg-white p-1"
-              />
-              <input
-                name="secondaryColor"
-                value={value.secondaryColor}
-                onChange={onChange}
-                className={appInputClass}
-                placeholder="#17b45b"
               />
             </div>
           </div>
@@ -266,16 +245,10 @@ export default function TeamsPage() {
                 className="h-14 w-14 rounded-2xl object-cover"
               />
             ) : (
-              <div className="flex gap-2">
-                <div
-                  className="h-12 w-12 rounded-2xl"
-                  style={{ backgroundColor: value.primaryColor }}
-                />
-                <div
-                  className="h-12 w-12 rounded-2xl"
-                  style={{ backgroundColor: value.secondaryColor }}
-                />
-              </div>
+              <div
+                className="h-12 w-12 rounded-2xl"
+                style={{ backgroundColor: value.primaryColor }}
+              />
             )}
             <div>
               <p
@@ -445,9 +418,9 @@ export default function TeamsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 rounded-[1.4rem] bg-[#f4f7f2] p-4">
+                <div className="rounded-[1.4rem] bg-[#f4f7f2] p-4">
                   <div>
-                    <p className="app-kicker">Primary</p>
+                    <p className="app-kicker">Team Color</p>
                     <div className="mt-2 flex items-center gap-2">
                       <span
                         className="h-4 w-4 rounded-full border border-white"
@@ -455,18 +428,6 @@ export default function TeamsPage() {
                       />
                       <span className="text-sm font-medium text-slate-900">
                         {team.primaryColor}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="app-kicker">Secondary</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span
-                        className="h-4 w-4 rounded-full border border-white"
-                        style={{ backgroundColor: team.secondaryColor }}
-                      />
-                      <span className="text-sm font-medium text-slate-900">
-                        {team.secondaryColor}
                       </span>
                     </div>
                   </div>

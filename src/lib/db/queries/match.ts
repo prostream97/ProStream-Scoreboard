@@ -76,7 +76,6 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     name: matchRow.homeTeam.name,
     shortCode: matchRow.homeTeam.shortCode,
     primaryColor: matchRow.homeTeam.primaryColor,
-    secondaryColor: matchRow.homeTeam.secondaryColor,
     logoCloudinaryId: matchRow.homeTeam.logoCloudinaryId,
   }
 
@@ -85,7 +84,6 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     name: matchRow.awayTeam.name,
     shortCode: matchRow.awayTeam.shortCode,
     primaryColor: matchRow.awayTeam.primaryColor,
-    secondaryColor: matchRow.awayTeam.secondaryColor,
     logoCloudinaryId: matchRow.awayTeam.logoCloudinaryId,
   }
 
@@ -773,4 +771,37 @@ export async function getLiveMatches() {
     },
     orderBy: (m, { desc }) => [desc(m.createdAt)],
   })
+}
+
+export async function recomputeInningsAggregates(
+  inningsId: number,
+  bpo: number,
+): Promise<{ totalRuns: number; wickets: number; overs: number; balls: number }> {
+  const [totals] = await db
+    .select({
+      totalRuns: sql<number>`COALESCE(SUM(${deliveries.runs} + ${deliveries.extraRuns}), 0)`,
+      wickets: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isWicket} = true)`,
+      legalBalls: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isLegal} = true)`,
+    })
+    .from(deliveries)
+    .where(eq(deliveries.inningsId, inningsId))
+
+  const legalBalls = Number(totals.legalBalls)
+  const overs = Math.floor(legalBalls / bpo)
+  const balls = legalBalls % bpo
+
+  await db
+    .update(innings)
+    .set({ totalRuns: Number(totals.totalRuns), wickets: Number(totals.wickets), overs, balls })
+    .where(eq(innings.id, inningsId))
+
+  const inningsRow = await db.query.innings.findFirst({ where: eq(innings.id, inningsId) })
+  if (inningsRow) {
+    await db
+      .update(matchState)
+      .set({ currentOver: overs, currentBalls: balls, lastUpdated: new Date() })
+      .where(eq(matchState.matchId, inningsRow.matchId))
+  }
+
+  return { totalRuns: Number(totals.totalRuns), wickets: Number(totals.wickets), overs, balls }
 }

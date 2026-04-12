@@ -21,7 +21,7 @@ export async function POST(
   }
 
   const body = await req.json()
-  const { name, shortCode, primaryColor, secondaryColor, logoCloudinaryId } = body
+  const { name, shortCode, primaryColor, logoCloudinaryId } = body
 
   if (!name?.trim() || !shortCode?.trim()) {
     return NextResponse.json({ error: 'name and shortCode are required' }, { status: 400 })
@@ -35,7 +35,6 @@ export async function POST(
         name: name.trim(),
         shortCode: shortCode.toUpperCase().trim().slice(0, 3),
         primaryColor: primaryColor ?? '#4F46E5',
-        secondaryColor: secondaryColor ?? '#10B981',
         logoCloudinaryId: logoCloudinaryId || null,
       })
       .returning()

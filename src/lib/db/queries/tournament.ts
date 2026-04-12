@@ -207,7 +207,6 @@ export async function getTournamentWithDetails(
       name: t.name,
       shortCode: t.shortCode,
       primaryColor: t.primaryColor,
-      secondaryColor: t.secondaryColor,
       logoCloudinaryId: t.logoCloudinaryId ?? null,
     })),
     matches: tournamentMatches,

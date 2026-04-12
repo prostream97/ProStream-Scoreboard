@@ -572,7 +572,7 @@ function MatchCard({
               {match.status}
             </AppBadge>
           </div>
-          {canManage ? (
+          {canManage && match.status !== 'complete' ? (
             <button
               onClick={() => setShowEdit(true)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dfe6df] bg-white text-slate-400 transition hover:border-[#b8d7c0] hover:text-slate-700"
@@ -597,7 +597,11 @@ function MatchCard({
         ) : null}
         <div className="mt-4 flex gap-2">
           <AppButton href={`/viewer/${match.id}`} variant="secondary" className="h-9 px-3 text-xs">View</AppButton>
-          <AppButton href={`/match/${match.id}/operator`} className="h-9 px-3 text-xs">Score</AppButton>
+          {match.status !== 'complete' ? (
+            <AppButton href={`/match/${match.id}/operator`} className="h-9 px-3 text-xs">Score</AppButton>
+          ) : (
+            <AppButton href={`/admin/matches/${match.id}/score-editor`} variant="secondary" className="h-9 px-3 text-xs">Edit Score</AppButton>
+          )}
         </div>
       </div>
 

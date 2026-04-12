@@ -39,7 +39,6 @@ export type TournamentTeamSummary = {
   name: string
   shortCode: string
   primaryColor: string
-  secondaryColor: string
   logoCloudinaryId: string | null
 }
 
