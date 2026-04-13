@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!isAdminSession(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const adminId = parseInt(session.user.id, 10)
+  const adminIdRaw = parseInt(session.user.id, 10)
+  const adminId = isNaN(adminIdRaw) ? null : adminIdRaw
   const body = await req.json()
   const { userId, amount, description } = body
 

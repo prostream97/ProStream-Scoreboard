@@ -76,11 +76,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         if (passwordValid) {
+          // Upsert the super-admin into the DB so they always have a real numeric ID.
+          // On first login this creates the row; on subsequent logins it's a no-op.
+          const displayName =
+            process.env.OPERATOR_DISPLAY_NAME ?? process.env.OPERATOR_USERNAME ?? 'Super Admin'
+          const passwordHash = await bcrypt.hash(password, 12)
+
+          const [upserted] = await db
+            .insert(users)
+            .values({ username: envUsername, passwordHash, displayName, role: 'admin' })
+            .onConflictDoUpdate({
+              target: users.username,
+              set: { passwordHash, displayName, updatedAt: new Date() },
+            })
+            .returning()
+
           return {
-            id: 'env-super-admin',
-            name: process.env.OPERATOR_DISPLAY_NAME ?? process.env.OPERATOR_USERNAME ?? 'Super Admin',
-            email: `${envUsername || 'admin'}@prostream.local`,
-            username: envUsername,
+            id: String(upserted.id),
+            name: upserted.displayName,
+            email: `${upserted.username}@prostream.local`,
+            username: upserted.username,
             role: 'admin',
           }
         }
