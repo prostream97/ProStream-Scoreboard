@@ -283,10 +283,13 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
                   const isSelected = selectedMode === theme.mode
                   const hasLink = !!libraryLinks[theme.mode]
                   return (
-                    <button
+                    <div
                       key={theme.mode}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedMode(theme.mode)}
-                      className={`group relative overflow-hidden rounded-[1.8rem] border-2 text-left transition-all ${
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedMode(theme.mode) }}
+                      className={`group relative overflow-hidden rounded-[1.8rem] border-2 text-left transition-all cursor-pointer ${
                         isSelected
                           ? 'shadow-[0_0_0_3px_rgba(0,0,0,0.08)]'
                           : 'border-[#e1e7df] hover:border-[#c8d4c6]'
@@ -353,7 +356,7 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
                           </div>
                         )}
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>

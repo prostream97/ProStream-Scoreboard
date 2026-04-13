@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       await tx.update(wallets).set({ balance: updatedBalance, updatedAt: new Date() }).where(eq(wallets.id, wallet.id))
     })
   } catch (err) {
-    console.error('Wallet topup transaction error:', err)
+    console.error('Wallet topup error:', err)
     return NextResponse.json({ error: 'Failed to process top-up' }, { status: 500 })
   }
 

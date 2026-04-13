@@ -2,12 +2,12 @@ import { config } from 'dotenv'
 config({ path: '.env.local' })
 
 import bcrypt from 'bcryptjs'
-import { neon } from '@neondatabase/serverless'
-import { drizzle } from 'drizzle-orm/neon-http'
+import { Pool } from '@neondatabase/serverless'
+import { drizzle } from 'drizzle-orm/neon-serverless'
 import * as schema from '../src/lib/db/schema'
 
-const sql = neon(process.env.DATABASE_URL!)
-const db = drizzle(sql, { schema })
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! })
+const db = drizzle(pool, { schema })
 
 async function main() {
   const username = process.env.OPERATOR_USERNAME?.trim().toLowerCase()
