@@ -9,6 +9,7 @@ import { MatchGraphs } from '@/components/viewer/MatchGraphs'
 import { AppBadge } from '@/components/shared/AppPrimitives'
 import type { MatchSnapshot, BatterStats, BowlerStats, InningsState } from '@/types/match'
 import type { DeliveryAddedPayload, WicketPayload, InningsChangePayload } from '@/types/pusher'
+import { applyDeliveryToPartnershipStats, createPartnershipStats } from '@/lib/match/partnership'
 
 type ViewerClientProps = {
   matchId: number
@@ -170,12 +171,15 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
         batters: applyDeliveryToBatters(s.batters, data, s.battingTeamPlayers),
         bowlers: applyDeliveryToBowlers(s.bowlers, data, s.bowlingTeamPlayers, bpo),
         partnership: s.strikerId && s.nonStrikerId
-          ? {
-              runs: (s.partnership?.runs ?? 0) + (data.runs ?? 0) + (data.extraRuns ?? 0),
-              balls: (s.partnership?.balls ?? 0) + (data.isLegal ? 1 : 0),
-              batter1Id: data.strikerId ?? s.strikerId,
-              batter2Id: data.nonStrikerId ?? s.nonStrikerId,
-            }
+          ? (data.isWicket
+              ? createPartnershipStats(data.strikerId ?? s.strikerId, data.nonStrikerId ?? s.nonStrikerId)
+              : applyDeliveryToPartnershipStats(
+                  s.partnership,
+                  data.batsmanId,
+                  data.strikerId ?? s.strikerId,
+                  data.nonStrikerId ?? s.nonStrikerId,
+                  data,
+                ))
           : s.partnership,
       }
     })

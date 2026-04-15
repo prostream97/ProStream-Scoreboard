@@ -51,12 +51,14 @@ export type InningsChangePayload = {
 }
 
 export type DisplayTogglePayload = {
-  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'teamSummary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries'
+  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'teamSummary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamSquad' | 'squadWithImage' | 'teamVsTeam'
   visible: boolean
   playerId?: number
   summaryTeamId?: number
   summaryView?: 'batting' | 'bowling'
-  themeScope?: 'all' | 'standard' | 'icc2023'
+  themeScope?: 'all' | 'standard' | 'icc2023' | 'standard1'
+  teamSquadTeamId?: number
+  squadWithImageTeamId?: number
 }
 
 export type DlsUpdatePayload = {

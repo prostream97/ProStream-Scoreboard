@@ -57,6 +57,13 @@
       "when": 1775986851595,
       "tag": "0007_concerned_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776182800000,
+      "tag": "0008_add_standard1_overlay_mode",
+      "breakpoints": true
     }
   ]
 }

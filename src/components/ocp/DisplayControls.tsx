@@ -33,7 +33,7 @@ export function DisplayControls() {
         body: JSON.stringify({
           matchId: snapshot.matchId,
           event: 'display.toggle',
-          payload: { element, visible: newVisible, themeScope: element === 'tossResult' ? 'standard' : 'all' },
+          payload: { element, visible: newVisible, themeScope: 'all' },
         }),
       })
   }

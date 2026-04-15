@@ -53,6 +53,13 @@ const OVERLAY_THEMES = [
     accentBg: '#eef8f1',
   },
   {
+    mode: 'standard1',
+    name: 'Standard 1',
+    description: 'Modern broadcast theme with enhanced player cards, squad displays, and team vs team intro.',
+    accentColor: '#0066cc',
+    accentBg: '#e8f2ff',
+  },
+  {
     mode: 'icc2023',
     name: 'ICC World Cup 2023',
     description: 'Official ICC Cricket World Cup 2023 branded theme with purple and pink accents.',

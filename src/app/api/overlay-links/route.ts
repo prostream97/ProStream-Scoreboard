@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'matchId is required' }, { status: 400 })
   }
 
-  const VALID_MODES = ['bug', 'card', 'partnership', 'boundary', 'standard', 'icc2023'] as const
+  const VALID_MODES = ['bug', 'card', 'partnership', 'boundary', 'standard', 'icc2023', 'standard1'] as const
   if (mode && !VALID_MODES.includes(mode)) {
     return NextResponse.json({ error: 'Invalid overlay mode' }, { status: 400 })
   }

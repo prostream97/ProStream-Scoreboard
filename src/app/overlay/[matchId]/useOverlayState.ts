@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useEvent } from '@/components/shared/PusherProvider'
 import type { MatchSnapshot, InningsState } from '@/types/match'
 import type { InningsSummaryData, TournamentMostWicketsData, TournamentMostBoundariesData } from '@/lib/db/queries/match'
+import { applyDeliveryToPartnershipStats, createPartnershipStats } from '@/lib/match/partnership'
 import type {
   DeliveryAddedPayload,
   WicketPayload,
@@ -16,7 +17,7 @@ type Props = {
   matchId: number
   initialSnapshot: MatchSnapshot
   initialMostWickets: TournamentMostWicketsData | null
-  overlayTheme: 'standard' | 'icc2023'
+  overlayTheme: 'standard' | 'icc2023' | 'standard1'
 }
 
 export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme }: Props) {
@@ -36,6 +37,12 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
   const [activeSummaryView, setActiveSummaryView] = useState<'batting' | 'bowling' | null>(null)
   const [mostWicketsVisible, setMostWicketsVisible] = useState(false)
   const [mostBoundariesVisible, setMostBoundariesVisible] = useState(false)
+  const [lastOutCardVisible, setLastOutCardVisible] = useState(false)
+  const [teamSquadVisible, setTeamSquadVisible] = useState(false)
+  const [squadWithImageVisible, setSquadWithImageVisible] = useState(false)
+  const [teamVsTeamVisible, setTeamVsTeamVisible] = useState(false)
+  const [activeTeamSquadTeamId, setActiveTeamSquadTeamId] = useState<number | null>(null)
+  const [activeSquadWithImageTeamId, setActiveSquadWithImageTeamId] = useState<number | null>(null)
   const [inningsSummaries, setInningsSummaries] = useState<InningsSummaryData[]>([])
   const [mostWicketsData, setMostWicketsData] = useState<TournamentMostWicketsData | null>(initialMostWickets)
   const [mostBoundariesData, setMostBoundariesData] = useState<TournamentMostBoundariesData | null>(null)
@@ -226,20 +233,16 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
         bowlers: finalBowlers,
         partnership: data.isWicket
           ? (hasCurrentPair
-              ? {
-                  runs: 0,
-                  balls: 0,
-                  batter1Id: data.strikerId!,
-                  batter2Id: data.nonStrikerId!,
-                }
+              ? createPartnershipStats(data.strikerId!, data.nonStrikerId!)
               : null)
           : (hasCurrentPair
-              ? {
-                  runs: (s.partnership?.runs ?? 0) + data.runs + data.extraRuns,
-                  balls: (s.partnership?.balls ?? 0) + (data.isLegal ? 1 : 0),
-                  batter1Id: data.strikerId!,
-                  batter2Id: data.nonStrikerId!,
-                }
+              ? applyDeliveryToPartnershipStats(
+                  s.partnership,
+                  data.batsmanId,
+                  data.strikerId!,
+                  data.nonStrikerId!,
+                  data,
+                )
               : s.partnership),
       }
     })
@@ -291,6 +294,18 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     }
     if (data.element === 'mostWickets') setMostWicketsVisible(data.visible)
     if (data.element === 'mostBoundaries') setMostBoundariesVisible(data.visible)
+    if (data.element === 'lastOutCard') setLastOutCardVisible(data.visible)
+    if (data.element === 'teamSquad') {
+      setTeamSquadVisible(data.visible)
+      if (data.visible) setActiveTeamSquadTeamId(data.teamSquadTeamId ?? null)
+      else setActiveTeamSquadTeamId(null)
+    }
+    if (data.element === 'squadWithImage') {
+      setSquadWithImageVisible(data.visible)
+      if (data.visible) setActiveSquadWithImageTeamId(data.squadWithImageTeamId ?? null)
+      else setActiveSquadWithImageTeamId(null)
+    }
+    if (data.element === 'teamVsTeam') setTeamVsTeamVisible(data.visible)
   })
 
   useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
@@ -321,6 +336,12 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     inningsSummaries,
     mostWicketsData,
     mostBoundariesData,
+    lastOutCardVisible,
+    teamSquadVisible,
+    squadWithImageVisible,
+    teamVsTeamVisible,
+    activeTeamSquadTeamId,
+    activeSquadWithImageTeamId,
     inn,
     battingTeam,
     bowlingTeam,

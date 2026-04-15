@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { matches, innings, players, teams, matchState, deliveries, users } from '@/lib/db/schema'
 import { eq, and, sql, gt, desc, inArray } from 'drizzle-orm'
 import type { MatchSnapshot, BatterStats, BowlerStats, PartnershipStats, InningsState, InningsStatus, TeamSummary, PlayerSummary } from '@/types/match'
+import { createPartnershipStats, getBatterContributionForDelivery } from '@/lib/match/partnership'
 
 const NON_BOWLER_WICKET_TYPES = new Set(['runout', 'obstructingfield', 'handledball'])
 
@@ -35,7 +36,12 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
       currentInningsRow ? getBatterStats(currentInningsRow.id, state?.strikerId ?? null) : [],
       currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null, matchRow.ballsPerOver ?? 6) : [],
       currentInningsRow
-        ? getPartnershipStats(currentInningsRow.id, state?.strikerId ?? null, state?.nonStrikerId ?? null)
+        ? getPartnershipStats(
+            currentInningsRow.id,
+            state?.strikerId ?? null,
+            state?.nonStrikerId ?? null,
+            state?.currentOverBuffer ?? [],
+          )
         : null,
     ])
 
@@ -92,6 +98,7 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     format: matchRow.format,
     status: matchRow.status,
     venue: matchRow.venue,
+    matchLabel: matchRow.matchLabel ?? null,
     tournamentId: matchRow.tournament?.id ?? null,
     tournamentName: matchRow.tournament?.name ?? null,
     tournamentLogoCloudinaryId: matchRow.tournament?.logoCloudinaryId ?? null,
@@ -341,6 +348,13 @@ async function getPartnershipStats(
   inningsId: number,
   strikerId: number | null,
   nonStrikerId: number | null,
+  liveBuffer: Array<{
+    batsmanId: number
+    runs: number
+    extraRuns: number
+    isLegal: boolean
+    extraType: string | null
+  }> = [],
 ): Promise<PartnershipStats | null> {
   if (!strikerId || !nonStrikerId) return null
 
@@ -354,11 +368,13 @@ async function getPartnershipStats(
 
   const lastWicketId = lastWicket[0]?.id ?? 0
 
-  // Sum runs and count legal balls since that wicket
-  const rows = await db
+  const persistedDeliveries = await db
     .select({
-      runs: sql<number>`COALESCE(SUM(${deliveries.runs} + ${deliveries.extraRuns}), 0)`,
-      balls: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isLegal} = true)`,
+      batsmanId: deliveries.batsmanId,
+      runs: deliveries.runs,
+      extraRuns: deliveries.extraRuns,
+      isLegal: deliveries.isLegal,
+      extraType: deliveries.extraType,
     })
     .from(deliveries)
     .where(
@@ -368,12 +384,30 @@ async function getPartnershipStats(
       ),
     )
 
-  const p = rows[0]
+  const partnership = createPartnershipStats(strikerId, nonStrikerId)
+  const contributionByBatter = new Map<number, { runs: number; balls: number }>()
+
+  for (const delivery of [...persistedDeliveries, ...liveBuffer]) {
+    const current = contributionByBatter.get(delivery.batsmanId) ?? { runs: 0, balls: 0 }
+    const delta = getBatterContributionForDelivery(delivery)
+
+    partnership.runs += Number(delivery.runs) + Number(delivery.extraRuns)
+    partnership.balls += delivery.isLegal ? 1 : 0
+    contributionByBatter.set(delivery.batsmanId, {
+      runs: current.runs + delta.runs,
+      balls: current.balls + delta.balls,
+    })
+  }
+
+  const batter1Contribution = contributionByBatter.get(strikerId) ?? { runs: 0, balls: 0 }
+  const batter2Contribution = contributionByBatter.get(nonStrikerId) ?? { runs: 0, balls: 0 }
+
   return {
-    runs: Number(p?.runs) || 0,
-    balls: Number(p?.balls) || 0,
-    batter1Id: strikerId,
-    batter2Id: nonStrikerId,
+    ...partnership,
+    batter1ContributionRuns: batter1Contribution.runs,
+    batter1ContributionBalls: batter1Contribution.balls,
+    batter2ContributionRuns: batter2Contribution.runs,
+    batter2ContributionBalls: batter2Contribution.balls,
   }
 }
 

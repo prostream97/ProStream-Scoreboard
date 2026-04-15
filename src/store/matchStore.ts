@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DeliveryInput, DeliveryRecord, MatchSnapshot, InningsState, BatterStats, BowlerStats, PlayerSummary } from '@/types/match'
 import { computeMatchResult, toResultPayload } from '@/lib/match/result'
+import { applyDeliveryToPartnershipStats, createPartnershipStats, reorderPartnershipStats } from '@/lib/match/partnership'
 
 type WicketInput = {
   runs: number
@@ -443,12 +444,13 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     )
 
     // Update partnership optimistically; reset to zero on wicket (new pair starts fresh)
-    const updatedPartnership = {
-      runs: (snapshot.partnership?.runs ?? 0) + input.runs + input.extraRuns,
-      balls: (snapshot.partnership?.balls ?? 0) + (input.isLegal ? 1 : 0),
-      batter1Id: newStrikerId ?? snapshot.strikerId ?? 0,
-      batter2Id: newNonStrikerId ?? snapshot.nonStrikerId ?? 0,
-    }
+    const updatedPartnership = applyDeliveryToPartnershipStats(
+      snapshot.partnership,
+      snapshot.strikerId,
+      newStrikerId ?? snapshot.strikerId ?? 0,
+      newNonStrikerId ?? snapshot.nonStrikerId ?? 0,
+      input,
+    )
 
     const updatedOverBalls = [...currentOverBalls, delivery]
 
@@ -708,12 +710,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         batters: updatedBatters,
         bowlers: updatedBowlers,
         partnership: input.incomingBatterId != null && postWicketPair.strikerId && postWicketPair.nonStrikerId
-          ? {
-              runs: 0,
-              balls: 0,
-              batter1Id: postWicketPair.strikerId,
-              batter2Id: postWicketPair.nonStrikerId,
-            }
+          ? createPartnershipStats(postWicketPair.strikerId, postWicketPair.nonStrikerId)
           : null,
         currentRunRate: newCurrentRunRate,
         requiredRunRate: newRequiredRunRate,
@@ -950,10 +947,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
           nonStrikerId: batsmanId,
           // Seed a fresh partnership now that both openers are known
           partnership: {
-            runs: 0,
-            balls: 0,
-            batter1Id: s.snapshot.strikerId ?? batsmanId,
-            batter2Id: batsmanId,
+            ...createPartnershipStats(s.snapshot.strikerId ?? batsmanId, batsmanId),
           },
         },
       }
@@ -980,11 +974,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
             isStriker: b.playerId === nextStrikerId,
           })),
           partnership: s.snapshot.partnership
-            ? {
-                ...s.snapshot.partnership,
-                batter1Id: nextStrikerId,
-                batter2Id: nextNonStrikerId,
-              }
+            ? reorderPartnershipStats(s.snapshot.partnership, nextStrikerId, nextNonStrikerId)
             : null,
         },
       }

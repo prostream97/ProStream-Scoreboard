@@ -112,6 +112,10 @@ export type PartnershipStats = {
   balls: number
   batter1Id: number
   batter2Id: number
+  batter1ContributionRuns: number
+  batter1ContributionBalls: number
+  batter2ContributionRuns: number
+  batter2ContributionBalls: number
 }
 
 // ─── Full Match State (snapshot from DB / Pusher) ─────────────────────────────
@@ -121,6 +125,7 @@ export type MatchSnapshot = {
   format: MatchFormat
   status: MatchStatus
   venue: string | null
+  matchLabel: string | null
   tournamentId: number | null
   tournamentName: string | null
   tournamentLogoCloudinaryId: string | null

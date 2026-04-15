@@ -5,6 +5,7 @@ import { matches, overlayLinks } from '@/lib/db/schema'
 import { getMatchSnapshot, getTournamentMostWickets } from '@/lib/db/queries/match'
 import { OverlayClient } from '@/app/overlay/[matchId]/OverlayClient'
 import { OverlayClientICC2023 } from '@/app/overlay/[matchId]/OverlayClientICC2023'
+import { OverlayClientStandard1 } from '@/app/overlay/[matchId]/OverlayClientStandard1'
 
 type Props = {
   params: Promise<{ token: string }>
@@ -62,6 +63,9 @@ export default async function TokenOverlayPage({ params }: Props) {
 
   if (link.mode === 'icc2023') {
     return <OverlayClientICC2023 {...sharedProps} />
+  }
+  if (link.mode === 'standard1') {
+    return <OverlayClientStandard1 {...sharedProps} />
   }
   return <OverlayClient {...sharedProps} />
 }

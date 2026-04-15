@@ -98,7 +98,7 @@ export const matchStageEnum = pgEnum('match_stage', [
 
 export const userRoleEnum = pgEnum('user_role', ['admin', 'operator'])
 
-export const overlayModeEnum = pgEnum('overlay_mode', ['bug', 'card', 'partnership', 'boundary', 'standard', 'icc2023'])
+export const overlayModeEnum = pgEnum('overlay_mode', ['bug', 'card', 'partnership', 'boundary', 'standard', 'icc2023', 'standard1'])
 
 export const transactionTypeEnum = pgEnum('transaction_type', ['topup', 'deduction'])
 
