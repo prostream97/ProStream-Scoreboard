@@ -5,15 +5,31 @@ import type { MatchSnapshot, BatterStats, BowlerStats } from '@/types/match'
 
 // Exact CSS from Scorebug.html
 const DARK_GRAD = 'linear-gradient(to right, #000000, #212122, #39393a, #39393a, #4f4c4c)'
-const PINK_GRAD = 'linear-gradient(to bottom, #ed00dc 2%, #ed00dc 25%, #ed00dc 50%, #d600c7 100%)'
 const GRAY_GRAD = 'linear-gradient(to right, #808080, #8a8a8a, #949394, #9e9d9e, #a8a7a8)'
 const YELLOW = '#f6ce00'
+const BAT_ICON_URL = 'https://res.cloudinary.com/dcv4wu1b6/image/upload/f_png/prostream/overlay-icons/bat'
+const BALL_ICON_URL = 'https://res.cloudinary.com/dcv4wu1b6/image/upload/f_png/prostream/overlay-icons/ball'
 
 type Props = { snapshot: MatchSnapshot }
+const isDarkHexColor = (hexColor: string) => {
+  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hexColor)
+  if (!match) return true
+  const [, rHex, gHex, bHex] = match
+  const r = Number.parseInt(rHex, 16)
+  const g = Number.parseInt(gHex, 16)
+  const b = Number.parseInt(bHex, 16)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luminance < 0.55
+}
 
 export function Standard1Scorebug({ snapshot }: Props) {
   const inn = snapshot.currentInningsState
   const batting = inn?.battingTeamId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam
+  const battingPanelColor = batting.primaryColor || '#1f2937'
+  const isDarkBattingColor = isDarkHexColor(battingPanelColor)
+  const bowling = inn?.bowlingTeamId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam
+  const bowlingPanelColor = bowling.primaryColor || '#1f2937'
+  const isDarkBowlingColor = isDarkHexColor(bowlingPanelColor)
 
   const activeBatters = snapshot.batters.filter(b => !b.isOut)
   type BatterDisplay = Pick<BatterStats, 'displayName' | 'runs' | 'balls' | 'isStriker'>
@@ -59,10 +75,29 @@ export function Standard1Scorebug({ snapshot }: Props) {
         margin: 'auto',
         width: '100%',
         height: 120,
+        overflow: 'hidden',
         fontFamily: 'Arial, sans-serif',
         zIndex: 20,
       }}
     >
+      {/* Vertical shine sweep */}
+      <motion.div
+        aria-hidden
+        initial={{ y: -60, opacity: 0 }}
+        animate={{ y: 140, opacity: [0, 0.55, 0] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'linear', repeatDelay: 0.35 }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: 55,
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.45), rgba(255,255,255,0))',
+          pointerEvents: 'none',
+          zIndex: 50,
+          mixBlendMode: 'screen',
+        }}
+      />
       {/* .bgLowerScoreboard: width:1920px; height:120px; display:inline-flex */}
       <div style={{ width: 1920, height: 120, display: 'inline-flex' }}>
 
@@ -100,7 +135,7 @@ export function Standard1Scorebug({ snapshot }: Props) {
 
             {/* .lowerScoreBoardBox.grayColor: margin-left:10px, height:60px, line-height:60px, margin-top:5px */}
             <div style={{
-              marginLeft: 10,
+              marginLeft: -5,
               height: 60,
               lineHeight: '60px',
               marginTop: 5,
@@ -113,9 +148,10 @@ export function Standard1Scorebug({ snapshot }: Props) {
                 width: 190,
                 height: 60,
                 lineHeight: '60px',
-                fontSize: 55,
+                fontSize: 40,
                 fontWeight: 1000 as number,
                 display: 'inline-flex',
+                alignItems: 'flex-end',
               }}>
                 {/* .lowerScoreBoardBoxScoreRun: width:90px, text-align:right */}
                 <div style={{ width: 90, textAlign: 'right' }}>{inn?.totalRuns ?? 0}</div>
@@ -126,10 +162,10 @@ export function Standard1Scorebug({ snapshot }: Props) {
               </div>
             </div>
 
-            {/* .lowerScoreBoxOver: width:150px, font-size:40px, font-weight:bold, height:60px, line-height:60px, margin-top:5px */}
+            {/* .lowerScoreBoxOver: width:130px, font-size:40px, font-weight:bold, height:60px, line-height:60px, margin-top:5px */}
             <div style={{
-              width: 150,
-              fontSize: 40,
+              width: 130,
+              fontSize: 36,
               fontWeight: 'bold',
               height: 60,
               lineHeight: '60px',
@@ -140,8 +176,8 @@ export function Standard1Scorebug({ snapshot }: Props) {
               <div style={{ width: 100, textAlign: 'right', fontWeight: 1000 as number }}>
                 {snapshot.currentOver}.{snapshot.currentBalls}
               </div>
-              {/* .lowerScoreBoxOver3: width:60px, text-align:left, margin-left:10px, font-weight:1000, font-size:29px */}
-              <div style={{ width: 60, textAlign: 'left', marginLeft: 10, fontWeight: 1000 as number, fontSize: 29 }}>
+              {/* .lowerScoreBoxOver3: width:60px, text-align:left, margin-left:10px, font-weight:1000, font-size:36px */}
+              <div style={{ width: 60, textAlign: 'left', marginLeft: 10, fontWeight: 1000 as number, fontSize: 36 }}>
                 ({snapshot.totalOvers})
               </div>
             </div>
@@ -167,6 +203,8 @@ export function Standard1Scorebug({ snapshot }: Props) {
           boxShadow: 'rgba(0,0,0,0.35) 15px 0px 0px',
           border: '5px solid #222222',
           marginLeft: -5,
+          background: battingPanelColor,
+          color: isDarkBattingColor ? 'white' : 'black',
           boxSizing: 'border-box',
           overflow: 'hidden',
           flexShrink: 0,
@@ -182,8 +220,8 @@ export function Standard1Scorebug({ snapshot }: Props) {
               {b ? (
                 // inner div.grayColor: display:inline-flex, gray gradient bg, color:black
                 <div style={{
-                  backgroundImage: GRAY_GRAD,
-                  color: 'black',
+                  background: battingPanelColor,
+                  color: isDarkBattingColor ? 'white' : 'black',
                   display: 'inline-flex',
                   width: '100%',
                   height: 60,
@@ -198,7 +236,17 @@ export function Standard1Scorebug({ snapshot }: Props) {
                     flexShrink: 0,
                   }}>
                     {b.isStriker && (
-                      <span style={{ fontSize: 18, color: '#000', fontWeight: 900 }}>▶</span>
+                      <img
+                        src={BAT_ICON_URL}
+                        alt="Striker bat"
+                        width={22}
+                        height={32}
+                        style={{
+                          display: 'block',
+                          objectFit: 'contain',
+                          mixBlendMode: 'screen',
+                        }}
+                      />
                     )}
                   </div>
                   {/* .lowerScoreBoxBatsmen1Name: width:270px, height:60px, line-height:60px, font-weight:bold, overflow:hidden */}
@@ -218,17 +266,17 @@ export function Standard1Scorebug({ snapshot }: Props) {
                   {/* .lowerScoreBoxBatsmen1Score: width:150px, height:60px, display:inline-flex */}
                   <div style={{ width: 150, height: 60, display: 'inline-flex' }}>
                     {/* .lowerScoreBoxBatsmen1ScoreRun: width:90px, text-align:right, font-size:48px, font-weight:1000 */}
-                    <div style={{ width: 90, textAlign: 'right', fontSize: 48, fontWeight: 1000 as number }}>
+                    <div style={{ width: 90, textAlign: 'right', fontSize: 32, fontWeight: 1000 as number }}>
                       {b.runs}
                     </div>
                     {/* .lowerScoreBoxBatsmen1ScoreBalls: width:60px, height:60px, line-height:70px, text-align:center, font-size:35px, font-weight:1000 */}
-                    <div style={{ width: 60, height: 60, lineHeight: '70px', textAlign: 'center', fontSize: 35, fontWeight: 1000 as number }}>
+                    <div style={{ width: 60, height: 60, lineHeight: '70px', textAlign: 'center', fontSize: 30, fontWeight: 1000 as number }}>
                       {b.balls}
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ height: 60, width: '100%', backgroundImage: GRAY_GRAD }} />
+                <div style={{ height: 60, width: '100%', background: battingPanelColor }} />
               )}
             </div>
           ))}
@@ -272,22 +320,22 @@ export function Standard1Scorebug({ snapshot }: Props) {
           </div>
         </div>
 
-        {/* === RIGHT PINK BOX (.lowerScoreBoxRight.pinkColor): 570×120, margin-left:-9px === */}
+        {/* === RIGHT PINK BOX (.lowerScoreBoxRight.pinkColor): 651×120, margin-left:-9px === */}
         <div style={{
-          width: 570,
+          width: 651,
           height: 120,
           border: '5px solid #222222',
           marginLeft: -9,
-          backgroundImage: PINK_GRAD,
-          color: 'white',
+          background: bowlingPanelColor,
+          color: isDarkBowlingColor ? 'white' : 'black',
           boxSizing: 'border-box',
           overflow: 'hidden',
           flexShrink: 0,
         }}>
           {currentBowler ? (
             <>
-              {/* Bowler row (.lowerScoreBoxBowler): width:570px, height:60px, display:inline-flex */}
-              <div style={{ width: 570, height: 60, display: 'inline-flex' }}>
+              {/* Bowler row (.lowerScoreBoxBowler): width:651px, height:60px, display:inline-flex */}
+              <div style={{ width: 651, height: 60, display: 'inline-flex' }}>
                 {/* .lowerScoreBoxBowler1Name: width:300px, height:60px, line-height:60px, font-weight:bold, overflow:hidden */}
                 <div style={{
                   width: 300,
@@ -301,7 +349,17 @@ export function Standard1Scorebug({ snapshot }: Props) {
                   fontSize: 20,
                   paddingLeft: 8,
                   boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
                 }}>
+                  <img
+                    src={BALL_ICON_URL}
+                    alt="Bowler ball"
+                    width={22}
+                    height={22}
+                    style={{ display: 'block', objectFit: 'contain', flexShrink: 0, mixBlendMode: 'screen' }}
+                  />
                   {currentBowler.displayName}
                 </div>
                 {/* .lowerScoreBoxBowler1Score: width:230px, height:60px, display:inline-flex */}
@@ -311,7 +369,7 @@ export function Standard1Scorebug({ snapshot }: Props) {
                     width: 150,
                     height: 60,
                     lineHeight: '60px',
-                    fontSize: 44,
+                    fontSize: 32,
                     fontWeight: 1000 as number,
                     display: 'inline-flex',
                   }}>
@@ -337,7 +395,7 @@ export function Standard1Scorebug({ snapshot }: Props) {
               </div>
 
               {/* Over balls row — second 60px row of the pink box */}
-              <div style={{ display: 'inline-flex', paddingLeft: 0 }}>
+              <div style={{ width: 651, display: 'flex', flexWrap: 'wrap', paddingLeft: 0 }}>
                 {overBalls.map((ball, i) => {
                   let bg = 'rgba(255,255,255,0.25)'
                   let label = '0'

@@ -41,7 +41,7 @@ type UIStore = {
   setActivePlayer: (id: number | null) => void
   showTeamSummary: (teamId: number, view: 'batting' | 'bowling') => void
   hideTeamSummary: () => void
-  showTeamSquad: (teamId: number) => void
+  showTeamSquad: () => void
   hideTeamSquad: () => void
   showSquadWithImage: (teamId: number) => void
   hideSquadWithImage: () => void
@@ -117,10 +117,10 @@ export const useUIStore = create<UIStore>((set) => ({
     }))
   },
 
-  showTeamSquad(teamId) {
+  showTeamSquad() {
     set((s) => ({
       display: { ...s.display, teamSquad: true },
-      activeTeamSquadTeamId: teamId,
+      activeTeamSquadTeamId: null,
     }))
   },
 

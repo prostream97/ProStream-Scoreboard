@@ -76,22 +76,51 @@ export function Standard1TossDetailsOverlay({ snapshot }: Props) {
   const decisionText = snapshot.tossDecision === 'bat' ? 'ELECTED TO BAT' : 'ELECTED TO BOWL'
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      style={{
-        position: 'absolute',
-        bottom: 40,
-        left: 0,
-        right: 0,
-        display: 'flex',
-        justifyContent: 'center',
-        zIndex: 20,
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+    <>
+      <style jsx>{`
+        .s1-toss-shine-wrap {
+          position: relative;
+          overflow: hidden;
+        }
+        .s1-toss-shine {
+          position: absolute;
+          top: 0;
+          left: -50%;
+          width: 200%;
+          height: 100%;
+          background: linear-gradient(
+            100deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.03) 35%,
+            rgba(255, 255, 255, 0.22) 50%,
+            rgba(255, 255, 255, 0.03) 65%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          animation: s1-toss-shine 4.4s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 1;
+        }
+        @keyframes s1-toss-shine {
+          0% { transform: translateX(-35%); }
+          100% { transform: translateX(35%); }
+        }
+      `}</style>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        style={{
+          position: 'absolute',
+          bottom: 40,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          zIndex: 20,
+          fontFamily: 'Arial, sans-serif',
+        }}
+      >
       <div style={{
         width: 1600,
         height: 145,
@@ -106,7 +135,9 @@ export function Standard1TossDetailsOverlay({ snapshot }: Props) {
           style={{ display: 'flex', alignItems: 'center' }}
         >
           {/* Black accent bar */}
-          <div style={{ width: 50, height: 145, backgroundImage: BLACK_GRAD }} />
+          <div className="s1-toss-shine-wrap" style={{ width: 50, height: 145, backgroundImage: BLACK_GRAD }}>
+            <div className="s1-toss-shine" />
+          </div>
           {/* Gray team box */}
           <TeamSide
             id={snapshot.homeTeam.logoCloudinaryId}
@@ -117,7 +148,7 @@ export function Standard1TossDetailsOverlay({ snapshot }: Props) {
         </motion.div>
 
         {/* Center: toss info */}
-        <div style={{
+        <div className="s1-toss-shine-wrap" style={{
           flex: 1,
           backgroundImage: BLACK_GRAD,
           display: 'flex',
@@ -127,6 +158,7 @@ export function Standard1TossDetailsOverlay({ snapshot }: Props) {
           gap: 4,
           padding: '0 20px',
         }}>
+          <div className="s1-toss-shine" />
           {/* Toss winner name in yellow */}
           <motion.div
             initial={{ x: 40, opacity: 0 }}
@@ -149,11 +181,11 @@ export function Standard1TossDetailsOverlay({ snapshot }: Props) {
             {winningTeam.name}
           </motion.div>
 
-          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 16, fontWeight: 600 }}>
+          <span style={{ position: 'relative', zIndex: 2, color: 'rgba(255,255,255,0.75)', fontSize: 16, fontWeight: 600 }}>
             won the toss and
           </span>
 
-          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+          <span style={{ position: 'relative', zIndex: 2, color: '#fff', fontSize: 20, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5 }}>
             {decisionText}
           </span>
 
@@ -198,9 +230,12 @@ export function Standard1TossDetailsOverlay({ snapshot }: Props) {
             background={PINK_GRAD}
           />
           {/* Black accent bar */}
-          <div style={{ width: 50, height: 145, backgroundImage: BLACK_GRAD }} />
+          <div className="s1-toss-shine-wrap" style={{ width: 50, height: 145, backgroundImage: BLACK_GRAD }}>
+            <div className="s1-toss-shine" />
+          </div>
         </motion.div>
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   )
 }

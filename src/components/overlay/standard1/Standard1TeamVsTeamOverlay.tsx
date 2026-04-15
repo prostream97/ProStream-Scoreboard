@@ -18,12 +18,13 @@ function cloudinaryUrl(id: string | null, size: number) {
 }
 
 function PlaceholderLogo({ label, size }: { label: string; size: number }) {
+  const renderSize = size === 58 ? 150 : size
   return (
     <div
       style={{
-        width: size,
-        height: size,
-        borderRadius: 20,
+        width: renderSize,
+        height: renderSize,
+        borderRadius: size === 170 || size === 58 ? 35 : 20,
         border: '4px solid rgba(255,255,255,0.65)',
         background:
           'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), transparent 35%), linear-gradient(135deg, #0a0d1f, #1d2d59 50%, #f6ce00 100%)',
@@ -31,7 +32,7 @@ function PlaceholderLogo({ label, size }: { label: string; size: number }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: Math.round(size * 0.28),
+        fontSize: Math.round(renderSize * 0.28),
         fontWeight: 900,
         boxShadow: 'rgba(0, 0, 0, 0.56) 0 22px 70px 4px',
       }}
@@ -52,7 +53,8 @@ function LogoCard({
   alt: string
   size: number
 }) {
-  const src = cloudinaryUrl(logoId, size)
+  const renderSize = size === 58 ? 150 : size
+  const src = cloudinaryUrl(logoId, renderSize)
 
   if (!src) {
     return <PlaceholderLogo label={fallback} size={size} />
@@ -62,20 +64,67 @@ function LogoCard({
     <div
       style={{
         position: 'relative',
-        width: size,
-        height: size,
-        borderRadius: 20,
+        width: renderSize,
+        height: renderSize,
+        borderRadius: size === 170 || size === 58 ? 35 : 20,
         overflow: 'hidden',
         boxShadow: 'rgba(0, 0, 0, 0.56) 0 22px 70px 4px',
       }}
     >
-      <Image src={src} alt={alt} fill sizes={`${size}px`} style={{ objectFit: 'cover' }} />
+      <Image src={src} alt={alt} fill sizes={`${renderSize}px`} style={{ objectFit: 'cover' }} />
     </div>
   )
 }
 
 function Beam() {
   return <div className="standard1-vs-beam" aria-hidden="true" />
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, v))
+}
+
+function normalizeHexColor(hex: string | null | undefined) {
+  if (!hex) return null
+  const trimmed = hex.trim()
+  const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`
+  if (/^#[0-9a-fA-F]{6}$/.test(withHash)) return withHash
+  if (/^#[0-9a-fA-F]{3}$/.test(withHash)) {
+    const [, r, g, b] = withHash
+    return `#${r}${r}${g}${g}${b}${b}`
+  }
+  return null
+}
+
+function hexToRgb(hex: string) {
+  const normalized = normalizeHexColor(hex)
+  if (!normalized) return null
+  return {
+    r: parseInt(normalized.slice(1, 3), 16),
+    g: parseInt(normalized.slice(3, 5), 16),
+    b: parseInt(normalized.slice(5, 7), 16),
+  }
+}
+
+function shiftHex(hex: string, delta: number) {
+  const rgb = hexToRgb(hex)
+  if (!rgb) return hex
+  const r = clamp(rgb.r + delta, 0, 255)
+  const g = clamp(rgb.g + delta, 0, 255)
+  const b = clamp(rgb.b + delta, 0, 255)
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+function teamStripColor(primaryColor: string) {
+  const normalized = normalizeHexColor(primaryColor)
+  return normalized ?? primaryColor
+}
+
+function teamStripTextColor(primaryColor: string) {
+  const rgb = hexToRgb(primaryColor)
+  if (!rgb) return '#fff'
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255
+  return luminance > 0.62 ? '#000' : '#fff'
 }
 
 export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
@@ -104,6 +153,53 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
             transform: translate(0%, -50%);
           }
         }
+
+        .standard1-vs-row-beam {
+          position: absolute;
+          top: 0;
+          left: -50%;
+          width: 200%;
+          height: 100%;
+          background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.06) 35%,
+            rgba(255, 255, 255, 0.75) 50%,
+            rgba(255, 255, 255, 0.06) 65%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          animation: standard1-vs-row-beam 3.2s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        @keyframes standard1-vs-row-beam {
+          0% { transform: translateX(-35%); }
+          100% { transform: translateX(35%); }
+        }
+
+        .standard1-vs-panel-shine {
+          position: absolute;
+          top: 0;
+          left: -45%;
+          width: 190%;
+          height: 100%;
+          background: linear-gradient(
+            100deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.04) 32%,
+            rgba(255, 255, 255, 0.42) 50%,
+            rgba(255, 255, 255, 0.04) 68%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          animation: standard1-vs-panel-shine 3.8s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        @keyframes standard1-vs-panel-shine {
+          0% { transform: translateX(-42%); }
+          100% { transform: translateX(42%); }
+        }
       `}</style>
 
       <motion.div
@@ -113,10 +209,10 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
         transition={{ type: 'spring', stiffness: 110, damping: 18 }}
         style={{
           position: 'absolute',
-          right: 0,
-          bottom: 5,
           left: 0,
-          width: '100%',
+          top: 905,
+          width: 1920,
+          height: 80,
           zIndex: 20,
           display: 'flex',
           justifyContent: 'center',
@@ -124,8 +220,25 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
           letterSpacing: 1,
         }}
       >
-        {/* 1200px centred content column */}
-        <div style={{ position: 'relative', width: 1200 }}>
+        {/* Full-width scorebug content column */}
+        <div style={{ position: 'relative', width: '100%' }}>
+          {/* Side team logos outside all three bars (render first so bars/text layer above) */}
+          <div style={{ position: 'absolute', top: 25, left: 20, width: 150, height: 150, zIndex: 8 }}>
+            <LogoCard
+              logoId={snapshot.homeTeam.logoCloudinaryId}
+              fallback={snapshot.homeTeam.shortCode}
+              alt={snapshot.homeTeam.name}
+              size={58}
+            />
+          </div>
+          <div style={{ position: 'absolute', top: 25, right: 20, width: 150, height: 150, zIndex: 8 }}>
+            <LogoCard
+              logoId={snapshot.awayTeam.logoCloudinaryId}
+              fallback={snapshot.awayTeam.shortCode}
+              alt={snapshot.awayTeam.name}
+              size={58}
+            />
+          </div>
 
           {/* Match number label */}
           <div
@@ -152,19 +265,22 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
           </div>
 
           {/* Team names row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: '0 190px' }}>
 
             {/* Home team box — outer black gradient, inner yellow */}
             <div
               style={{
-                width: 580,
+                position: 'relative',
+                overflow: 'hidden',
+                flex: 1,
                 height: 80,
                 borderRadius: 5,
-                border: '5px solid #000',
+                border: 'none',
                 backgroundImage: BLACK_GRAD,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
               }}
             >
+              <div className="standard1-vs-row-beam" />
               <div
                 style={{
                   position: 'relative',
@@ -172,19 +288,24 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
                   width: '100%',
                   height: '100%',
                   borderRadius: 3,
-                  border: '5px solid #ffff00',
-                  background: YELLOW_MAIN,
-                  color: '#000',
+                  borderWidth: 0,
+                  borderStyle: 'none',
+                  borderColor: 'transparent',
+                  borderImage: 'none',
+                  background: teamStripColor(snapshot.homeTeam.primaryColor),
+                  color: teamStripTextColor(snapshot.homeTeam.primaryColor),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 35,
                   fontWeight: 1000,
                   textTransform: 'uppercase',
+                  padding: '0 20px',
                 }}
               >
                 <Beam />
-                <span style={{ position: 'relative', padding: '0 20px', textAlign: 'center', lineHeight: 1 }}>
+                <div className="standard1-vs-panel-shine" />
+                <span style={{ position: 'relative', zIndex: 3, textAlign: 'center', lineHeight: 1 }}>
                   {snapshot.homeTeam.name}
                 </span>
               </div>
@@ -193,7 +314,8 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
             {/* VS badge */}
             <div
               style={{
-                zIndex: 1,
+                position: 'relative',
+                zIndex: 12,
                 width: 50,
                 height: 50,
                 margin: 'auto -10px',
@@ -217,14 +339,17 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
             {/* Away team box — outer black gradient, inner yellow */}
             <div
               style={{
-                width: 580,
+                position: 'relative',
+                overflow: 'hidden',
+                flex: 1,
                 height: 80,
                 borderRadius: 5,
-                border: '5px solid #000',
+                border: 'none',
                 backgroundImage: BLACK_GRAD,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.24)',
               }}
             >
+              <div className="standard1-vs-row-beam" />
               <div
                 style={{
                   position: 'relative',
@@ -232,19 +357,24 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
                   width: '100%',
                   height: '100%',
                   borderRadius: 3,
-                  border: '5px solid #ffff00',
-                  background: YELLOW_MAIN,
-                  color: '#000',
+                  borderWidth: 0,
+                  borderStyle: 'none',
+                  borderColor: 'transparent',
+                  borderImage: 'none',
+                  background: teamStripColor(snapshot.awayTeam.primaryColor),
+                  color: teamStripTextColor(snapshot.awayTeam.primaryColor),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 35,
                   fontWeight: 1000,
                   textTransform: 'uppercase',
+                  padding: '0 20px',
                 }}
               >
                 <Beam />
-                <span style={{ position: 'relative', padding: '0 20px', textAlign: 'center', lineHeight: 1 }}>
+                <div className="standard1-vs-panel-shine" />
+                <span style={{ position: 'relative', zIndex: 3, textAlign: 'center', lineHeight: 1 }}>
                   {snapshot.awayTeam.name}
                 </span>
               </div>
@@ -273,33 +403,13 @@ export function Standard1TeamVsTeamOverlay({ snapshot }: Props) {
             </span>
           </div>
 
-          {/* Home team logo — top-left, 250×250, 150px from left edge */}
-          <div style={{ position: 'absolute', top: -138, left: 150, width: 250, height: 250 }}>
-            <LogoCard
-              logoId={snapshot.homeTeam.logoCloudinaryId}
-              fallback={snapshot.homeTeam.shortCode}
-              alt={snapshot.homeTeam.name}
-              size={250}
-            />
-          </div>
-
           {/* Tournament logo — top-centre, 170×170 */}
-          <div style={{ position: 'absolute', top: -161, left: 515, width: 170, height: 170 }}>
+          <div style={{ position: 'absolute', top: -161, left: '50%', transform: 'translateX(-50%)', width: 170, height: 170 }}>
             <LogoCard
               logoId={snapshot.tournamentLogoCloudinaryId}
               fallback="T"
               alt={tournamentLabel}
               size={170}
-            />
-          </div>
-
-          {/* Away team logo — top-right, 250×250, 150px from right edge */}
-          <div style={{ position: 'absolute', top: -138, right: 150, width: 250, height: 250 }}>
-            <LogoCard
-              logoId={snapshot.awayTeam.logoCloudinaryId}
-              fallback={snapshot.awayTeam.shortCode}
-              alt={snapshot.awayTeam.name}
-              size={250}
             />
           </div>
         </div>

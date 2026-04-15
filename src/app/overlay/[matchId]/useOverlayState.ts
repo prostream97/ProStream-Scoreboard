@@ -297,8 +297,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     if (data.element === 'lastOutCard') setLastOutCardVisible(data.visible)
     if (data.element === 'teamSquad') {
       setTeamSquadVisible(data.visible)
-      if (data.visible) setActiveTeamSquadTeamId(data.teamSquadTeamId ?? null)
-      else setActiveTeamSquadTeamId(null)
+      setActiveTeamSquadTeamId(null)
     }
     if (data.element === 'squadWithImage') {
       setSquadWithImageVisible(data.visible)

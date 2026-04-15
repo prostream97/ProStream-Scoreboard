@@ -19,6 +19,7 @@ import { Standard1SquadWithImageOverlay } from '@/components/overlay/standard1/S
 import { Standard1TeamVsTeamOverlay } from '@/components/overlay/standard1/Standard1TeamVsTeamOverlay'
 import { Standard1TossDetailsOverlay } from '@/components/overlay/standard1/Standard1TossDetailsOverlay'
 import { Standard1TournamentNameOverlay } from '@/components/overlay/standard1/Standard1TournamentNameOverlay'
+import { Standard1MatchSummaryOverlay } from '@/components/overlay/standard1/Standard1MatchSummaryOverlay'
 
 type Props = {
   matchId: number
@@ -35,13 +36,14 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
     headerVisible,
     cardVisible,
     partnershipVisible,
+    summaryVisible,
     tossResultVisible,
     lastOutCardVisible,
     teamSquadVisible,
     squadWithImageVisible,
     teamVsTeamVisible,
-    activeTeamSquadTeamId,
     activeSquadWithImageTeamId,
+    inningsSummaries,
     battingTeam,
     bowlingTeam,
   } = useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme: 'standard1' })
@@ -70,6 +72,13 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
 
   // Resolve team for squad overlays — players are keyed by batting/bowling role
   const battingTeamId = snapshot.currentInningsState?.battingTeamId
+  const bowlingTeamId = snapshot.currentInningsState?.bowlingTeamId
+  const resolvePlayersByTeamId = (teamId: number) =>
+    teamId === battingTeamId ? snapshot.battingTeamPlayers
+    : teamId === bowlingTeamId ? snapshot.bowlingTeamPlayers
+    : []
+  const homePlayers = resolvePlayersByTeamId(snapshot.homeTeam.id)
+  const awayPlayers = resolvePlayersByTeamId(snapshot.awayTeam.id)
   const resolveSquadTeam = (teamId: number | null) =>
     teamId === snapshot.homeTeam.id ? snapshot.homeTeam
     : teamId === snapshot.awayTeam.id ? snapshot.awayTeam
@@ -78,8 +87,6 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
   const resolveSquadPlayers = (teamId: number | null) =>
     teamId === battingTeamId ? snapshot.battingTeamPlayers : snapshot.bowlingTeamPlayers
 
-  const teamSquadTeam = resolveSquadTeam(activeTeamSquadTeamId)
-  const teamSquadPlayers = resolveSquadPlayers(activeTeamSquadTeamId)
   const squadWithImageTeam = resolveSquadTeam(activeSquadWithImageTeamId)
   const squadWithImagePlayers = resolveSquadPlayers(activeSquadWithImageTeamId)
 
@@ -101,6 +108,15 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
       <AnimatePresence>
         {tossResultVisible && (
           <Standard1TossDetailsOverlay snapshot={snapshot} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {summaryVisible && (
+          <Standard1MatchSummaryOverlay
+            snapshot={snapshot}
+            inningsSummaries={inningsSummaries}
+          />
         )}
       </AnimatePresence>
 
@@ -144,10 +160,12 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {teamSquadVisible && teamSquadTeam && (
+        {teamSquadVisible && (
           <Standard1TeamSquadOverlay
-            team={teamSquadTeam}
-            players={teamSquadPlayers}
+            homeTeam={snapshot.homeTeam}
+            awayTeam={snapshot.awayTeam}
+            homePlayers={homePlayers}
+            awayPlayers={awayPlayers}
           />
         )}
       </AnimatePresence>

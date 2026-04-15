@@ -10,7 +10,7 @@ const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'header', label: 'Header' },
   { key: 'scorebug', label: 'Scorebug' },
   { key: 'partnership', label: 'Partnership' },
-  { key: 'summary', label: 'Innings Summary' },
+  { key: 'summary', label: 'Match Summary' },
   { key: 'tossResult', label: 'Toss Result' },
   { key: 'mostWickets', label: 'Most Wickets' },
   { key: 'mostBoundaries', label: 'Most Boundaries' },
@@ -24,9 +24,8 @@ const S1_SIMPLE_ELEMENTS: { key: Element; label: string }[] = [
 ]
 
 // Standard 1 elements that require team selection
-type TeamElement = 'teamSquad' | 'squadWithImage'
+type TeamElement = 'squadWithImage'
 const S1_TEAM_ELEMENTS: { key: TeamElement; label: string }[] = [
-  { key: 'teamSquad', label: 'S1 · Team Squad' },
   { key: 'squadWithImage', label: 'S1 · Squad w/ Image' },
 ]
 
@@ -41,7 +40,6 @@ export function OverlayPanel() {
 
   // Pending team selection for each team element before triggering
   const [pendingTeam, setPendingTeam] = useState<Record<TeamElement, 'home' | 'away'>>({
-    teamSquad: 'home',
     squadWithImage: 'home',
   })
 
@@ -73,16 +71,10 @@ export function OverlayPanel() {
     const teamId = pendingTeam[element] === 'home' ? snapshot.homeTeam.id : snapshot.awayTeam.id
 
     if (newVisible) {
-      if (element === 'teamSquad') showTeamSquad(teamId)
-      else showSquadWithImage(teamId)
+      showSquadWithImage(teamId)
     } else {
-      if (element === 'teamSquad') hideTeamSquad()
-      else hideSquadWithImage()
+      hideSquadWithImage()
     }
-
-    const payloadExtra = element === 'teamSquad'
-      ? { teamSquadTeamId: teamId }
-      : { squadWithImageTeamId: teamId }
 
     await fetch('/api/pusher/trigger', {
       method: 'POST',
@@ -90,7 +82,25 @@ export function OverlayPanel() {
       body: JSON.stringify({
         matchId: snapshot.matchId,
         event: 'display.toggle',
-        payload: { element, visible: newVisible, themeScope: 'standard1', ...payloadExtra },
+        payload: { element, visible: newVisible, themeScope: 'standard1', squadWithImageTeamId: teamId },
+      }),
+    })
+  }
+
+  async function toggleTeamSquad() {
+    if (!snapshot) return
+    const newVisible = !display.teamSquad
+
+    if (newVisible) showTeamSquad()
+    else hideTeamSquad()
+
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot.matchId,
+        event: 'display.toggle',
+        payload: { element: 'teamSquad', visible: newVisible, themeScope: 'standard1' },
       }),
     })
   }
@@ -135,6 +145,17 @@ export function OverlayPanel() {
             {display[key] ? 'On' : 'Off'} · {label}
           </button>
         ))}
+
+        <button
+          onClick={toggleTeamSquad}
+          className={`rounded-[1.2rem] border px-4 py-3 text-left text-sm font-semibold transition ${
+            display.teamSquad
+              ? 'border-[#cce8d4] bg-[#eef8f1] text-[#10994c]'
+              : 'border-[#e1e7df] bg-[#f8faf7] text-slate-600 hover:bg-white'
+          }`}
+        >
+          {display.teamSquad ? 'On' : 'Off'} · S1 · Team Squad
+        </button>
 
         {/* Standard 1 team-selector elements */}
         {S1_TEAM_ELEMENTS.map(({ key, label }) => (

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Image from 'next/image'
+import { useEffect, useMemo, useState } from 'react'
 import type { PlayerSummary, TeamSummary } from '@/types/match'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
@@ -17,27 +18,58 @@ type Props = {
 
 export function Standard1SquadWithImageOverlay({ team, players }: Props) {
   const displayed = players.slice(0, 15)
+  const PANEL_WIDTH = 880
+  const [viewport, setViewport] = useState({ width: 1920, height: 1080 })
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewport({
+        width: window.innerWidth || 1920,
+        height: window.innerHeight || 1080,
+      })
+    }
+    updateViewport()
+    window.addEventListener('resize', updateViewport)
+    return () => window.removeEventListener('resize', updateViewport)
+  }, [])
+
+  const scale = useMemo(() => {
+    // Overlay's natural size based on current card/grid sizing.
+    const baseWidth = PANEL_WIDTH
+    const baseHeight = 760
+    const widthScale = (viewport.width - 40) / baseWidth
+    const heightScale = (viewport.height - 40) / baseHeight
+    return Math.max(0.6, Math.min(1, widthScale, heightScale))
+  }, [viewport.width, viewport.height])
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 40 }}
-      transition={{ type: 'spring', stiffness: 110, damping: 18 }}
+    <div
       style={{
         position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        background: '#ffffff4a',
-        borderRadius: 10,
-        border: '4px solid white',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 20,
-        fontFamily: 'Arial, sans-serif',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
       }}
     >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ type: 'spring', stiffness: 110, damping: 18 }}
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          width: PANEL_WIDTH,
+          background: '#ffffff4a',
+          borderRadius: 10,
+          border: 'none',
+          fontFamily: 'Arial, sans-serif',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
       {/* Black header */}
       <div style={{
         backgroundImage: BLACK_GRAD,
@@ -89,6 +121,10 @@ export function Standard1SquadWithImageOverlay({ team, players }: Props) {
         gridTemplateColumns: 'repeat(5, 160px)',
         gap: 10,
         padding: '16px 20px 20px',
+        width: PANEL_WIDTH,
+        boxSizing: 'border-box',
+        margin: '0',
+        justifyContent: 'center',
       }}>
         {displayed.map((player) => (
           <div key={player.id} style={{
@@ -147,6 +183,7 @@ export function Standard1SquadWithImageOverlay({ team, players }: Props) {
           </div>
         ))}
       </div>
-    </motion.div>
+      </motion.div>
+    </div>
   )
 }
