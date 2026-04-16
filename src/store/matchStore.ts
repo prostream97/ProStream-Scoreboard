@@ -242,6 +242,7 @@ function buildDeliveryRecord(
 ): DeliveryRecord {
   return {
     ...input,
+    isBoundary: input.isBoundary ?? false,
     overNumber,
     ballNumber,
     batsmanId: snapshot.strikerId!,
@@ -322,6 +323,7 @@ function hydrateCurrentOverBalls(snapshot: MatchSnapshot): DeliveryRecord[] {
     runs: ball.runs,
     extraRuns: ball.extraRuns,
     isLegal: ball.isLegal,
+    isBoundary: ball.isBoundary ?? false,
     extraType: ball.extraType as DeliveryInput['extraType'],
     isWicket: ball.isWicket,
     dismissalType: null,

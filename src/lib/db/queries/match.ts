@@ -127,6 +127,7 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
       runs: d.runs,
       extraRuns: d.extraRuns,
       isLegal: d.isLegal,
+      isBoundary: d.isBoundary ?? false,
       extraType: d.extraType,
       isWicket: d.isWicket,
     })),
