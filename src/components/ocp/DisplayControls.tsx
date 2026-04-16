@@ -73,7 +73,7 @@ export function DisplayControls() {
             onClick={() => toggle(key)}
             className={`px-3 py-1.5 font-stats text-xs rounded-lg border transition-colors ${
               display[key]
-                ? 'bg-accent/20 border-accent text-accent'
+                ? 'bg-[#00a832] border-[#cce8d4] text-white'
                 : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
             }`}
           >

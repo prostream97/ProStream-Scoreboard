@@ -9,14 +9,14 @@ import { AppBadge } from '@/components/shared/AppPrimitives'
 import type { ExtraType, DeliveryRecord } from '@/types/match'
 
 function ballDotColor(ball: DeliveryRecord): string {
-  if (ball.isWicket) return 'bg-[#ffeceb] text-[#c54e4c]'
-  if (ball.extraType === 'penalty') return 'bg-[#fef2f2] text-[#b91c1c]'
-  if (ball.extraType === 'wide') return 'bg-[#fff5e7] text-[#c98010]'
-  if (ball.extraType === 'noball') return 'bg-[#fff1ec] text-[#d07b2b]'
-  if (ball.runs === 6) return 'bg-[#ebf5ff] text-[#2d6fb0]'
-  if (ball.runs === 4) return 'bg-[#e8f7ee] text-[#10994c]'
-  if (ball.runs === 0) return 'bg-[#f4f7f2] text-slate-500'
-  return 'bg-white text-slate-900'
+  if (ball.isWicket) return 'bg-[#ffc4c0] text-black'
+  if (ball.extraType === 'penalty') return 'bg-[#fcd0d0] text-black'
+  if (ball.extraType === 'wide') return 'bg-[#ffdca8] text-black'
+  if (ball.extraType === 'noball') return 'bg-[#ffcdb3] text-black'
+  if (ball.runs === 6) return 'bg-[#bfdfff] text-black'
+  if (ball.runs === 4) return 'bg-[#bee6ce] text-black'
+  if (ball.runs === 0) return 'bg-[#d5dfcf] text-black'
+  return 'bg-[#e3e3e3] text-black'
 }
 
 function ballDotLabel(ball: DeliveryRecord): string {
@@ -178,7 +178,7 @@ export function ScoringControls() {
   }, [pendingExtra, undoDelivery, openWicketModal])
 
   return (
-    <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
+    <section className="rounded-[1.8rem] border border-black bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="app-kicker">Scoring controls</p>
@@ -190,11 +190,11 @@ export function ScoringControls() {
       </div>
 
       {currentOverBalls.length > 0 ? (
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2 text-black">
           {currentOverBalls.map((ball, i) => (
             <span
               key={i}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold ${ballDotColor(ball)} ${i >= flushedBallCount ? 'ring-2 ring-black/5' : 'opacity-60'}`}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/30 text-xs font-semibold ${ballDotColor(ball)} ${i >= flushedBallCount ? 'ring-2 ring-black/20' : 'opacity-60'}`}
             >
               {ballDotLabel(ball)}
             </span>
@@ -210,7 +210,7 @@ export function ScoringControls() {
             key={runs}
             onClick={() => scoreRuns(runs)}
             disabled={!isActive || !!pendingExtra}
-            className="h-16 rounded-[1.2rem] bg-[#f4f7f2] text-slate-900 text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-16 rounded-[1.2rem] border border-black bg-[#f4f7f2] text-slate-900 text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
           >
             {runs}
           </motion.button>
@@ -223,7 +223,7 @@ export function ScoringControls() {
           whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
           onClick={() => scoreBoundary(4)}
           disabled={!isActive || !!pendingExtra}
-          className="h-16 rounded-[1.2rem] bg-[#e8f7ee] text-[#10994c] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-16 rounded-[1.2rem] bg-[#0047a380] text-black text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           4
         </motion.button>
@@ -231,7 +231,7 @@ export function ScoringControls() {
           whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
           onClick={() => scoreBoundary(6)}
           disabled={!isActive || !!pendingExtra}
-          className="h-16 rounded-[1.2rem] bg-[#ebf5ff] text-[#2d6fb0] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-16 rounded-[1.2rem] border border-black bg-[#ebf5ff] text-[#2d6fb0] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           6
         </motion.button>
@@ -249,7 +249,7 @@ export function ScoringControls() {
           >
             {(
               [
-                { label: 'WD', type: 'wide' as ExtraType, className: 'bg-[#fff5e7] text-[#c98010]' },
+                { label: 'WD', type: 'wide' as ExtraType, className: 'bg-[#fff5e7] text-black' },
                 { label: 'NB', type: 'noball' as ExtraType, className: 'bg-[#fff1ec] text-[#d07b2b]' },
                 { label: 'BYE', type: 'bye' as ExtraType, className: 'bg-[#f4f7f2] text-slate-700' },
                 { label: 'LB', type: 'legbye' as ExtraType, className: 'bg-[#f4f7f2] text-slate-700' },
@@ -265,7 +265,7 @@ export function ScoringControls() {
                   }
                 }}
                 disabled={!isActive}
-                className={`h-12 rounded-[1.2rem] text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+                className={`h-12 rounded-[1.2rem] border border-black text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
               >
                 {label}
               </button>
@@ -273,7 +273,7 @@ export function ScoringControls() {
             <button
               onClick={() => { if (isActive) setPendingExtra('penalty') }}
               disabled={!isActive}
-              className="h-12 rounded-[1.2rem] bg-[#fef2f2] text-sm font-semibold text-[#b91c1c] transition disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-12 rounded-[1.2rem] border border-black bg-[#fffa7580] text-sm font-semibold text-[#b91c1c] transition disabled:cursor-not-allowed disabled:opacity-40"
             >
               PEN
             </button>
@@ -313,7 +313,7 @@ export function ScoringControls() {
         <button
           onClick={() => { setPendingExtra(null); undoDelivery(); toast.info('Delivery Undone', { description: 'Last action reverted.' }) }}
           disabled={!!pendingExtra}
-          className="h-14 rounded-[1.2rem] bg-[#f4f7f2] text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-14 rounded-[1.2rem] border border-black bg-[#f4f7f2] text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           Undo
         </button>
@@ -348,13 +348,13 @@ function PenaltyChooser({
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => setMode('award')}
-          className={`h-9 flex-1 rounded-[0.8rem] text-sm font-semibold transition ${mode === 'award' ? 'bg-[#b91c1c] text-white' : 'bg-white text-slate-700'}`}
+          className={`h-9 flex-1 rounded-[0.8rem] text-sm font-semibold transition ${mode === 'award' ? 'bg-[#2eba1c] text-white' : 'bg-white text-slate-700'}`}
         >
           Award
         </button>
         <button
           onClick={() => setMode('deduct')}
-          className={`h-9 flex-1 rounded-[0.8rem] text-sm font-semibold transition ${mode === 'deduct' ? 'bg-[#b91c1c] text-white' : 'bg-white text-slate-700'}`}
+          className={`h-9 flex-1 rounded-[0.8rem] text-sm font-semibold transition ${mode === 'deduct' ? 'bg-[#2eba1c] text-white' : 'bg-white text-slate-700'}`}
         >
           Deduct
         </button>

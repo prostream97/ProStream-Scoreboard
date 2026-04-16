@@ -262,8 +262,13 @@ function TeamLabel({
             className={`mt-3 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
               isSummaryActive
                 ? 'border-[#f5c6c4] bg-[#fff1f0] text-[#c54e4c] hover:bg-[#ffe5e3]'
-                : 'border-[#b8e4cc] bg-[#eef8f1] text-[#10994c] hover:bg-[#dff0e4]'
+                : 'border-[#b8e4cc] bg-[#00b336] text-white hover:bg-[#dff0e4]'
             }`}
+            style={
+              isSummaryActive
+                ? { borderColor: '#f5c6c4', backgroundColor: '#fff1f0', color: '#c54e4c' }
+                : { borderColor: '#b8e4cc', backgroundColor: '#00b336', color: '#ffffff' }
+            }
           >
             {isSummaryActive ? 'Hide' : 'Show'}
           </button>
@@ -288,8 +293,13 @@ function TeamLabel({
             className={`mt-3 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
               isSummaryActive
                 ? 'border-[#f5c6c4] bg-[#fff1f0] text-[#c54e4c] hover:bg-[#ffe5e3]'
-                : 'border-[#b8e4cc] bg-[#eef8f1] text-[#10994c] hover:bg-[#dff0e4]'
+                : 'border-[#b8e4cc] bg-[#00b336] text-white hover:bg-[#dff0e4]'
             }`}
+            style={
+              isSummaryActive
+                ? { borderColor: '#f5c6c4', backgroundColor: '#fff1f0', color: '#c54e4c' }
+                : { borderColor: '#b8e4cc', backgroundColor: '#00b336', color: '#ffffff' }
+            }
           >
             {isSummaryActive ? 'Hide' : 'Show'}
           </button>

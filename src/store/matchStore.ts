@@ -104,6 +104,15 @@ function updateBowlersOptimistically(
   const player = bowlingTeamPlayers.find((p) => p.id === bowlerId)
   if (!existing && !player) return bowlers
 
+  // Byes, leg-byes and penalty runs are NOT charged to the bowler per Laws of Cricket
+  const chargeableExtraRuns = (
+    input.extraType === 'bye' || input.extraType === 'legbye' || input.extraType === 'penalty'
+  ) ? 0 : input.extraRuns
+
+  // Run-outs, obstructing the field and handled ball are NOT credited to the bowler
+  const nonBowlerDismissals = ['runout', 'obstructingfield', 'handledball']
+  const isChargeableWicket = input.isWicket && !nonBowlerDismissals.includes(input.dismissalType ?? '')
+
   if (!existing) {
     const newBowler: BowlerStats = {
       playerId: bowlerId,
@@ -112,8 +121,8 @@ function updateBowlersOptimistically(
       overs: 0,
       balls: input.isLegal ? 1 : 0,
       maidens: 0,
-      runs: input.runs + input.extraRuns,
-      wickets: input.isWicket ? 1 : 0,
+      runs: input.runs + chargeableExtraRuns,
+      wickets: isChargeableWicket ? 1 : 0,
       economy: 0,
       isCurrent: true,
     }
@@ -125,7 +134,7 @@ function updateBowlersOptimistically(
     const newLegalBalls = b.balls + (input.isLegal ? 1 : 0)
     const completedOvers = b.overs + Math.floor(newLegalBalls / bpo)
     const ballsInOver = newLegalBalls % bpo
-    const newRuns = b.runs + input.runs + input.extraRuns
+    const newRuns = b.runs + input.runs + chargeableExtraRuns
     const totalLegal = completedOvers * bpo + ballsInOver
     const oversDecimal = totalLegal / bpo
     return {
@@ -133,7 +142,7 @@ function updateBowlersOptimistically(
       overs: completedOvers,
       balls: ballsInOver,
       runs: newRuns,
-      wickets: b.wickets + (input.isWicket ? 1 : 0),
+      wickets: b.wickets + (isChargeableWicket ? 1 : 0),
       economy: oversDecimal > 0 ? Math.round((newRuns / oversDecimal) * 100) / 100 : 0,
     }
   })
@@ -244,6 +253,14 @@ function buildDeliveryRecord(
 function shouldRotateStrike(runs: number, isWicket: boolean): boolean {
   // Rotate on odd runs (1, 3, 5); not on wickets (next batsman takes non-striker end)
   return !isWicket && runs % 2 === 1
+}
+
+// Returns the number of runs that physically crossed the batsmen (determines strike rotation).
+// Wide penalty (1) and no-ball penalty (1) are signalled by the umpire — batsmen don't run for them.
+function runsForStrikeRotation(input: DeliveryInput): number {
+  if (input.extraType === 'wide') return input.extraRuns - 1   // subtract the 1-run penalty
+  if (input.extraType === 'bye' || input.extraType === 'legbye') return input.extraRuns
+  return input.runs   // noball: only bat runs; normal: bat runs
 }
 
 function rotatePairForCompletedRuns(
@@ -399,7 +416,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     // Rotate strike
     let newStrikerId: number | null = snapshot.strikerId
     let newNonStrikerId: number | null = snapshot.nonStrikerId
-    if (shouldRotateStrike(input.runs, input.isWicket)) {
+    if (shouldRotateStrike(runsForStrikeRotation(input), input.isWicket)) {
       newStrikerId = snapshot.nonStrikerId
       newNonStrikerId = snapshot.strikerId
     }
@@ -996,6 +1013,47 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         balls: legalBallsInOver < 6 ? legalBallsInOver : 0,
       }
 
+      // Reverse bowler stats
+      const bpo = snapshot.ballsPerOver ?? 6
+      const removedChargeableExtraRuns = (
+        removed.extraType === 'bye' || removed.extraType === 'legbye' || removed.extraType === 'penalty'
+      ) ? 0 : removed.extraRuns
+      const removedNonBowlerDismissals = ['runout', 'obstructingfield', 'handledball']
+      const removedIsChargeableWicket = removed.isWicket && !removedNonBowlerDismissals.includes(removed.dismissalType ?? '')
+      const updatedBowlers = snapshot.bowlers.map((b) => {
+        if (b.playerId !== removed.bowlerId) return b
+        const rawBalls = b.balls - (removed.isLegal ? 1 : 0)
+        const adjBalls = rawBalls < 0 ? bpo - 1 : rawBalls
+        const adjOvers = rawBalls < 0 ? Math.max(0, b.overs - 1) : b.overs
+        const updRuns = Math.max(0, b.runs - removed.runs - removedChargeableExtraRuns)
+        const updWickets = Math.max(0, b.wickets - (removedIsChargeableWicket ? 1 : 0))
+        const totalLegal = adjOvers * bpo + adjBalls
+        const oversDecimal = totalLegal / bpo
+        return {
+          ...b,
+          overs: adjOvers,
+          balls: adjBalls,
+          runs: updRuns,
+          wickets: updWickets,
+          economy: oversDecimal > 0 ? Math.round((updRuns / oversDecimal) * 100) / 100 : 0,
+        }
+      })
+
+      // Reverse batter stats
+      const updatedBatters = snapshot.batters.map((b) => {
+        if (b.playerId !== removed.batsmanId) return b
+        const updRuns = Math.max(0, b.runs - removed.runs)
+        const updBalls = Math.max(0, b.balls - (removed.isLegal ? 1 : 0))
+        return {
+          ...b,
+          runs: updRuns,
+          balls: updBalls,
+          fours: Math.max(0, b.fours - (removed.isBoundary && removed.runs === 4 ? 1 : 0)),
+          sixes: Math.max(0, b.sixes - (removed.isBoundary && removed.runs === 6 ? 1 : 0)),
+          strikeRate: updBalls > 0 ? Math.round((updRuns / updBalls) * 10000) / 100 : 0,
+        }
+      })
+
       set({
         currentOverBalls: newBalls,
         legalDeliveryCount: Math.max(0, newLegalCount),
@@ -1005,6 +1063,8 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
           innings: snapshot.innings.map((i) =>
             i.inningsNumber === snapshot.currentInnings ? updatedInnings : i
           ),
+          bowlers: updatedBowlers,
+          batters: updatedBatters,
         },
       })
 

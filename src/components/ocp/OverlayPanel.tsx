@@ -108,9 +108,11 @@ export function OverlayPanel() {
   const visibleElements = snapshot.tournamentId
     ? ELEMENTS
     : ELEMENTS.filter(({ key }) => key !== 'mostWickets' && key !== 'mostBoundaries')
+  const onStateClass = '!border-[#f5c6c4] !bg-[#fff1f0] !text-[#c54e4c] hover:!bg-[#ffe5e3]'
+  const offStateClass = '!border-[#b8e4cc] !bg-[#eef8f1] !text-[#2f7a4d] hover:!bg-[#e3f3e8]'
 
   return (
-    <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
+    <section className="rounded-[1.8rem] border-4 border-[#1cbd00] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
       <div className="mb-4">
         <p className="app-kicker">Overlay control</p>
         <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">On-air elements</h3>
@@ -123,8 +125,8 @@ export function OverlayPanel() {
             onClick={() => toggle(key)}
             className={`rounded-[1.2rem] border px-4 py-3 text-left text-sm font-semibold transition ${
               display[key]
-                ? 'border-[#cce8d4] bg-[#eef8f1] text-[#10994c]'
-                : 'border-[#e1e7df] bg-[#f8faf7] text-slate-600 hover:bg-white'
+                ? onStateClass
+                : offStateClass
             }`}
           >
             {display[key] ? 'On' : 'Off'} · {label}
@@ -138,8 +140,8 @@ export function OverlayPanel() {
             onClick={() => toggle(key)}
             className={`rounded-[1.2rem] border px-4 py-3 text-left text-sm font-semibold transition ${
               display[key]
-                ? 'border-[#cce8d4] bg-[#eef8f1] text-[#10994c]'
-                : 'border-[#e1e7df] bg-[#f8faf7] text-slate-600 hover:bg-white'
+                ? onStateClass
+                : offStateClass
             }`}
           >
             {display[key] ? 'On' : 'Off'} · {label}
@@ -150,8 +152,8 @@ export function OverlayPanel() {
           onClick={toggleTeamSquad}
           className={`rounded-[1.2rem] border px-4 py-3 text-left text-sm font-semibold transition ${
             display.teamSquad
-              ? 'border-[#cce8d4] bg-[#eef8f1] text-[#10994c]'
-              : 'border-[#e1e7df] bg-[#f8faf7] text-slate-600 hover:bg-white'
+              ? onStateClass
+              : offStateClass
           }`}
         >
           {display.teamSquad ? 'On' : 'Off'} · S1 · Team Squad
@@ -172,8 +174,8 @@ export function OverlayPanel() {
               onClick={() => toggleTeamElement(key)}
               className={`flex-1 rounded-[1.2rem] border px-4 py-3 text-left text-sm font-semibold transition ${
                 display[key]
-                  ? 'border-[#cce8d4] bg-[#eef8f1] text-[#10994c]'
-                  : 'border-[#e1e7df] bg-[#f8faf7] text-slate-600 hover:bg-white'
+                  ? onStateClass
+                  : offStateClass
               }`}
             >
               {display[key] ? 'On' : 'Off'} · {label}

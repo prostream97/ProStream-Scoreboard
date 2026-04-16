@@ -9,6 +9,7 @@ export function BowlerSelect() {
   const closeBowlerSelect = useUIStore((s) => s.closeBowlerSelect)
 
   const snapshot = useMatchStore((s) => s.snapshot)
+  const legalDeliveryCount = useMatchStore((s) => s.legalDeliveryCount)
   const setBowler = useMatchStore((s) => s.setBowler)
   const setStriker = useMatchStore((s) => s.setStriker)
   const setNonStriker = useMatchStore((s) => s.setNonStriker)
@@ -22,6 +23,7 @@ export function BowlerSelect() {
 
   // isInningsStart: true only when openers haven't been chosen yet (not after every over)
   const isInningsStart = !snapshot.strikerId && !snapshot.nonStrikerId
+  const isOverComplete = legalDeliveryCount === snapshot.ballsPerOver
 
   // Can't bowl consecutive overs
   const lastBowlerId = isInningsStart ? null : snapshot.currentBowlerId
@@ -30,7 +32,7 @@ export function BowlerSelect() {
 
   const canConfirm = isInningsStart
     ? selectedBowlerId && selectedStrikerId && selectedNonStrikerId && selectedStrikerId !== selectedNonStrikerId
-    : !!selectedBowlerId
+    : !!selectedBowlerId && isOverComplete
 
   async function handleConfirm() {
     if (!selectedBowlerId || !snapshot) return
@@ -41,7 +43,7 @@ export function BowlerSelect() {
     // startNextOver() must run BEFORE setBowler(). startNextOver increments the over counter and
     // resets currentBowlerId to null. setBowler then writes to the already-advanced snapshot.
     // Both are synchronous Zustand mutations — this ordering is intentional and safe.
-    if (!isInningsStart) {
+    if (!isInningsStart && isOverComplete) {
       startNextOver()
     }
 
@@ -85,7 +87,9 @@ export function BowlerSelect() {
           <p className="font-stats text-sm text-gray-400 mt-1">
             {isInningsStart
               ? 'Set opening batsmen and bowler'
-              : `Over ${snapshot.currentOver + 1} — Select next bowler`}
+              : isOverComplete
+                ? `Over ${snapshot.currentOver + 1} — Select next bowler`
+                : `Over ${snapshot.currentOver}.${snapshot.currentBalls} in progress — finish over to change bowler`}
           </p>
         </div>
 

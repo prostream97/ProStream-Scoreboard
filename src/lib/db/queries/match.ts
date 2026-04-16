@@ -312,7 +312,7 @@ async function getBowlerStats(inningsId: number, currentBowlerId: number | null,
     .select({
       playerId: deliveries.bowlerId,
       legalBalls: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isLegal} = true)`.as('legal_balls'),
-      runs: sql<number>`SUM(${deliveries.runs} + ${deliveries.extraRuns}) FILTER (WHERE ${deliveries.extraType} != 'bye' AND ${deliveries.extraType} != 'legbye' OR ${deliveries.extraType} IS NULL)`.as('runs'),
+      runs: sql<number>`SUM(${deliveries.runs} + ${deliveries.extraRuns}) FILTER (WHERE (${deliveries.extraType} != 'bye' AND ${deliveries.extraType} != 'legbye' AND ${deliveries.extraType} != 'penalty') OR ${deliveries.extraType} IS NULL)`.as('runs'),
       wickets: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isWicket} = true AND ${deliveries.dismissalType} NOT IN ('runout', 'obstructingfield', 'handledball'))`.as('wickets'),
       playerName: players.name,
       displayName: players.displayName,

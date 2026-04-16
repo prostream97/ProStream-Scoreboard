@@ -67,7 +67,7 @@ export function BattingPanel() {
   const canSwapStrike = Boolean(strikerId && nonStrikerId)
 
   return (
-    <section className="rounded-[1.8rem] border border-[#d7ddd6] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
+    <section className="rounded-[1.8rem] border border-[#0008ff] bg-white p-4 shadow-[0_18px_45px_rgba(26,36,32,0.06)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="app-kicker">Batting</p>
@@ -164,6 +164,7 @@ function BatterRow({
                 <button
                   onClick={onHide}
                   className="rounded-full border border-[#f5c6c4] bg-[#fff1f0] px-3 py-1.5 text-xs font-semibold text-[#c54e4c] transition hover:bg-[#ffe5e3]"
+                  style={{ borderColor: '#f5c6c4', backgroundColor: '#fff1f0', color: '#c54e4c' }}
                   title="Hide player card"
                 >
                   Hide
@@ -171,14 +172,15 @@ function BatterRow({
               ) : onShow ? (
                 <button
                   onClick={onShow}
-                  className="rounded-full border border-[#b8e4cc] bg-[#eef8f1] px-3 py-1.5 text-xs font-semibold text-[#10994c] transition hover:bg-[#dff0e4]"
+                  className="rounded-full border border-[#b8e4cc] bg-[#00b336] px-3 py-1.5 text-xs font-semibold text-[#fafafa] transition hover:bg-[#dff0e4]"
+                  style={{ borderColor: '#b8e4cc', backgroundColor: '#00b336', color: '#fafafa' }}
                   title="Show player card on overlay"
                 >
                   Show
                 </button>
               ) : null}
               {onEdit ? (
-                <button onClick={onEdit} className="rounded-full bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]" title="Edit player">
+                <button onClick={onEdit} className="rounded-full border border-[#737373] bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]" title="Edit player">
                   <EditIcon className="h-4 w-4" />
                 </button>
               ) : null}
