@@ -51,6 +51,7 @@ const OVERLAY_THEMES = [
     description: 'Clean, minimal scorebug for general broadcast use.',
     accentColor: '#10994c',
     accentBg: '#eef8f1',
+    previewImage: 'https://res.cloudinary.com/dcv4wu1b6/image/upload/q_auto/f_auto/v1776363716/049da256-e296-4f4a-9085-5a7240ab6cba.png',
   },
   {
     mode: 'standard1',
@@ -58,6 +59,7 @@ const OVERLAY_THEMES = [
     description: 'Modern broadcast theme with enhanced player cards, squad displays, and team vs team intro.',
     accentColor: '#0066cc',
     accentBg: '#e8f2ff',
+    previewImage: 'https://res.cloudinary.com/dcv4wu1b6/image/upload/q_auto/f_auto/v1776363389/88486b69-9964-407b-83df-76a38db3793f.png',
   },
   {
     mode: 'icc2023',
@@ -65,6 +67,7 @@ const OVERLAY_THEMES = [
     description: 'Official ICC Cricket World Cup 2023 branded theme with purple and pink accents.',
     accentColor: '#FD02A3',
     accentBg: '#f9eeff',
+    previewImage: 'https://res.cloudinary.com/dcv4wu1b6/image/upload/q_auto/f_auto/v1776363595/013608cf-733a-41da-8881-f518869af0ec.png',
   },
 ]
 
@@ -305,24 +308,32 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
                     >
                       {/* Preview image area — 16:9 */}
                       <div
-                        className="relative w-full"
-                        style={{ aspectRatio: '16/9', ...TRANSPARENT_PREVIEW_STYLE }}
+                        className="relative w-full overflow-hidden"
+                        style={{ aspectRatio: '16/9', ...('previewImage' in theme ? {} : TRANSPARENT_PREVIEW_STYLE) }}
                       >
-                        {/* Placeholder overlay graphic */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4">
-                          <div
-                            className="rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-white/80"
-                            style={{ backgroundColor: `${theme.accentColor}33`, border: `1px solid ${theme.accentColor}55` }}
-                          >
-                            {theme.name}
-                          </div>
-                          <p className="text-[0.65rem] font-mono text-white/30 mt-1">1920 × 1080</p>
-                          {/* Mock scorebug bar at bottom */}
-                          <div
-                            className="absolute bottom-4 left-4 right-4 h-10 rounded-lg opacity-60"
-                            style={{ backgroundColor: theme.accentColor, opacity: 0.15, border: `1px solid ${theme.accentColor}` }}
+                        {'previewImage' in theme && theme.previewImage ? (
+                          <img
+                            src={theme.previewImage}
+                            alt={`${theme.name} preview`}
+                            className="absolute inset-0 h-full w-full object-cover"
                           />
-                        </div>
+                        ) : (
+                          /* Placeholder overlay graphic */
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4">
+                            <div
+                              className="rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-white/80"
+                              style={{ backgroundColor: `${theme.accentColor}33`, border: `1px solid ${theme.accentColor}55` }}
+                            >
+                              {theme.name}
+                            </div>
+                            <p className="text-[0.65rem] font-mono text-white/30 mt-1">1920 × 1080</p>
+                            {/* Mock scorebug bar at bottom */}
+                            <div
+                              className="absolute bottom-4 left-4 right-4 h-10 rounded-lg"
+                              style={{ backgroundColor: theme.accentColor, opacity: 0.15, border: `1px solid ${theme.accentColor}` }}
+                            />
+                          </div>
+                        )}
 
                         {/* Maximize button */}
                         <button
@@ -442,27 +453,35 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
             style={{ aspectRatio: '16/9' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Full-size preview placeholder */}
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-              style={TRANSPARENT_PREVIEW_STYLE}
-            >
+            {'previewImage' in lightboxTheme && lightboxTheme.previewImage ? (
+              <img
+                src={lightboxTheme.previewImage}
+                alt={`${lightboxTheme.name} preview`}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : (
+              /* Full-size preview placeholder */
               <div
-                className="rounded-xl px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white/80"
-                style={{ backgroundColor: `${lightboxTheme.accentColor}33`, border: `1px solid ${lightboxTheme.accentColor}66` }}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-4"
+                style={TRANSPARENT_PREVIEW_STYLE}
               >
-                {lightboxTheme.name}
-              </div>
-              <p className="text-xs font-mono text-white/30">1920 × 1080 — Preview placeholder</p>
-              <p className="text-xs text-white/20">Actual overlay preview will appear here</p>
-              {/* Mock scorebug */}
-              <div className="absolute bottom-8 left-8 right-8 flex items-center gap-4">
                 <div
-                  className="h-14 flex-1 rounded-xl opacity-20"
-                  style={{ backgroundColor: lightboxTheme.accentColor, border: `1px solid ${lightboxTheme.accentColor}` }}
-                />
+                  className="rounded-xl px-6 py-2 text-sm font-semibold uppercase tracking-widest text-white/80"
+                  style={{ backgroundColor: `${lightboxTheme.accentColor}33`, border: `1px solid ${lightboxTheme.accentColor}66` }}
+                >
+                  {lightboxTheme.name}
+                </div>
+                <p className="text-xs font-mono text-white/30">1920 × 1080 — Preview placeholder</p>
+                <p className="text-xs text-white/20">Actual overlay preview will appear here</p>
+                {/* Mock scorebug */}
+                <div className="absolute bottom-8 left-8 right-8 flex items-center gap-4">
+                  <div
+                    className="h-14 flex-1 rounded-xl opacity-20"
+                    style={{ backgroundColor: lightboxTheme.accentColor, border: `1px solid ${lightboxTheme.accentColor}` }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Close button */}
             <button
