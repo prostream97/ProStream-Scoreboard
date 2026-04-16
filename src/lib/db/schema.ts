@@ -484,6 +484,7 @@ export type DeliveryBuffer = {
   runs: number
   extraRuns: number
   isLegal: boolean
+  isBoundary: boolean
   extraType: 'wide' | 'noball' | 'bye' | 'legbye' | 'penalty' | null
   isWicket: boolean
   dismissalType: string | null
