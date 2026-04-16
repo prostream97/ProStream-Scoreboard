@@ -122,7 +122,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
         : 0
 
       const overChanged = data.inningsOvers > (s.currentInningsState?.overs ?? 0)
-      const newBall = { runs: data.runs, extraRuns: data.extraRuns, isLegal: data.isLegal, extraType: data.extraType, isWicket: data.isWicket }
+      const newBall = { runs: data.runs, extraRuns: data.extraRuns, isLegal: data.isLegal, isBoundary: data.isBoundary ?? false, extraType: data.extraType, isWicket: data.isWicket }
       const currentOverBalls = overChanged ? [] : [...(s.currentOverBalls ?? []), newBall]
 
       const updatedBatters = s.batters.map((b) => {
