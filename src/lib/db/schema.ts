@@ -61,6 +61,7 @@ export const extraTypeEnum = pgEnum('extra_type', [
   'noball',
   'bye',
   'legbye',
+  'penalty',
 ])
 
 export const dismissalTypeEnum = pgEnum('dismissal_type', [
@@ -243,6 +244,7 @@ export const deliveries = pgTable('deliveries', {
     .references(() => players.id),
   runs: integer('runs').notNull().default(0),        // runs off the bat (not extras)
   extraRuns: integer('extra_runs').notNull().default(0),
+  isBoundary: boolean('is_boundary').notNull().default(false),
   // isLegal = false for WD and NB only; true for all others (including bye/legbye)
   isLegal: boolean('is_legal').notNull().default(true),
   extraType: extraTypeEnum('extra_type'),
@@ -482,7 +484,7 @@ export type DeliveryBuffer = {
   runs: number
   extraRuns: number
   isLegal: boolean
-  extraType: 'wide' | 'noball' | 'bye' | 'legbye' | null
+  extraType: 'wide' | 'noball' | 'bye' | 'legbye' | 'penalty' | null
   isWicket: boolean
   dismissalType: string | null
   dismissedBatterId?: number | null

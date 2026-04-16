@@ -159,8 +159,8 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
       playerId: deliveries.batsmanId,
       runs: sql<number>`SUM(${deliveries.runs})`.as('runs'),
       balls: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isLegal} = true)`.as('balls'),
-      fours: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.runs} = 4)`.as('fours'),
-      sixes: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.runs} = 6)`.as('sixes'),
+      fours: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isBoundary} = true AND ${deliveries.runs} = 4)`.as('fours'),
+      sixes: sql<number>`COUNT(*) FILTER (WHERE ${deliveries.isBoundary} = true AND ${deliveries.runs} = 6)`.as('sixes'),
       playerName: players.name,
       displayName: players.displayName,
     })
@@ -709,8 +709,8 @@ export async function getTournamentMostBoundaries(matchId: number): Promise<Tour
 
     for (const delivery of liveBuffer) {
       const agg = liveAdditions.get(delivery.batsmanId) ?? { fours: 0, sixes: 0 }
-      if (delivery.runs === 4 && !delivery.extraType) agg.fours += 1
-      if (delivery.runs === 6 && !delivery.extraType) agg.sixes += 1
+      if (delivery.isBoundary && delivery.runs === 4) agg.fours += 1
+      if (delivery.isBoundary && delivery.runs === 6) agg.sixes += 1
       liveAdditions.set(delivery.batsmanId, agg)
     }
 

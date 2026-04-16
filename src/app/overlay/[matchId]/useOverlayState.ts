@@ -101,7 +101,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
   }, [mostBoundariesVisible, fetchMostBoundaries])
 
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
-    if (data.runs === 4 || data.runs === 6) {
+    if (data.isBoundary && (data.runs === 4 || data.runs === 6)) {
       setLastBoundary({ id: Date.now(), runs: data.runs as 4 | 6 })
     }
     if (mostWicketsVisible) fetchMostWickets()

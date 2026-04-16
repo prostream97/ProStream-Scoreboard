@@ -11,6 +11,7 @@ export type DeliveryAddedPayload = {
   isLegal: boolean
   extraType: string | null
   isWicket: boolean
+  isBoundary: boolean
   batsmanId: number
   dismissedBatterId?: number | null
   bowlerId: number

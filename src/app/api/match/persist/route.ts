@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
           bowlerId: d.bowlerId,
           runs: d.runs,
           extraRuns: d.extraRuns,
+          isBoundary: d.isBoundary ?? false,
           isLegal: d.isLegal,
           extraType: d.extraType,
           isWicket: d.isWicket,

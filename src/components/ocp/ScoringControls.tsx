@@ -10,6 +10,7 @@ import type { ExtraType, DeliveryRecord } from '@/types/match'
 
 function ballDotColor(ball: DeliveryRecord): string {
   if (ball.isWicket) return 'bg-[#ffeceb] text-[#c54e4c]'
+  if (ball.extraType === 'penalty') return 'bg-[#fef2f2] text-[#b91c1c]'
   if (ball.extraType === 'wide') return 'bg-[#fff5e7] text-[#c98010]'
   if (ball.extraType === 'noball') return 'bg-[#fff1ec] text-[#d07b2b]'
   if (ball.runs === 6) return 'bg-[#ebf5ff] text-[#2d6fb0]'
@@ -20,18 +21,22 @@ function ballDotColor(ball: DeliveryRecord): string {
 
 function ballDotLabel(ball: DeliveryRecord): string {
   if (ball.isWicket) return 'W'
+  if (ball.extraType === 'penalty') return ball.extraRuns > 0 ? `P+${ball.extraRuns}` : ball.extraRuns < 0 ? `P${ball.extraRuns}` : 'P0'
   if (ball.extraType === 'wide') return ball.extraRuns > 1 ? `Wd${ball.extraRuns}` : 'Wd'
   if (ball.extraType === 'noball') return ball.runs > 0 ? `${ball.runs}nb` : 'Nb'
-  if (ball.extraType === 'bye') return ball.runs > 0 ? `${ball.runs}B` : 'B'
-  if (ball.extraType === 'legbye') return ball.runs > 0 ? `${ball.runs}Lb` : 'Lb'
+  if (ball.extraType === 'bye') return ball.extraRuns > 0 ? `${ball.extraRuns}B` : 'B'
+  if (ball.extraType === 'legbye') return ball.extraRuns > 0 ? `${ball.extraRuns}Lb` : 'Lb'
+  if (ball.runs === 4) return ball.isBoundary ? '4' : '4r'
+  if (ball.runs === 6) return '6'
   return String(ball.runs)
 }
 
-type PendingExtra = 'wide' | 'noball' | null
+type PendingExtra = 'wide' | 'noball' | 'penalty' | null
 
 export function ScoringControls() {
   const snapshot = useMatchStore((s) => s.snapshot)
   const addDelivery = useMatchStore((s) => s.addDelivery)
+  const addPenaltyRuns = useMatchStore((s) => s.addPenaltyRuns)
   const undoDelivery = useMatchStore((s) => s.undoDelivery)
   const isFlushing = useMatchStore((s) => s.isFlushing)
   const syncError = useMatchStore((s) => s.syncError)
@@ -52,16 +57,28 @@ export function ScoringControls() {
       isLegal: true,
       extraType: null,
       isWicket: false,
+      isBoundary: false,
       dismissalType: null,
       fielder1Id: null,
       fielder2Id: null,
     })
+    toast(`+${runs} runs scored`)
+  }
 
-    if (runs === 4 || runs === 6) {
-      toast.success(`${runs} RUNS!`, { description: 'Boundary scored' })
-    } else {
-      toast(`+${runs} runs scored`)
-    }
+  function scoreBoundary(runs: 4 | 6) {
+    if (!isActive) return
+    addDelivery({
+      runs,
+      extraRuns: 0,
+      isLegal: true,
+      extraType: null,
+      isWicket: false,
+      isBoundary: true,
+      dismissalType: null,
+      fielder1Id: null,
+      fielder2Id: null,
+    })
+    toast.success(runs === 6 ? 'SIX!' : 'FOUR!', { description: 'Boundary scored' })
   }
 
   function scoreExtra(type: ExtraType, extraRuns = 1) {
@@ -110,6 +127,15 @@ export function ScoringControls() {
     })
     setPendingExtra(null)
     toast.error(`NO BALL + ${batRuns} runs off bat`)
+  }
+
+  function scorePenaltyRuns(runs: number) {
+    if (!isActive) return
+    addPenaltyRuns(runs)
+    setPendingExtra(null)
+    if (runs > 0) toast.warning(`+${runs} penalty runs awarded`)
+    else if (runs < 0) toast.warning(`${runs} penalty runs deducted`)
+    else toast(`Penalty: 0 runs`)
   }
 
   useEffect(() => {
@@ -176,24 +202,39 @@ export function ScoringControls() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-        {[0, 1, 2, 3, 4, 6].map((runs) => (
+      {/* Normal run buttons: 0,1,2,3 + plain 4 (running between wickets) */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {[0, 1, 2, 3, 4].map((runs) => (
           <motion.button
             whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
             key={runs}
             onClick={() => scoreRuns(runs)}
             disabled={!isActive || !!pendingExtra}
-            className={`h-16 rounded-[1.2rem] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40 ${
-              runs === 4
-                ? 'bg-[#e8f7ee] text-[#10994c]'
-                : runs === 6
-                  ? 'bg-[#ebf5ff] text-[#2d6fb0]'
-                  : 'bg-[#f4f7f2] text-slate-900'
-            }`}
+            className="h-16 rounded-[1.2rem] bg-[#f4f7f2] text-slate-900 text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
           >
             {runs}
           </motion.button>
         ))}
+      </div>
+
+      {/* Boundary buttons: 4 (green) and 6 (blue) */}
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <motion.button
+          whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
+          onClick={() => scoreBoundary(4)}
+          disabled={!isActive || !!pendingExtra}
+          className="h-16 rounded-[1.2rem] bg-[#e8f7ee] text-[#10994c] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          4
+        </motion.button>
+        <motion.button
+          whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
+          onClick={() => scoreBoundary(6)}
+          disabled={!isActive || !!pendingExtra}
+          className="h-16 rounded-[1.2rem] bg-[#ebf5ff] text-[#2d6fb0] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          6
+        </motion.button>
       </div>
 
       <AnimatePresence mode="popLayout">
@@ -204,7 +245,7 @@ export function ScoringControls() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+            className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5"
           >
             {(
               [
@@ -229,6 +270,13 @@ export function ScoringControls() {
                 {label}
               </button>
             ))}
+            <button
+              onClick={() => { if (isActive) setPendingExtra('penalty') }}
+              disabled={!isActive}
+              className="h-12 rounded-[1.2rem] bg-[#fef2f2] text-sm font-semibold text-[#b91c1c] transition disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              PEN
+            </button>
           </motion.div>
         ) : pendingExtra === 'wide' ? (
           <ExtraChooser
@@ -238,12 +286,17 @@ export function ScoringControls() {
             onSelect={confirmWide}
             onCancel={() => setPendingExtra(null)}
           />
-        ) : (
+        ) : pendingExtra === 'noball' ? (
           <ExtraChooser
             title="No ball - runs off the bat"
             toneClass="bg-[#fff1ec] text-[#d07b2b]"
             values={[0, 1, 2, 3, 4, 6]}
             onSelect={confirmNoBall}
+            onCancel={() => setPendingExtra(null)}
+          />
+        ) : (
+          <PenaltyChooser
+            onSelect={scorePenaltyRuns}
             onCancel={() => setPendingExtra(null)}
           />
         )}
@@ -270,6 +323,57 @@ export function ScoringControls() {
         Shortcuts: 0-6 to score, W for wicket, U to undo, Esc to cancel extra mode.
       </p>
     </section>
+  )
+}
+
+function PenaltyChooser({
+  onSelect,
+  onCancel,
+}: {
+  onSelect: (runs: number) => void
+  onCancel: () => void
+}) {
+  const [mode, setMode] = useState<'award' | 'deduct'>('award')
+
+  return (
+    <motion.div
+      key="penalty-chooser"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.15 }}
+      className="mt-4 rounded-[1.4rem] bg-[#fef2f2] p-4 text-[#b91c1c]"
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.22em]">Penalty runs</p>
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={() => setMode('award')}
+          className={`h-9 flex-1 rounded-[0.8rem] text-sm font-semibold transition ${mode === 'award' ? 'bg-[#b91c1c] text-white' : 'bg-white text-slate-700'}`}
+        >
+          Award
+        </button>
+        <button
+          onClick={() => setMode('deduct')}
+          className={`h-9 flex-1 rounded-[0.8rem] text-sm font-semibold transition ${mode === 'deduct' ? 'bg-[#b91c1c] text-white' : 'bg-white text-slate-700'}`}
+        >
+          Deduct
+        </button>
+      </div>
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+          <button
+            key={n}
+            onClick={() => onSelect(mode === 'award' ? n : -n)}
+            className="h-12 rounded-[1rem] bg-white text-lg font-semibold text-slate-900"
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <button onClick={onCancel} className="mt-3 text-sm font-medium underline">
+        Cancel
+      </button>
+    </motion.div>
   )
 }
 

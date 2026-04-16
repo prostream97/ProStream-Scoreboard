@@ -4,7 +4,7 @@ export type MatchFormat = 'T20' | 'ODI' | 'T10' | 'custom'
 export type MatchStatus = 'setup' | 'active' | 'paused' | 'break' | 'complete'
 export type TossDecision = 'bat' | 'field'
 export type InningsStatus = 'active' | 'complete' | 'declared'
-export type ExtraType = 'wide' | 'noball' | 'bye' | 'legbye'
+export type ExtraType = 'wide' | 'noball' | 'bye' | 'legbye' | 'penalty'
 export type DismissalType =
   | 'bowled'
   | 'caught'
@@ -44,6 +44,7 @@ export type DeliveryInput = {
   isLegal: boolean          // false for WD and NB only
   extraType: ExtraType | null
   isWicket: boolean
+  isBoundary?: boolean      // true only if the ball reached the boundary rope
   dismissalType: DismissalType | null
   dismissedBatterId?: number | null
   fielder1Id: number | null
@@ -51,6 +52,7 @@ export type DeliveryInput = {
 }
 
 export type DeliveryRecord = DeliveryInput & {
+  isBoundary: boolean
   overNumber: number
   ballNumber: number
   batsmanId: number

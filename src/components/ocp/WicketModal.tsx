@@ -41,6 +41,8 @@ export function WicketModal() {
   const [fielder2Id, setFielder2Id] = useState<number | null>(null)
   const [runs, setRuns] = useState(0)
   const [dismissedBatterId, setDismissedBatterId] = useState<number | null>(null)
+  const [isWide, setIsWide] = useState(false)
+  const [wideRuns, setWideRuns] = useState(0)
 
   if (!isOpen || !snapshot) return null
   const matchSnapshot = snapshot
@@ -69,6 +71,8 @@ export function WicketModal() {
     setFielder2Id(null)
     setRuns(0)
     setDismissedBatterId(null)
+    setIsWide(false)
+    setWideRuns(0)
   }
 
   function handleClose() {
@@ -101,12 +105,13 @@ export function WicketModal() {
     if (!selectedDismissedBatterId) return
 
     await recordWicket({
-      runs,
+      runs: isWide ? 0 : runs,
       dismissalType: selectedDismissal.type,
       dismissedBatterId: selectedDismissedBatterId,
       incomingBatterId: nextBatsmanId,
       fielder1Id,
       fielder2Id,
+      ...(isWide ? { extraType: 'wide' as const, extraRuns: 1 + wideRuns, isLegal: false } : {}),
     })
 
     reset()
@@ -147,26 +152,60 @@ export function WicketModal() {
             <div>
               <p className="font-stats text-sm text-gray-400 mb-4">How was the batsman dismissed?</p>
 
-              {/* Runs off the wicket delivery */}
-              <div className="flex items-center gap-3 mb-4">
-                <span className="font-stats text-sm text-gray-400">Runs scored:</span>
-                {[0, 1, 2, 3, 4].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRuns(r)}
-                    className={`w-9 h-9 rounded-lg font-stats font-semibold text-sm transition-colors ${
-                      runs === r
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
+              {/* Wide delivery toggle */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="font-stats text-sm text-gray-400">Wide delivery?</span>
+                <button
+                  onClick={() => { setIsWide(!isWide); setRuns(0); setWideRuns(0) }}
+                  className={`px-3 py-1.5 rounded-lg font-stats text-xs font-semibold border transition-colors ${
+                    isWide
+                      ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {isWide ? 'Wide ✓' : 'No'}
+                </button>
               </div>
 
+              {/* Runs / extra runs selector */}
+              {isWide ? (
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="font-stats text-sm text-gray-400">Completed runs (extras):</span>
+                  {[0, 1, 2, 3, 4].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setWideRuns(r)}
+                      className={`w-9 h-9 rounded-lg font-stats font-semibold text-sm transition-colors ${
+                        wideRuns === r
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="font-stats text-sm text-gray-400">Runs scored:</span>
+                  {[0, 1, 2, 3, 4].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setRuns(r)}
+                      className={`w-9 h-9 rounded-lg font-stats font-semibold text-sm transition-colors ${
+                        runs === r
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-2">
-                {DISMISSALS.map((d) => (
+                {(isWide ? DISMISSALS.filter((d) => d.type === 'runout') : DISMISSALS).map((d) => (
                   <button
                     key={d.type}
                     onClick={() => handleDismissalSelect(d)}
