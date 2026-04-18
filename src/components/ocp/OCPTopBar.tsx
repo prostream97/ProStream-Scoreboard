@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 import { useRouter } from 'next/navigation'
@@ -30,6 +31,7 @@ export function OCPTopBar() {
   const openSquadPanel = useUIStore((s) => s.openSquadPanel)
   const router = useRouter()
   const [endingInnings, setEndingInnings] = useState(false)
+  const [recomputingStats, setRecomputingStats] = useState(false)
 
   if (!snapshot) return null
 
@@ -43,8 +45,9 @@ export function OCPTopBar() {
   const innings = currentInningsState
   const scoreText = innings ? `${innings.totalRuns}/${innings.wickets}` : '0/0'
   const oversText = innings ? `${innings.overs}.${innings.balls}` : '0.0'
-  const totalLegalBalls = (innings?.overs ?? 0) * 6 + (innings?.balls ?? 0)
-  const ratesReady = totalLegalBalls >= 6
+  const bpo = snapshot.ballsPerOver ?? 6
+  const totalLegalBalls = (innings?.overs ?? 0) * bpo + (innings?.balls ?? 0)
+  const ratesReady = totalLegalBalls >= bpo
   const battingTeam = innings?.battingTeamId === homeTeam.id ? homeTeam : awayTeam
   const bowlingTeam = innings?.bowlingTeamId === homeTeam.id ? homeTeam : awayTeam
   const resolveSummaryView = (teamId: number) => {
@@ -121,6 +124,27 @@ export function OCPTopBar() {
     }
   }
 
+  async function handleRecomputeStatsFromDeliveries() {
+    setRecomputingStats(true)
+    try {
+      await flushOverToNeon()
+      const res = await fetch(`/api/match/${matchId}/recompute-stats`, { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(typeof body.error === 'string' ? body.error : 'Could not recalculate stats')
+        return
+      }
+      const stateRes = await fetch(`/api/match/${matchId}/state`)
+      if (stateRes.ok) hydrate(await stateRes.json())
+      toast.success('Totals and player stats refreshed from delivery history')
+    } catch (e) {
+      console.error(e)
+      toast.error('Recalculate failed — check connection and try again')
+    } finally {
+      setRecomputingStats(false)
+    }
+  }
+
   async function toggleTeamSummary(teamId: number, view: 'batting' | 'bowling') {
     const effectiveView = resolveSummaryView(teamId)
     const isActive =
@@ -162,7 +186,7 @@ export function OCPTopBar() {
             {status === 'setup' ? <AppButton onClick={handleStart}>Start Match</AppButton> : null}
             {status === 'active' ? (
               <>
-                <AppButton variant="secondary" onClick={handlePause}>Pause</AppButton>
+                <AppButton variant="secondary" className="hover:bg-[#ababab]" onClick={handlePause}>Pause</AppButton>
                 <AppButton variant="secondary" onClick={handleBreak}>Break</AppButton>
                 <AppButton variant="danger" onClick={handleEndInnings} disabled={endingInnings}>
                   {endingInnings ? 'Ending...' : currentInnings === 1 ? 'End Innings' : 'End Match'}
@@ -185,7 +209,32 @@ export function OCPTopBar() {
                 </AppButton>
               </>
             ) : null}
-            <AppButton variant="secondary" onClick={openSquadPanel}>Squads</AppButton>
+            <AppButton
+              variant="secondary"
+              className="bg-[#e18c14] text-white hover:bg-[#e18c14]"
+              onClick={handleRecomputeStatsFromDeliveries}
+              disabled={recomputingStats}
+              title="Recompute innings totals, overs, and batter/bowler figures from saved deliveries. Flush pending balls first automatically."
+            >
+              {recomputingStats ? 'Recalculating…' : 'Recal.'}
+            </AppButton>
+            {(status === 'active' || status === 'paused' || status === 'break' || status === 'complete') ? (
+              <AppButton
+                variant="secondary"
+                className="border-[#5bc0ff] bg-[#42adff] text-white hover:bg-[#38a0f0]"
+                onClick={() => router.push(`/admin/matches/${matchId}/score-editor`)}
+                title="Edit any ball already saved to the database (runs, extras, legality, wicket, batsman, bowler)."
+              >
+                Edit Score
+              </AppButton>
+            ) : null}
+            <AppButton
+              variant="secondary"
+              className="border-[#8a8a8a] bg-[#a1a1a1] text-white hover:bg-[#919191]"
+              onClick={openSquadPanel}
+            >
+              Squads
+            </AppButton>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

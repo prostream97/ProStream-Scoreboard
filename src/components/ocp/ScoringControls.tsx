@@ -223,7 +223,7 @@ export function ScoringControls() {
           whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
           onClick={() => scoreBoundary(4)}
           disabled={!isActive || !!pendingExtra}
-          className="h-16 rounded-[1.2rem] bg-[#0047a380] text-black text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-16 rounded-[1.2rem] border border-black bg-[#0047a380] text-black text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           4
         </motion.button>
@@ -231,7 +231,7 @@ export function ScoringControls() {
           whileTap={isActive && !pendingExtra ? { scale: 0.94 } : undefined}
           onClick={() => scoreBoundary(6)}
           disabled={!isActive || !!pendingExtra}
-          className="h-16 rounded-[1.2rem] border border-black bg-[#ebf5ff] text-[#2d6fb0] text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-16 rounded-[1.2rem] border border-black bg-[#ebf5ff] text-black text-2xl font-semibold tracking-[-0.04em] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           6
         </motion.button>
@@ -273,7 +273,7 @@ export function ScoringControls() {
             <button
               onClick={() => { if (isActive) setPendingExtra('penalty') }}
               disabled={!isActive}
-              className="h-12 rounded-[1.2rem] border border-black bg-[#fffa7580] text-sm font-semibold text-[#b91c1c] transition disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-12 rounded-[1.2rem] border border-black bg-[#ff808080] text-sm font-semibold text-[#b91c1c] transition disabled:cursor-not-allowed disabled:opacity-40"
             >
               PEN
             </button>
@@ -306,7 +306,7 @@ export function ScoringControls() {
         <button
           onClick={openWicketModal}
           disabled={!isActive || !!pendingExtra}
-          className="h-14 rounded-[1.2rem] bg-[#ffeceb] text-sm font-semibold uppercase tracking-[0.18em] text-[#c54e4c] transition disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-14 rounded-[1.2rem] border border-black bg-[#ffeceb] text-sm font-semibold uppercase tracking-[0.18em] text-[#ab0a07] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           Wicket
         </button>

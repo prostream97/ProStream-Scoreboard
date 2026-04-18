@@ -199,6 +199,13 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
       .catch((err) => { console.warn('[ViewerClient] Innings change state refetch failed:', err) })
   })
 
+  useEvent(`match-${matchId}`, 'state.refresh', () => {
+    fetch(`/api/match/${matchId}/state`)
+      .then((r) => r.json())
+      .then((fresh: MatchSnapshot) => { if (isMountedRef.current) setSnapshot(fresh) })
+      .catch((err) => { console.warn('[ViewerClient] state.refresh refetch failed:', err) })
+  })
+
   useEvent(`match-${matchId}`, 'break.start', () => {
     setSnapshot((s) => ({ ...s, status: 'break' }))
   })

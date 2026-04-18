@@ -76,6 +76,11 @@ export type BreakStartPayload = {
 
 export type MatchStatePayload = MatchSnapshot
 
+/** Full snapshot should be refetched from GET /api/match/[id]/state (e.g. after DB aggregate recompute). */
+export type StateRefreshPayload = {
+  source?: string
+}
+
 export type PusherEvents = {
   'delivery.added': DeliveryAddedPayload
   'wicket.fell': WicketPayload
@@ -86,4 +91,5 @@ export type PusherEvents = {
   'break.start': BreakStartPayload
   'break.end': Record<string, never>
   'match.state': MatchStatePayload
+  'state.refresh': StateRefreshPayload
 }

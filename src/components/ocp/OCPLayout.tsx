@@ -68,6 +68,13 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
     // handled by legalDeliveryCount watcher
   })
 
+  useEvent(`match-${initialSnapshot.matchId}`, 'state.refresh', () => {
+    fetch(`/api/match/${initialSnapshot.matchId}/state`)
+      .then((r) => r.json())
+      .then((fresh: MatchSnapshot) => hydrate(fresh))
+      .catch((err) => { console.warn('[OCPLayout] state.refresh refetch failed:', err) })
+  })
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f7faf5_0%,#eef3ed_100%)]">
       <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-3 py-3 sm:px-4">

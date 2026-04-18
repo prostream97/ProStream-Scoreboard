@@ -10,6 +10,7 @@ export function BowlerSelect() {
 
   const snapshot = useMatchStore((s) => s.snapshot)
   const legalDeliveryCount = useMatchStore((s) => s.legalDeliveryCount)
+  const currentOverBalls = useMatchStore((s) => s.currentOverBalls)
   const setBowler = useMatchStore((s) => s.setBowler)
   const setStriker = useMatchStore((s) => s.setStriker)
   const setNonStriker = useMatchStore((s) => s.setNonStriker)
@@ -24,15 +25,31 @@ export function BowlerSelect() {
   // isInningsStart: true only when openers haven't been chosen yet (not after every over)
   const isInningsStart = !snapshot.strikerId && !snapshot.nonStrikerId
   const isOverComplete = legalDeliveryCount === snapshot.ballsPerOver
+  /** No ball has been bowled in the current over yet (legal or recorded in the live buffer). */
+  const noBallsYetInCurrentOver =
+    legalDeliveryCount === 0 && currentOverBalls.length === 0 && snapshot.currentBalls === 0
+  /** After startNextOver: bowler cleared, waiting for selection. */
+  const isAwaitingNextOverBowler =
+    !isInningsStart
+    && !snapshot.currentBowlerId
+    && noBallsYetInCurrentOver
+  /**
+   * At 0.0 the scoreboard is "between deliveries" for the new over, but currentBowlerId is often
+   * still set (previous bowler) until the operator confirms — we must still allow change/confirm.
+   */
+  const canSelectBowlerNow =
+    isOverComplete || isAwaitingNextOverBowler || (!isInningsStart && noBallsYetInCurrentOver)
 
   // Can't bowl consecutive overs
-  const lastBowlerId = isInningsStart ? null : snapshot.currentBowlerId
+  const lastBowlerId = isInningsStart
+    ? null
+    : (snapshot.currentBowlerId ?? snapshot.bowlers.find((b) => b.isCurrent)?.playerId ?? null)
   const bowlerList = snapshot.bowlingTeamPlayers.filter((p) => p.id !== lastBowlerId)
   const battingList = snapshot.battingTeamPlayers
 
   const canConfirm = isInningsStart
     ? selectedBowlerId && selectedStrikerId && selectedNonStrikerId && selectedStrikerId !== selectedNonStrikerId
-    : !!selectedBowlerId && isOverComplete
+    : !!selectedBowlerId && canSelectBowlerNow
 
   async function handleConfirm() {
     if (!selectedBowlerId || !snapshot) return
@@ -54,18 +71,42 @@ export function BowlerSelect() {
 
     setBowler(selectedBowlerId)
 
-    // Persist to DB so players survive page refresh
+    // Persist to DB so players survive page refresh.
+    // When confirming after an over is complete, also sync the over transition state
+    // to prevent stale server data from corrupting legalDeliveryCount on re-hydration.
+    const freshSnapshot = useMatchStore.getState().snapshot
+    const patchPayload: Record<string, unknown> = {
+      strikerId: newStrikerId,
+      nonStrikerId: newNonStrikerId,
+      currentBowlerId: selectedBowlerId,
+    }
+    if (!isInningsStart && isOverComplete && freshSnapshot) {
+      patchPayload.currentBalls = 0
+      patchPayload.currentOver = freshSnapshot.currentOver
+      patchPayload.currentOverBuffer = []
+    }
+
     try {
       const res = await fetch(`/api/match/${snapshot.matchId}/state`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strikerId: newStrikerId,
-          nonStrikerId: newNonStrikerId,
-          currentBowlerId: selectedBowlerId,
-        }),
+        body: JSON.stringify(patchPayload),
       })
-      if (!res.ok) console.error('[BowlerSelect] Failed to persist state to DB:', res.status)
+      if (!res.ok) {
+        console.error('[BowlerSelect] Failed to persist state to DB:', res.status)
+      } else {
+        // Overlays/viewers keep a cached snapshot until the next delivery; refetch so
+        // striker / non-striker / bowler names appear immediately (e.g. after innings 2 openers).
+        await fetch('/api/pusher/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matchId: snapshot.matchId,
+            event: 'state.refresh',
+            payload: { source: 'bowler-select' },
+          }),
+        })
+      }
     } catch (err) {
       console.error('[BowlerSelect] Failed to persist state to DB:', err)
     }
@@ -82,14 +123,16 @@ export function BowlerSelect() {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-800">
           <h2 className="font-display text-2xl text-accent tracking-wider">
-            {isInningsStart ? 'START INNINGS' : 'OVER COMPLETE'}
+            {isInningsStart ? 'START INNINGS' : canSelectBowlerNow ? 'SELECT BOWLER' : 'OVER IN PROGRESS'}
           </h2>
           <p className="font-stats text-sm text-gray-400 mt-1">
             {isInningsStart
               ? 'Set opening batsmen and bowler'
-              : isOverComplete
-                ? `Over ${snapshot.currentOver + 1} — Select next bowler`
-                : `Over ${snapshot.currentOver}.${snapshot.currentBalls} in progress — finish over to change bowler`}
+              : canSelectBowlerNow
+                ? isOverComplete
+                  ? `Over ${snapshot.currentOver + 1} — Select next bowler`
+                  : `Over ${snapshot.currentOver + 1} — Confirm or change bowler (no balls bowled yet)`
+                : `Over ${snapshot.currentOver + 1}.${snapshot.currentBalls} in progress — finish over to change bowler`}
           </p>
         </div>
 

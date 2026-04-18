@@ -13,6 +13,7 @@ const ALLOWED_EVENTS = new Set([
   'break.end',
   'match.status',
   'display.toggle',
+  'state.refresh',
 ])
 
 export async function POST(req: NextRequest) {

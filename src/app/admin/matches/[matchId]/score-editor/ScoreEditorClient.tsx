@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Pencil, X, Check, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Pencil, X, Check, ChevronDown, ChevronRight, ArrowLeft, Plus } from 'lucide-react'
 import type { ScoreDataResponse, DeliveryDetail, InningsDetail } from '@/app/api/match/[matchId]/score-data/route'
 
 type Team = { id: number; name: string; shortCode: string; primaryColor: string }
@@ -12,6 +12,8 @@ type Props = {
   homeTeam: Team
   awayTeam: Team
   tournamentId: number | null
+  matchStatus: string
+  operatorHref: string
 }
 
 const EXTRA_TYPES = ['wide', 'noball', 'bye', 'legbye'] as const
@@ -22,6 +24,7 @@ type EditState = {
   extraRuns: number
   extraType: string
   isLegal: boolean
+  isBoundary: boolean
   isWicket: boolean
   dismissalType: string
   dismissedBatterId: string
@@ -35,6 +38,7 @@ function deliveryToEditState(d: DeliveryDetail): EditState {
     extraRuns: d.extraRuns,
     extraType: d.extraType ?? '',
     isLegal: d.isLegal,
+    isBoundary: false,
     isWicket: d.isWicket,
     dismissalType: d.dismissalType ?? '',
     dismissedBatterId: d.dismissedBatterId != null ? String(d.dismissedBatterId) : '',
@@ -394,9 +398,271 @@ function OverSection({
   )
 }
 
+// ── Add delivery (append to an over) ─────────────────────────────────────────
+
+function emptyAddForm(batters: { id: number }[], bowlers: { id: number }[]): EditState {
+  return {
+    runs: 0,
+    extraRuns: 0,
+    extraType: '',
+    isLegal: true,
+    isBoundary: false,
+    isWicket: false,
+    dismissalType: '',
+    dismissedBatterId: '',
+    batsmanId: String(batters[0]?.id ?? ''),
+    bowlerId: String(bowlers[0]?.id ?? ''),
+  }
+}
+
+function AddDeliveryForm({
+  matchId,
+  inningsId,
+  inningsDetail,
+  players,
+  battingTeamId,
+  bowlingTeamId,
+  onAdded,
+}: {
+  matchId: number
+  inningsId: number
+  inningsDetail: InningsDetail
+  players: ScoreDataResponse['players']
+  battingTeamId: number
+  bowlingTeamId: number
+  onAdded: () => void
+}) {
+  const batters = players.filter((p) => p.teamId === battingTeamId)
+  const bowlers = players.filter((p) => p.teamId === bowlingTeamId)
+  const maxOverInData = inningsDetail.oversDetail.length
+    ? Math.max(...inningsDetail.oversDetail.map((o) => o.overNumber))
+    : -1
+  const defaultOver = Math.max(0, maxOverInData)
+
+  const [open, setOpen] = useState(false)
+  const [overNumber, setOverNumber] = useState(defaultOver)
+  const [form, setForm] = useState<EditState>(() => emptyAddForm(batters, bowlers))
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  function handleChange(field: keyof EditState, value: string | boolean | number) {
+    setForm((f) => {
+      const next = { ...f, [field]: value }
+      if (field === 'extraType') {
+        next.isLegal = value !== 'wide' && value !== 'noball'
+        if (!value) next.extraRuns = 0
+      }
+      if (field === 'isWicket' && !value) {
+        next.dismissalType = ''
+        next.dismissedBatterId = ''
+      }
+      return next
+    })
+  }
+
+  async function handleSubmit() {
+    if (!form.batsmanId || !form.bowlerId) {
+      setToast('Choose batsman and bowler')
+      return
+    }
+    setSaving(true)
+    setToast(null)
+    try {
+      const res = await fetch(`/api/match/${matchId}/score-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inningsId,
+          overNumber,
+          batsmanId: parseInt(form.batsmanId, 10),
+          bowlerId: parseInt(form.bowlerId, 10),
+          runs: form.runs,
+          extraRuns: form.extraRuns,
+          isLegal: form.isLegal,
+          extraType: form.extraType || null,
+          isBoundary: form.isBoundary,
+          isWicket: form.isWicket,
+          dismissalType: form.dismissalType || null,
+          dismissedBatterId: form.dismissedBatterId ? parseInt(form.dismissedBatterId, 10) : null,
+          fielder1Id: null,
+          fielder2Id: null,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setToast(json.error ?? 'Failed to add')
+        return
+      }
+      setForm(emptyAddForm(batters, bowlers))
+      setOpen(false)
+      onAdded()
+      setToast('Delivery added')
+      setTimeout(() => setToast(null), 2000)
+    } catch {
+      setToast('Network error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const overOptions: number[] = []
+  const maxOpt = Math.max(defaultOver + 1, 0)
+  for (let o = 0; o <= maxOpt; o++) overOptions.push(o)
+
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-gray-300 p-4 mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+      >
+        <Plus className="h-4 w-4" />
+        {open ? 'Hide' : 'Add'} delivery (appends next ball in the chosen over)
+      </button>
+      {toast && <p className="text-xs mt-2 text-green-600">{toast}</p>}
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Over (0 = 1st over)</label>
+            <select
+              value={overNumber}
+              onChange={(e) => setOverNumber(parseInt(e.target.value, 10))}
+              className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+            >
+              {overOptions.map((o) => (
+                <option key={o} value={o}>
+                  Over {o + 1}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              The new ball is appended after existing balls in this over (wide/no-ball use the next index automatically).
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Batsman</label>
+              <select
+                value={form.batsmanId}
+                onChange={(e) => handleChange('batsmanId', e.target.value)}
+                className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white min-w-[140px]"
+              >
+                {batters.map((p) => (
+                  <option key={p.id} value={p.id}>{p.displayName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Bowler</label>
+              <select
+                value={form.bowlerId}
+                onChange={(e) => handleChange('bowlerId', e.target.value)}
+                className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white min-w-[140px]"
+              >
+                {bowlers.map((p) => (
+                  <option key={p.id} value={p.id}>{p.displayName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Runs (bat)</label>
+              <input
+                type="number"
+                min={0}
+                max={7}
+                value={form.runs}
+                onChange={(e) => handleChange('runs', parseInt(e.target.value) || 0)}
+                className="text-sm border border-gray-300 rounded px-2 py-1.5 w-20"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Extra type</label>
+              <select
+                value={form.extraType}
+                onChange={(e) => handleChange('extraType', e.target.value)}
+                className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+              >
+                <option value="">None</option>
+                {EXTRA_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            {form.extraType ? (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Extra runs</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  value={form.extraRuns}
+                  onChange={(e) => handleChange('extraRuns', parseInt(e.target.value) || 0)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1.5 w-20"
+                />
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2 self-end pb-2">
+              <input
+                type="checkbox"
+                id="add-wicket"
+                checked={form.isWicket}
+                onChange={(e) => handleChange('isWicket', e.target.checked)}
+                className="w-4 h-4"
+              />
+              <label htmlFor="add-wicket" className="text-sm text-gray-700">Wicket</label>
+            </div>
+          </div>
+
+          {form.isWicket ? (
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Dismissal type</label>
+                <select
+                  value={form.dismissalType}
+                  onChange={(e) => handleChange('dismissalType', e.target.value)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+                >
+                  <option value="">Select...</option>
+                  {DISMISSAL_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Dismissed batter</label>
+                <select
+                  value={form.dismissedBatterId}
+                  onChange={(e) => handleChange('dismissedBatterId', e.target.value)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white min-w-[140px]"
+                >
+                  <option value="">Same as batsman</option>
+                  {batters.map((p) => (
+                    <option key={p.id} value={p.id}>{p.displayName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:opacity-60"
+          >
+            <Check className="h-3.5 w-3.5" />
+            {saving ? 'Saving…' : 'Add delivery'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Client ───────────────────────────────────────────────────────────────
 
-export function ScoreEditorClient({ initialData, homeTeam, awayTeam, tournamentId }: Props) {
+export function ScoreEditorClient({ initialData, homeTeam, awayTeam, tournamentId, matchStatus, operatorHref }: Props) {
   const [data, setData] = useState<ScoreDataResponse>(initialData)
   const [activeInningsIdx, setActiveInningsIdx] = useState(0)
 
@@ -404,6 +670,13 @@ export function ScoreEditorClient({ initialData, homeTeam, awayTeam, tournamentI
 
   const battingTeam = activeInnings?.battingTeamId === homeTeam.id ? homeTeam : awayTeam
   const bowlingTeam = activeInnings?.bowlingTeamId === homeTeam.id ? homeTeam : awayTeam
+
+  async function reloadScoreData() {
+    const res = await fetch(`/api/match/${data.match.id}/score-data`)
+    if (!res.ok) return
+    const json: ScoreDataResponse = await res.json()
+    setData(json)
+  }
 
   function handleSaved(
     inningsIdx: number,
@@ -436,7 +709,19 @@ export function ScoreEditorClient({ initialData, homeTeam, awayTeam, tournamentI
                 <span className="mx-2 text-gray-300">vs</span>
                 <span style={{ color: awayTeam.primaryColor }}>{awayTeam.shortCode}</span>
               </h1>
-              <p className="text-xs text-gray-500 mt-0.5">Score Editor — completed match</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {matchStatus === 'complete'
+                  ? 'Score editor — finished match'
+                  : `Correct past deliveries — live match (${matchStatus}). Saving updates totals and refreshes the operator view and overlays.`}
+              </p>
+              {matchStatus !== 'complete' ? (
+                <Link
+                  href={operatorHref}
+                  className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                >
+                  Back to operator scoring
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>
@@ -492,6 +777,16 @@ export function ScoreEditorClient({ initialData, homeTeam, awayTeam, tournamentI
                 </p>
               </div>
             </div>
+
+            <AddDeliveryForm
+              matchId={data.match.id}
+              inningsId={activeInnings.id}
+              inningsDetail={activeInnings}
+              players={data.players}
+              battingTeamId={activeInnings.battingTeamId}
+              bowlingTeamId={activeInnings.bowlingTeamId}
+              onAdded={reloadScoreData}
+            />
 
             {/* Overs list */}
             {activeInnings.oversDetail.length === 0 ? (

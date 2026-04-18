@@ -163,8 +163,17 @@ export type MatchSnapshot = {
   battingTeamPlayers: PlayerSummary[]
   bowlingTeamPlayers: PlayerSummary[]
 
-  // In-progress over balls (from currentOverBuffer, not yet flushed to deliveries table)
-  currentOverBalls: { runs: number; extraRuns: number; isLegal: boolean; isBoundary: boolean; extraType: string | null; isWicket: boolean }[]
+  // In-progress over balls (from currentOverBuffer). `overNumber`/`ballNumber` align with DB rows when present.
+  currentOverBalls: {
+    runs: number
+    extraRuns: number
+    isLegal: boolean
+    isBoundary: boolean
+    extraType: string | null
+    isWicket: boolean
+    overNumber?: number
+    ballNumber?: number
+  }[]
 
   // Match result (populated when status === 'complete')
   resultWinnerId: number | null

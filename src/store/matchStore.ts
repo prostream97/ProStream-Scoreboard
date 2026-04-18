@@ -318,8 +318,25 @@ function computeInningsRuns(state: InningsState, runs: number, extraRuns: number
   return state.totalRuns + runs + extraRuns
 }
 
+function ballsForCurrentOverOnly(snapshot: MatchSnapshot) {
+  const co = snapshot.currentOver
+  return snapshot.currentOverBalls.filter((ball) => {
+    if (ball.overNumber === undefined) return true
+    return ball.overNumber === co
+  })
+}
+
+/** Legal balls in the current over: prefer server `currentBalls`, reconcile with buffer (handles unflushed deliveries). */
+function deriveLegalDeliveryCount(snapshot: MatchSnapshot, currentOverBallsForHydrate: DeliveryRecord[]): number {
+  const server = snapshot.currentBalls ?? 0
+  const fromBuffer = currentOverBallsForHydrate.filter((b) => b.isLegal).length
+  if (server === 0 && currentOverBallsForHydrate.length === 0) return 0
+  return Math.max(server, fromBuffer)
+}
+
 function hydrateCurrentOverBalls(snapshot: MatchSnapshot): DeliveryRecord[] {
-  return snapshot.currentOverBalls.map((ball, index) => ({
+  const inOver = ballsForCurrentOverOnly(snapshot)
+  return inOver.map((ball, index) => ({
     runs: ball.runs,
     extraRuns: ball.extraRuns,
     isLegal: ball.isLegal,
@@ -330,8 +347,8 @@ function hydrateCurrentOverBalls(snapshot: MatchSnapshot): DeliveryRecord[] {
     dismissedBatterId: null,
     fielder1Id: null,
     fielder2Id: null,
-    overNumber: snapshot.currentOver,
-    ballNumber: index,
+    overNumber: ball.overNumber ?? snapshot.currentOver,
+    ballNumber: ball.ballNumber ?? index,
     batsmanId: snapshot.strikerId ?? 0,
     bowlerId: snapshot.currentBowlerId ?? 0,
     timestamp: '',
@@ -356,7 +373,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
     set({
       snapshot,
       currentOverBalls,
-      legalDeliveryCount: currentOverBalls.filter((ball) => ball.isLegal).length,
+      legalDeliveryCount: deriveLegalDeliveryCount(snapshot, currentOverBalls),
       flushedBallCount: currentOverBalls.length,
       lastFlushedDeliveryIds: [],
     })
@@ -605,32 +622,10 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         await get().flushOverToNeon()
 
         if (shouldFlushOver) {
-          set((s) => ({
-            legalDeliveryCount: 0,
-            snapshot: s.snapshot
-              ? (() => {
-                  const nextStrikerId = s.snapshot.nonStrikerId
-                  return {
-                    ...s.snapshot,
-                    strikerId: nextStrikerId,
-                    nonStrikerId: s.snapshot.strikerId,
-                    batters: s.snapshot.batters.map((b) => ({
-                      ...b,
-                      isStriker: b.playerId === nextStrikerId,
-                    })),
-                    currentBalls: 0,
-                  }
-                })()
-              : null,
-          }))
-
-          await triggerPusherEvent(snapshot.matchId, 'over.complete', {
-            matchId: snapshot.matchId,
+          await persistEndOfOverCreaseSwapAndNotify(get, set, {
             overNumber,
-            overRuns: updatedOverBalls
-              .reduce((sum, d) => sum + d.runs + d.extraRuns, 0),
-            bowlerId: snapshot.currentBowlerId,
-            maidens: 0, // calculated server-side on persist
+            updatedOverBalls,
+            bowlerIdSnapshot: snapshot.currentBowlerId,
           })
         }
       }
@@ -944,32 +939,10 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       await get().flushOverToNeon()
 
       if (shouldFlushOver) {
-        set((s) => ({
-          legalDeliveryCount: 0,
-          snapshot: s.snapshot
-            ? (() => {
-                const nextStrikerId = s.snapshot.nonStrikerId
-                return {
-                  ...s.snapshot,
-                  strikerId: nextStrikerId,
-                  nonStrikerId: s.snapshot.strikerId,
-                  batters: s.snapshot.batters.map((b) => ({
-                    ...b,
-                    isStriker: b.playerId === nextStrikerId,
-                  })),
-                  currentBalls: 0,
-                }
-              })()
-            : null,
-        }))
-
-        await triggerPusherEvent(snapshot.matchId, 'over.complete', {
-          matchId: snapshot.matchId,
+        await persistEndOfOverCreaseSwapAndNotify(get, set, {
           overNumber,
-          overRuns: updatedOverBalls
-            .reduce((sum, d) => sum + d.runs + d.extraRuns, 0),
-          bowlerId: snapshot.currentBowlerId,
-          maidens: 0,
+          updatedOverBalls,
+          bowlerIdSnapshot: snapshot.currentBowlerId,
         })
       }
     }
@@ -1075,6 +1048,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         currentBalls: updatedInnings.balls,
         currentOverBuffer: newBalls,
       })
+      await triggerPusherEvent(snapshot.matchId, 'state.refresh', { source: 'undo-delivery' })
     } else if (lastFlushedDeliveryIds.length > 0) {
       // Undo a flushed delivery — requires DB delete
       const lastId = lastFlushedDeliveryIds[lastFlushedDeliveryIds.length - 1]
@@ -1092,6 +1066,7 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
         if (res.ok) {
           const freshSnapshot: MatchSnapshot = await res.json()
           set({ snapshot: freshSnapshot })
+          await triggerPusherEvent(snapshot.matchId, 'state.refresh', { source: 'undo-delivery' })
         }
       } catch (err) {
         console.error('Undo failed:', err)
@@ -1362,4 +1337,57 @@ async function syncLiveMatchState(
   } catch (err) {
     console.error('Live match state sync failed:', err)
   }
+}
+
+/**
+ * After the last legal ball of an over, batters change ends (swap striker ↔ non-striker).
+ * We already updated in-memory state once; this persists that swap to match_state and
+ * notifies overlays/viewers — otherwise only delivery.added ran (pre-swap) and DB never got the swap.
+ */
+async function persistEndOfOverCreaseSwapAndNotify(
+  get: () => MatchStore,
+  set: (partial: Partial<MatchStore> | ((state: MatchStore) => Partial<MatchStore>)) => void,
+  ctx: { overNumber: number; updatedOverBalls: DeliveryRecord[]; bowlerIdSnapshot: number | null },
+) {
+  const snap = get().snapshot
+  if (!snap?.strikerId || !snap?.nonStrikerId) return
+
+  const nextStrikerId = snap.nonStrikerId
+  const nextNonStrikerId = snap.strikerId
+
+  set((s) => ({
+    legalDeliveryCount: 0,
+    snapshot: s.snapshot
+      ? {
+          ...s.snapshot,
+          strikerId: nextStrikerId,
+          nonStrikerId: nextNonStrikerId,
+          batters: s.snapshot.batters.map((b) => ({
+            ...b,
+            isStriker: b.playerId === nextStrikerId,
+          })),
+          currentBalls: 0,
+        }
+      : null,
+  }))
+
+  const after = get().snapshot
+  await syncLiveMatchState(snap.matchId, {
+    strikerId: nextStrikerId,
+    nonStrikerId: nextNonStrikerId,
+    currentBowlerId: after?.currentBowlerId ?? null,
+    currentOver: after?.currentOver ?? 0,
+    currentBalls: 0,
+    currentOverBuffer: [],
+  })
+
+  await triggerPusherEvent(snap.matchId, 'over.complete', {
+    matchId: snap.matchId,
+    overNumber: ctx.overNumber,
+    overRuns: ctx.updatedOverBalls.reduce((sum, d) => sum + d.runs + d.extraRuns, 0),
+    bowlerId: ctx.bowlerIdSnapshot,
+    maidens: 0,
+  })
+
+  await triggerPusherEvent(snap.matchId, 'state.refresh', { source: 'end-of-over-crease-swap' })
 }

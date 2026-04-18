@@ -29,7 +29,17 @@ export function ICC2023WicketAlert({ wicket, snapshot }: Props) {
   const shownRef = useRef<WicketPayload | null>(null)
 
   useEffect(() => {
-    if (!wicket || wicket === shownRef.current) return
+    if (!wicket) {
+      shownRef.current = null
+      setShown(null)
+      setVisible(false)
+      return
+    }
+    const key = `${wicket.dismissedBatterId}-${wicket.inningsWickets}`
+    const prevKey = shownRef.current
+      ? `${shownRef.current.dismissedBatterId}-${shownRef.current.inningsWickets}`
+      : null
+    if (key === prevKey) return
     shownRef.current = wicket
     setShown(wicket)
     setVisible(true)

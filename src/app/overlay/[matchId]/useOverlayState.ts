@@ -17,7 +17,7 @@ type Props = {
   matchId: number
   initialSnapshot: MatchSnapshot
   initialMostWickets: TournamentMostWicketsData | null
-  overlayTheme: 'standard' | 'icc2023' | 'standard1'
+  overlayTheme: 'standard' | 'icc2023' | 'standard1' | 'theme1'
 }
 
 export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, overlayTheme }: Props) {
@@ -84,6 +84,8 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
 
   // Reconnect recovery
   useEffect(() => {
+    setLastBoundary(null)
+    setLastWicket(null)
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => setSnapshot(fresh))
@@ -102,7 +104,15 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
 
   useEvent(`match-${matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
     if (data.isBoundary && (data.runs === 4 || data.runs === 6)) {
-      setLastBoundary({ id: Date.now(), runs: data.runs as 4 | 6 })
+      // Use a stable per-delivery id so duplicate websocket events
+      // do not retrigger boundary animations repeatedly.
+      const boundaryId = (
+        (data.overNumber * 1_000_000)
+        + (data.ballNumber * 10_000)
+        + (data.inningsRuns * 10)
+        + data.runs
+      )
+      setLastBoundary({ id: boundaryId, runs: data.runs as 4 | 6 })
     }
     if (mostWicketsVisible) fetchMostWickets()
     if (mostBoundariesVisible) fetchMostBoundaries()
@@ -260,6 +270,8 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
   })
 
   useEvent(`match-${matchId}`, 'innings.change', (_data: InningsChangePayload) => {
+    setLastBoundary(null)
+    setLastWicket(null)
     fetch(`/api/match/${matchId}/state`)
       .then((r) => r.json())
       .then((fresh: MatchSnapshot) => setSnapshot({ ...fresh, currentOverBalls: [] }))
@@ -267,6 +279,15 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     fetchSummaries()
     if (mostWicketsVisible) fetchMostWickets()
     if (mostBoundariesVisible) fetchMostBoundaries()
+  })
+
+  useEvent(`match-${matchId}`, 'state.refresh', () => {
+    setLastBoundary(null)
+    setLastWicket(null)
+    fetch(`/api/match/${matchId}/state`)
+      .then((r) => r.json())
+      .then((fresh: MatchSnapshot) => setSnapshot(fresh))
+      .catch((err) => { console.warn('[useOverlayState] state.refresh refetch failed:', err) })
   })
 
   useEvent(`match-${matchId}`, 'display.toggle', (data: DisplayTogglePayload) => {

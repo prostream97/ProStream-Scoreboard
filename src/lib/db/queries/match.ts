@@ -1,10 +1,31 @@
 import { db } from '@/lib/db'
-import { matches, innings, players, teams, matchState, deliveries, users } from '@/lib/db/schema'
+import { matches, innings, players, teams, matchState, deliveries, users, type DeliveryBuffer } from '@/lib/db/schema'
 import { eq, and, sql, gt, desc, inArray } from 'drizzle-orm'
 import type { MatchSnapshot, BatterStats, BowlerStats, PartnershipStats, InningsState, InningsStatus, TeamSummary, PlayerSummary } from '@/types/match'
 import { createPartnershipStats, getBatterContributionForDelivery } from '@/lib/match/partnership'
+import { applyLiveOverBufferToPlayerStats } from '@/lib/match/applyLiveOverBufferToPlayerStats'
 
 const NON_BOWLER_WICKET_TYPES = new Set(['runout', 'obstructingfield', 'handledball'])
+
+/**
+ * `match_state.current_over_buffer` keeps the full current over for UI dots; balls already flushed
+ * to `deliveries` must not be applied again on top of SQL aggregates.
+ */
+async function getUnpersistedCurrentOverBuffer(
+  inningsId: number,
+  overNumber: number,
+  buffer: DeliveryBuffer[],
+): Promise<DeliveryBuffer[]> {
+  if (buffer.length === 0) return []
+  const existingRows = await db
+    .select({ ballNumber: deliveries.ballNumber })
+    .from(deliveries)
+    .where(and(eq(deliveries.inningsId, inningsId), eq(deliveries.overNumber, overNumber)))
+  const persistedBallNumbers = new Set(existingRows.map((r) => r.ballNumber))
+  return buffer.filter(
+    (d) => d.overNumber === overNumber && !persistedBallNumbers.has(d.ballNumber),
+  )
+}
 
 export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot | null> {
   // Fetch match + teams in one query
@@ -28,22 +49,45 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     (i) => i.inningsNumber === currentInningsNum
   ) ?? null
 
-  // Fetch squads for both teams in parallel
-  const [battingTeamPlayers, bowlingTeamPlayers, battersStats, bowlersStats, partnershipStats] =
-    await Promise.all([
-      getTeamPlayers(currentInningsRow?.battingTeamId ?? matchRow.homeTeamId),
-      getTeamPlayers(currentInningsRow?.bowlingTeamId ?? matchRow.awayTeamId),
-      currentInningsRow ? getBatterStats(currentInningsRow.id, state?.strikerId ?? null) : [],
-      currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null, matchRow.ballsPerOver ?? 6) : [],
-      currentInningsRow
-        ? getPartnershipStats(
-            currentInningsRow.id,
-            state?.strikerId ?? null,
-            state?.nonStrikerId ?? null,
-            state?.currentOverBuffer ?? [],
-          )
-        : null,
-    ])
+  const bpo = matchRow.ballsPerOver ?? 6
+  const rawOverBuffer = state?.currentOverBuffer ?? []
+  const unpersistedOverBuffer =
+    currentInningsRow && rawOverBuffer.length > 0
+      ? await getUnpersistedCurrentOverBuffer(
+          currentInningsRow.id,
+          state?.currentOver ?? 0,
+          rawOverBuffer,
+        )
+      : []
+
+  const [battingTeamPlayers, bowlingTeamPlayers, battersStats, bowlersStats] = await Promise.all([
+    getTeamPlayers(currentInningsRow?.battingTeamId ?? matchRow.homeTeamId),
+    getTeamPlayers(currentInningsRow?.bowlingTeamId ?? matchRow.awayTeamId),
+    currentInningsRow ? getBatterStats(currentInningsRow.id, state?.strikerId ?? null) : [],
+    currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null, bpo) : [],
+  ])
+
+  const partnershipStats =
+    currentInningsRow
+      ? await getPartnershipStats(
+          currentInningsRow.id,
+          state?.strikerId ?? null,
+          state?.nonStrikerId ?? null,
+          unpersistedOverBuffer,
+        )
+      : null
+
+  const { batters: battersWithBuffer, bowlers: bowlersWithBuffer } = applyLiveOverBufferToPlayerStats(
+    battersStats,
+    bowlersStats,
+    unpersistedOverBuffer,
+    battingTeamPlayers,
+    bowlingTeamPlayers,
+    bpo,
+    state?.strikerId ?? null,
+    state?.currentBowlerId ?? null,
+    state?.nonStrikerId ?? null,
+  )
 
   const inningsStates: InningsState[] = matchRow.innings.map((i) => ({
     id: i.id,
@@ -61,7 +105,6 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
   const currentInningsState = inningsStates.find((i) => i.inningsNumber === currentInningsNum) ?? null
 
   // Compute run rates
-  const bpo = matchRow.ballsPerOver ?? 6
   const totalBalls = (currentInningsState?.overs ?? 0) * bpo + (currentInningsState?.balls ?? 0)
   const totalOversDecimal = totalBalls / bpo
   const currentRunRate = totalOversDecimal > 0
@@ -116,8 +159,8 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
     strikerId: state?.strikerId ?? null,
     nonStrikerId: state?.nonStrikerId ?? null,
     currentBowlerId: state?.currentBowlerId ?? null,
-    batters: battersStats,
-    bowlers: bowlersStats,
+    batters: battersWithBuffer,
+    bowlers: bowlersWithBuffer,
     partnership: partnershipStats,
     currentRunRate: Math.round(currentRunRate * 100) / 100,
     requiredRunRate: requiredRunRate !== null ? Math.round(requiredRunRate * 100) / 100 : null,
@@ -130,6 +173,8 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
       isBoundary: d.isBoundary ?? false,
       extraType: d.extraType,
       isWicket: d.isWicket,
+      overNumber: d.overNumber,
+      ballNumber: d.ballNumber,
     })),
     resultWinnerId: matchRow.resultWinnerId ?? null,
     resultMargin: matchRow.resultMargin ?? null,
@@ -832,11 +877,29 @@ export async function recomputeInningsAggregates(
 
   const inningsRow = await db.query.innings.findFirst({ where: eq(innings.id, inningsId) })
   if (inningsRow) {
-    await db
-      .update(matchState)
-      .set({ currentOver: overs, currentBalls: balls, lastUpdated: new Date() })
-      .where(eq(matchState.matchId, inningsRow.matchId))
+    const ms = await db.query.matchState.findFirst({
+      where: eq(matchState.matchId, inningsRow.matchId),
+    })
+    // Only sync live over/ball position when recomputing the *current* innings — otherwise
+    // fixing completed innings would overwrite match_state for an active second innings.
+    if (ms && ms.currentInnings === inningsRow.inningsNumber) {
+      await db
+        .update(matchState)
+        .set({ currentOver: overs, currentBalls: balls, lastUpdated: new Date() })
+        .where(eq(matchState.matchId, inningsRow.matchId))
+    }
   }
 
   return { totalRuns: Number(totals.totalRuns), wickets: Number(totals.wickets), overs, balls }
+}
+
+/** Recompute innings totals and (when applicable) live over position from the deliveries table. */
+export async function recomputeAllInningsAggregatesForMatch(matchId: number, bpo: number): Promise<void> {
+  const innRows = await db.query.innings.findMany({
+    where: eq(innings.matchId, matchId),
+    orderBy: (i, { asc }) => [asc(i.inningsNumber)],
+  })
+  for (const inn of innRows) {
+    await recomputeInningsAggregates(inn.id, bpo)
+  }
 }

@@ -69,6 +69,14 @@ const OVERLAY_THEMES = [
     accentBg: '#f9eeff',
     previewImage: 'https://res.cloudinary.com/dcv4wu1b6/image/upload/q_auto/f_auto/v1776363595/013608cf-733a-41da-8881-f518869af0ec.png',
   },
+  {
+    mode: 'theme1',
+    name: 'Theme 1',
+    description: 'Retro-pulse scorebug with gold batting panel and blue bowling panel.',
+    accentColor: '#f9cc01',
+    accentBg: '#fffbe6',
+    previewImage: '',
+  },
 ]
 
 export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {

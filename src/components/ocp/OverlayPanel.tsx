@@ -15,11 +15,11 @@ const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'mostWickets', label: 'Most Wickets' },
   { key: 'mostBoundaries', label: 'Most Boundaries' },
   { key: 'ticker', label: 'Ticker' },
+  { key: 'teamVsTeam', label: 'Team Vs Team' },
 ]
 
 // Standard 1 exclusive elements (simple toggles)
 const S1_SIMPLE_ELEMENTS: { key: Element; label: string }[] = [
-  { key: 'teamVsTeam', label: 'S1 · Team Vs Team' },
   { key: 'lastOutCard', label: 'S1 · Last Out Card' },
 ]
 
@@ -50,7 +50,7 @@ export function OverlayPanel() {
     const newVisible = !display[element]
     setDisplay(element, newVisible)
 
-    const themeScope = (element === 'teamVsTeam' || element === 'lastOutCard')
+    const themeScope = element === 'lastOutCard'
       ? 'standard1'
       : 'all'
 

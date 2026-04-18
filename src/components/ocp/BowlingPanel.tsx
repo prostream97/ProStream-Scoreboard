@@ -52,7 +52,6 @@ export function BowlingPanel() {
   const bowlingTeamId = snapshot.currentInningsState?.bowlingTeamId
   const canChangeBowler =
     snapshot.status === 'active'
-    && !!currentBowlerId
     && currentOverBalls.length === 0
     && legalDeliveryCount === 0
     && !isBowlerSelectOpen
@@ -85,7 +84,7 @@ export function BowlingPanel() {
             onClick={openBowlerSelect}
             className="rounded-full border border-black bg-[#f4f7f2] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:bg-[#e9efe5]"
           >
-            Change bowler
+            {currentBowlerId ? 'Change bowler' : 'Select bowler'}
           </button>
         ) : null}
       </div>
@@ -133,7 +132,7 @@ export function BowlingPanel() {
                   {bowlingTeamId ? (
                     <button
                       onClick={() => openPlayerEdit(currentBowler.playerId, bowlingTeamId)}
-                      className="rounded-full bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]"
+                      className="rounded-full border border-[#737373] bg-white p-2 text-[#c54e4c] transition hover:bg-[#fff1f0]"
                       title="Edit player"
                     >
                       <EditIcon className="h-4 w-4" />

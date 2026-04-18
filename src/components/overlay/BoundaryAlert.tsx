@@ -20,7 +20,13 @@ export function BoundaryAlert({ boundary, snapshot }: Props) {
   const shownIdRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!boundary || boundary.id === shownIdRef.current) return
+    if (!boundary) {
+      shownIdRef.current = null
+      setShown(null)
+      setVisible(false)
+      return
+    }
+    if (boundary.id === shownIdRef.current) return
     shownIdRef.current = boundary.id
     setShown(boundary)
     setVisible(true)

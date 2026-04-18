@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { db } from '@/lib/db'
 import { matches, innings, deliveries, players, teams } from '@/lib/db/schema'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, and, max } from 'drizzle-orm'
 import { recomputeInningsAggregates } from '@/lib/db/queries/match'
+import { pusher } from '@/lib/pusher/server'
 
 export const runtime = 'nodejs'
 
@@ -158,6 +159,143 @@ export async function GET(
   }
 }
 
+/** Append one delivery to an over (ball number = next index in that over). */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ matchId: string }> },
+) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { matchId } = await params
+  const id = parseInt(matchId, 10)
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid matchId' }, { status: 400 })
+
+  const body = await req.json() as {
+    inningsId: number
+    overNumber: number
+    batsmanId: number
+    bowlerId: number
+    runs: number
+    extraRuns: number
+    isLegal: boolean
+    extraType: string | null
+    isBoundary: boolean
+    isWicket: boolean
+    dismissalType: string | null
+    dismissedBatterId: number | null
+    fielder1Id: number | null
+    fielder2Id: number | null
+  }
+
+  if (
+    body.inningsId == null
+    || body.overNumber == null
+    || body.batsmanId == null
+    || body.bowlerId == null
+  ) {
+    return NextResponse.json({ error: 'inningsId, overNumber, batsmanId, and bowlerId are required' }, { status: 400 })
+  }
+
+  try {
+    const matchRow = await db.query.matches.findFirst({
+      where: eq(matches.id, id),
+      columns: { id: true, status: true, ballsPerOver: true },
+    })
+    if (!matchRow) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+
+    const editableStatuses = new Set(['active', 'paused', 'break', 'complete'])
+    if (!editableStatuses.has(matchRow.status)) {
+      return NextResponse.json(
+        { error: 'Deliveries can only be added once the match has started or after it is complete' },
+        { status: 400 },
+      )
+    }
+
+    const inningsRow = await db.query.innings.findFirst({
+      where: eq(innings.id, body.inningsId),
+    })
+    if (!inningsRow || inningsRow.matchId !== id) {
+      return NextResponse.json({ error: 'Innings not found for this match' }, { status: 404 })
+    }
+
+    const [maxBallRow] = await db
+      .select({ maxBall: max(deliveries.ballNumber) })
+      .from(deliveries)
+      .where(and(eq(deliveries.inningsId, body.inningsId), eq(deliveries.overNumber, body.overNumber)))
+
+    const prevMax = maxBallRow?.maxBall
+    const ballNumber = (typeof prevMax === 'number' ? prevMax : -1) + 1
+
+    await db.insert(deliveries).values({
+      inningsId: body.inningsId,
+      overNumber: body.overNumber,
+      ballNumber,
+      batsmanId: body.batsmanId,
+      bowlerId: body.bowlerId,
+      runs: body.runs ?? 0,
+      extraRuns: body.extraRuns ?? 0,
+      isBoundary: body.isBoundary ?? false,
+      isLegal: body.isLegal,
+      extraType: (body.extraType as typeof deliveries.$inferInsert['extraType']) ?? null,
+      isWicket: body.isWicket ?? false,
+      dismissalType: (body.dismissalType as typeof deliveries.$inferInsert['dismissalType']) ?? null,
+      dismissedBatterId: body.dismissedBatterId ?? null,
+      fielder1Id: body.fielder1Id ?? null,
+      fielder2Id: body.fielder2Id ?? null,
+      timestamp: new Date(),
+    })
+
+    const bpo = matchRow.ballsPerOver ?? 6
+    const updatedInnings = await recomputeInningsAggregates(body.inningsId, bpo)
+
+    if (matchRow.status !== 'complete') {
+      try {
+        await pusher.trigger(`match-${id}`, 'state.refresh', { source: 'delivery-added' })
+      } catch (e) {
+        console.error('[score-data POST] pusher state.refresh failed:', e)
+      }
+    }
+
+    const allInnings = await db.query.innings.findMany({
+      where: eq(innings.matchId, id),
+      orderBy: (i, { asc: ascFn }) => [ascFn(i.inningsNumber)],
+    })
+
+    const inn1 = allInnings.find((i) => i.inningsNumber === 1)
+    const inn2 = allInnings.find((i) => i.inningsNumber === 2)
+
+    if (matchRow.status === 'complete' && inn1 && inn2) {
+      let resultWinnerId: number | null = null
+      let resultMargin = 0
+      let resultType: 'wickets' | 'runs' | 'tie' | null = null
+
+      const target = inn1.totalRuns + 1
+      if (inn2.totalRuns >= target) {
+        resultWinnerId = inn2.battingTeamId
+        resultMargin = 10 - inn2.wickets
+        resultType = 'wickets'
+      } else if (inn1.totalRuns > inn2.totalRuns) {
+        resultWinnerId = inn1.battingTeamId
+        resultMargin = inn1.totalRuns - inn2.totalRuns
+        resultType = 'runs'
+      } else {
+        resultType = 'tie'
+      }
+
+      await db
+        .update(matches)
+        .set({ resultWinnerId, resultMargin, resultType })
+        .where(eq(matches.id, id))
+    }
+
+    return NextResponse.json({ ok: true, updatedInnings, ballNumber })
+  } catch (err) {
+    console.error('Score data post error:', err)
+    return NextResponse.json({ error: 'Failed to add delivery' }, { status: 500 })
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ matchId: string }> },
@@ -188,8 +326,12 @@ export async function PATCH(
       columns: { id: true, status: true, ballsPerOver: true, homeTeamId: true, awayTeamId: true },
     })
     if (!matchRow) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
-    if (matchRow.status !== 'complete') {
-      return NextResponse.json({ error: 'Score editor only works on completed matches' }, { status: 400 })
+    const editableStatuses = new Set(['active', 'paused', 'break', 'complete'])
+    if (!editableStatuses.has(matchRow.status)) {
+      return NextResponse.json(
+        { error: 'Deliveries can only be corrected once the match has started or after it is complete' },
+        { status: 400 },
+      )
     }
 
     // Fetch delivery + verify it belongs to this match
@@ -220,7 +362,15 @@ export async function PATCH(
     const bpo = matchRow.ballsPerOver ?? 6
     const updatedInnings = await recomputeInningsAggregates(deliveryRow.inningsId, bpo)
 
-    // Re-evaluate match result using latest innings data from DB
+    if (matchRow.status !== 'complete') {
+      try {
+        await pusher.trigger(`match-${id}`, 'state.refresh', { source: 'delivery-corrected' })
+      } catch (e) {
+        console.error('[score-data PATCH] pusher state.refresh failed:', e)
+      }
+    }
+
+    // Re-evaluate match result using latest innings data from DB (finished matches only)
     const allInnings = await db.query.innings.findMany({
       where: eq(innings.matchId, id),
       orderBy: (i, { asc }) => [asc(i.inningsNumber)],
@@ -229,7 +379,7 @@ export async function PATCH(
     const inn1 = allInnings.find((i) => i.inningsNumber === 1)
     const inn2 = allInnings.find((i) => i.inningsNumber === 2)
 
-    if (inn1 && inn2) {
+    if (matchRow.status === 'complete' && inn1 && inn2) {
       let resultWinnerId: number | null = null
       let resultMargin = 0
       let resultType: 'wickets' | 'runs' | 'tie' | null = null

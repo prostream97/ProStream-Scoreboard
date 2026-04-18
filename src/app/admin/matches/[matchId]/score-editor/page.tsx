@@ -28,7 +28,10 @@ export default async function ScoreEditorPage({ params }: Props) {
   })
 
   if (!matchRow) notFound()
-  if (matchRow.status !== 'complete') redirect(`/admin/tournaments/${matchRow.tournamentId}`)
+  const canEditDeliveries = ['active', 'paused', 'break', 'complete'].includes(matchRow.status)
+  if (!canEditDeliveries) {
+    redirect(matchRow.tournamentId ? `/admin/tournaments/${matchRow.tournamentId}` : '/')
+  }
 
   // Fetch all deliveries for all innings
   const allDeliveries = await db
@@ -114,6 +117,8 @@ export default async function ScoreEditorPage({ params }: Props) {
       homeTeam={{ id: matchRow.homeTeam.id, name: matchRow.homeTeam.name, shortCode: matchRow.homeTeam.shortCode, primaryColor: matchRow.homeTeam.primaryColor }}
       awayTeam={{ id: matchRow.awayTeam.id, name: matchRow.awayTeam.name, shortCode: matchRow.awayTeam.shortCode, primaryColor: matchRow.awayTeam.primaryColor }}
       tournamentId={matchRow.tournamentId ?? null}
+      matchStatus={matchRow.status}
+      operatorHref={`/match/${matchRow.id}/operator`}
     />
   )
 }
