@@ -1053,13 +1053,24 @@ export const useMatchStore = create<MatchStore>((set, get) => ({
       // Undo a flushed delivery — requires DB delete
       const lastId = lastFlushedDeliveryIds[lastFlushedDeliveryIds.length - 1]
       try {
-        await fetch(`/api/match/undo`, {
+        const undoRes = await fetch(`/api/match/undo`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deliveryId: lastId, matchId: snapshot.matchId }),
         })
+        if (!undoRes.ok) {
+          console.error('Undo failed:', await undoRes.text())
+          return
+        }
+        const undoBody = await undoRes.json().catch(() => ({})) as {
+          rebuiltBuffer?: DeliveryRecord[]
+        }
+        const rebuilt = undoBody.rebuiltBuffer ?? []
         set((s) => ({
           lastFlushedDeliveryIds: s.lastFlushedDeliveryIds.slice(0, -1),
+          currentOverBalls: rebuilt,
+          flushedBallCount: rebuilt.length,
+          legalDeliveryCount: rebuilt.filter((d) => d.isLegal).length,
         }))
         // Refresh state from Neon after DB undo
         const res = await fetch(`/api/match/${snapshot.matchId}/state`)

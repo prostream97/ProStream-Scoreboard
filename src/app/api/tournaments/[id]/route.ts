@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth/config'
 import { canAccessTournament, getTournamentPermissionContext } from '@/lib/auth/access'
 import { db } from '@/lib/db'
-import { tournaments } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { tournaments, teams, matches, innings } from '@/lib/db/schema'
+import { eq, inArray } from 'drizzle-orm'
 import { getTournamentWithDetails } from '@/lib/db/queries/tournament'
 
 export const runtime = 'nodejs'
@@ -68,5 +68,54 @@ export async function PATCH(
   } catch (err) {
     console.error('Tournament update error:', err)
     return NextResponse.json({ error: 'Failed to update tournament' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (session.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = await params
+  const tournamentId = parseInt(id, 10)
+
+  try {
+    // 1. Get all team IDs in this tournament
+    const tournamentTeams = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.tournamentId, tournamentId))
+    const teamIds = tournamentTeams.map((t) => t.id)
+
+    // 2. Get all match IDs for this tournament (by tournamentId or by team membership)
+    let matchIds: number[] = []
+    if (teamIds.length > 0) {
+      const tournamentMatches = await db
+        .select({ id: matches.id })
+        .from(matches)
+        .where(inArray(matches.homeTeamId, teamIds))
+      matchIds = tournamentMatches.map((m) => m.id)
+    }
+
+    // 3. Delete innings for those matches (cascade handles deliveries, partnerships, match_state)
+    if (matchIds.length > 0) {
+      await db.delete(innings).where(inArray(innings.matchId, matchIds))
+      await db.delete(matches).where(inArray(matches.id, matchIds))
+    }
+
+    // 4. Delete tournament (cascades: teams → players, tournament_access, overlay_links)
+    const [deleted] = await db
+      .delete(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .returning()
+
+    if (!deleted) return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Tournament delete error:', err)
+    return NextResponse.json({ error: 'Failed to delete tournament' }, { status: 500 })
   }
 }

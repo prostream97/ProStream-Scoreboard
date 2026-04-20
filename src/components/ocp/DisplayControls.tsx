@@ -3,7 +3,7 @@
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'tossResult' | 'mostWickets' | 'mostBoundaries'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'tossResult' | 'mostWickets' | 'mostBoundaries' | 'matchSummary'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'scorebug', label: 'Scorebug' },
@@ -12,13 +12,18 @@ const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'tossResult', label: 'Toss Result' },
   { key: 'mostWickets', label: 'Most Wickets' },
   { key: 'mostBoundaries', label: 'Most Boundaries' },
-  { key: 'ticker', label: 'Ticker' },
+  { key: 'matchSummary', label: 'Match Summary' },
 ]
 
 export function DisplayControls() {
   const snapshot = useMatchStore((s) => s.snapshot)
   const display = useUIStore((s) => s.display)
   const setDisplay = useUIStore((s) => s.setDisplay)
+  const showTeamSummary = useUIStore((s) => s.showTeamSummary)
+  const hideTeamSummary = useUIStore((s) => s.hideTeamSummary)
+  const activeSummaryView = useUIStore((s) => s.activeSummaryView)
+  const showTeamSquad = useUIStore((s) => s.showTeamSquad)
+  const hideTeamSquad = useUIStore((s) => s.hideTeamSquad)
 
   if (!snapshot) return null
 
@@ -36,6 +41,48 @@ export function DisplayControls() {
           payload: { element, visible: newVisible, themeScope: 'all' },
         }),
       })
+  }
+
+  async function toggleBattingSummary() {
+    if (!snapshot) return
+    const battingTeamId = snapshot.currentInningsState?.battingTeamId
+    if (!battingTeamId) return
+    const newVisible = !(display.teamSummary && activeSummaryView === 'batting')
+    if (newVisible) {
+      showTeamSummary(battingTeamId, 'batting')
+    } else {
+      hideTeamSummary()
+    }
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot.matchId,
+        event: 'display.toggle',
+        payload: { element: 'teamSummary', visible: newVisible, summaryView: 'batting', summaryTeamId: battingTeamId, themeScope: 'all' },
+      }),
+    })
+  }
+
+  async function toggleBowlingSummary() {
+    if (!snapshot) return
+    const bowlingTeamId = snapshot.currentInningsState?.bowlingTeamId
+    if (!bowlingTeamId) return
+    const newVisible = !(display.teamSummary && activeSummaryView === 'bowling')
+    if (newVisible) {
+      showTeamSummary(bowlingTeamId, 'bowling')
+    } else {
+      hideTeamSummary()
+    }
+    await fetch('/api/pusher/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matchId: snapshot.matchId,
+        event: 'display.toggle',
+        payload: { element: 'teamSummary', visible: newVisible, summaryView: 'bowling', summaryTeamId: bowlingTeamId, themeScope: 'all' },
+      }),
+    })
   }
 
   async function showPlayerCard(playerId: number) {
@@ -80,6 +127,56 @@ export function DisplayControls() {
             {display[key] ? '●' : '○'} {label}
           </button>
         ))}
+
+        {/* Team Squad toggle */}
+        <button
+          onClick={async () => {
+            if (!snapshot) return
+            const newVisible = !display.teamSquad
+            if (newVisible) showTeamSquad()
+            else hideTeamSquad()
+            await fetch('/api/pusher/trigger', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                matchId: snapshot.matchId,
+                event: 'display.toggle',
+                payload: { element: 'teamSquad', visible: newVisible, themeScope: 'all' },
+              }),
+            })
+          }}
+          className={`px-3 py-1.5 font-stats text-xs rounded-lg border transition-colors ${
+            display.teamSquad
+              ? 'bg-[#00a832] border-[#cce8d4] text-white'
+              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          {display.teamSquad ? '●' : '○'} Team Squad
+        </button>
+
+        {/* Batting summary toggle */}
+        <button
+          onClick={toggleBattingSummary}
+          className={`px-3 py-1.5 font-stats text-xs rounded-lg border transition-colors ${
+            display.teamSummary && activeSummaryView === 'batting'
+              ? 'bg-[#00a832] border-[#cce8d4] text-white'
+              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          {display.teamSummary && activeSummaryView === 'batting' ? '●' : '○'} Batting Summary
+        </button>
+
+        {/* Bowling summary toggle */}
+        <button
+          onClick={toggleBowlingSummary}
+          className={`px-3 py-1.5 font-stats text-xs rounded-lg border transition-colors ${
+            display.teamSummary && activeSummaryView === 'bowling'
+              ? 'bg-[#00a832] border-[#cce8d4] text-white'
+              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          {display.teamSummary && activeSummaryView === 'bowling' ? '●' : '○'} Bowling Summary
+        </button>
 
         {/* Quick player card buttons */}
         <div className="w-full border-t border-gray-800 mt-2 pt-2 flex gap-2 flex-wrap">

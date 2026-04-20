@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, ChevronRight, Menu, Wallet } from 'lucide-react'
+import { ChevronRight, Menu, Wallet } from 'lucide-react'
 import { useSidebar } from '@/contexts/SidebarContext'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
@@ -12,7 +12,6 @@ const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 const TITLES: Array<{ match: (pathname: string) => boolean; label: string }> = [
   { match: (pathname) => pathname === '/', label: 'Dashboard' },
   { match: (pathname) => pathname.startsWith('/admin/tournaments'), label: 'Tournaments' },
-  { match: (pathname) => pathname.startsWith('/match/new'), label: 'Quick Match' },
   { match: (pathname) => pathname.startsWith('/overlay-manager'), label: 'Overlay Manager' },
   { match: (pathname) => pathname.startsWith('/wallet'), label: 'Wallet' },
   { match: (pathname) => pathname.startsWith('/admin/users'), label: 'User Management' },
@@ -91,6 +90,23 @@ export function Navbar() {
               </div>
             </div>
           </Link>
+
+          <a
+            href="https://prostream-auction.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden h-[50px] items-center rounded-full border border-white/12 bg-white/6 px-3 py-2 text-[25px] transition hover:bg-white/10 md:flex"
+          >
+            <p className="font-bold leading-none tracking-tight">
+              <span className="text-[20px]" style={{ color: '#4F46E5' }}>
+                Pro
+              </span>
+              <span className="text-[20px]" style={{ color: '#10B981' }}>
+                Stream
+              </span>
+              <span className="ml-1 text-[20px] text-white/90">Auction</span>
+            </p>
+          </a>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -103,10 +119,6 @@ export function Navbar() {
               </div>
             </div>
           ) : null}
-
-          <button className="hidden h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/80 transition hover:bg-white/10 sm:flex">
-            <Bell className="h-4 w-4" />
-          </button>
 
           {session ? (
             <>

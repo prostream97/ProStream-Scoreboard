@@ -6,7 +6,7 @@ import { User, WifiOff } from 'lucide-react'
 import { PusherProvider, useEvent } from '@/components/shared/PusherProvider'
 import { getPusherClient } from '@/lib/pusher/client'
 import { MatchGraphs } from '@/components/viewer/MatchGraphs'
-import { AppBadge } from '@/components/shared/AppPrimitives'
+import { AppBadge, AppButton } from '@/components/shared/AppPrimitives'
 import type { MatchSnapshot, BatterStats, BowlerStats, InningsState } from '@/types/match'
 import type { DeliveryAddedPayload, WicketPayload, InningsChangePayload } from '@/types/pusher'
 import { applyDeliveryToPartnershipStats, createPartnershipStats } from '@/lib/match/partnership'
@@ -236,6 +236,12 @@ function LiveScoreboard({ matchId, initialSnapshot }: ViewerClientProps) {
       </AnimatePresence>
 
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+        <div className="flex justify-end">
+          <AppButton href={`/admin/matches/${matchId}/score-editor`} variant="secondary" className="h-9 px-4 text-xs">
+            Edit Score
+          </AppButton>
+        </div>
+
         {fetchError ? (
           <div className="rounded-[1.5rem] border border-yellow-200 bg-yellow-50 px-4 py-3 text-center text-sm text-yellow-700">
             {fetchError}

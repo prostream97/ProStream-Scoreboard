@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Trophy, CalendarClock, Pencil, X } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
@@ -24,6 +25,7 @@ import type {
 } from '@/types/tournament'
 import { getBattingFirstTeamId } from '@/lib/auth/utils'
 import { MATCH_STAGE_LABELS, MATCH_STAGE_ORDER } from '@/lib/tournament/stageRules'
+import { cn } from '@/lib/cn'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 
@@ -231,7 +233,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     .map((stage) => ({
       stage,
       label: MATCH_STAGE_LABELS[stage],
-      matches: tournament.matches.filter((match) => (match.matchStage ?? 'group') === stage),
+      matches: tournament.matches
+        .filter((match) => (match.matchStage ?? 'group') === stage)
+        .sort((a, b) => {
+          const statusRank: Record<TournamentMatch['status'], number> = {
+            active: 0,
+            break: 1,
+            paused: 2,
+            scheduled: 3,
+            complete: 4,
+            abandoned: 5,
+          }
+          const rankDelta = statusRank[a.status] - statusRank[b.status]
+          if (rankDelta !== 0) return rankDelta
+          return new Date(a.date).getTime() - new Date(b.date).getTime()
+        }),
     }))
     .filter((group) => group.matches.length > 0)
 
@@ -240,7 +256,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     <AppPage className="max-w-7xl">
       <TournamentNav tournamentId={tournamentId} />
 
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+      <div className="grid gap-4">
         <SurfaceCard className="space-y-5">
           {/* Header row: logo + info + status dropdown */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -257,16 +273,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 )}
               </div>
               <div className="min-w-0 space-y-1">
-                <p className="app-kicker">Tournament overview</p>
-                <h1 className="text-xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-2xl">{tournament.name}</h1>
-                <p className="text-sm text-slate-500">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h1 className="text-xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-2xl">{tournament.name}</h1>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <AppBadge tone="neutral">{tournament.shortName}</AppBadge>
+                    <AppBadge tone="blue">{`TRN-${tournament.id.toString().padStart(3, '0')}`}</AppBadge>
+                    <AppBadge tone={tournamentTone[tournament.status] ?? 'neutral'}>{tournament.status.replace('_', ' ')}</AppBadge>
+                  </div>
+                </div>
+                <p className="text-lg text-slate-500">
                   {tournament.format} · {tournament.totalOvers} overs{tournament.ballsPerOver !== 6 ? ` · ${tournament.ballsPerOver} balls/over` : ''}
                 </p>
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <AppBadge tone="neutral">{tournament.shortName}</AppBadge>
-                  <AppBadge tone="blue">{`TRN-${tournament.id.toString().padStart(3, '0')}`}</AppBadge>
-                  <AppBadge tone={tournamentTone[tournament.status] ?? 'neutral'}>{tournament.status.replace('_', ' ')}</AppBadge>
-                </div>
               </div>
             </div>
             {canManageTournament ? (
@@ -294,132 +311,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             ) : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <StatCard label="Teams" value={tournament.teams.length} />
-            <StatCard label="Matches" value={tournament.matches.length} />
-            <StatCard label="Path" value={getStagePathLabel(stageStructure)} />
-          </div>
         </SurfaceCard>
 
-        <SurfaceCard className="space-y-4">
-          <div>
-            <p className="app-kicker">Bracket path</p>
-            <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{getStagePathLabel(stageStructure)}</h3>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {MATCH_STAGE_ORDER.map((stage) => (
-              <AppBadge key={stage} tone="neutral">
-                {MATCH_STAGE_LABELS[stage]}: {stageStructure.counts[stage]}
-              </AppBadge>
-            ))}
-          </div>
-          {MATCH_STAGE_ORDER.some((stage) => Boolean(stageStructure.reasonsByStage[stage])) ? (
-            <div className="space-y-2 text-sm text-slate-500">
-              {MATCH_STAGE_ORDER
-                .filter((stage) => stageStructure.reasonsByStage[stage])
-                .map((stage) => (
-                  <p key={stage}>
-                    <span className="font-semibold text-slate-700">{MATCH_STAGE_LABELS[stage]}:</span> {stageStructure.reasonsByStage[stage]}
-                  </p>
-                ))}
-            </div>
-          ) : null}
-        </SurfaceCard>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[0.72fr_1.28fr]">
-        <SurfaceCard className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="app-kicker">Tournament teams</p>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Teams ({tournament.teams.length})</h2>
-            </div>
-            {canManageTournament ? <AppButton href={`/admin/tournaments/${tournamentId}/teams`} variant="secondary">Manage Teams</AppButton> : null}
-          </div>
-          {tournament.teams.length === 0 ? (
-            <EmptyState
-              title="No teams yet"
-              description={canManageTournament ? 'Add teams to unlock fixtures and player management.' : 'Teams can be added by the owner or assigned operators.'}
-            />
-          ) : (
-            <div className="space-y-3">
-              {tournament.teams.map((team) => (
-                <div key={team.id} className="flex items-center gap-3 rounded-[1.35rem] border border-[#e1e7df] bg-[#f8faf7] px-4 py-3">
-                  {team.logoCloudinaryId ? (
-                    <img
-                      src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_36,h_36,f_webp/${team.logoCloudinaryId}`}
-                      alt=""
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full" style={{ backgroundColor: team.primaryColor }} />
-                  )}
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-950">{team.name}</p>
-                    <p className="text-sm" style={{ color: team.primaryColor }}>{team.shortCode}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </SurfaceCard>
-
-        <SurfaceCard className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="app-kicker">Standings</p>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Points and NRR</h2>
-            </div>
-          </div>
-          {tournament.status === 'upcoming' || standings.length === 0 ? (
-            <EmptyState
-              title="No standings yet"
-              description="Standings will appear once group matches start producing results."
-            />
-          ) : (
-            <div className="app-table-wrap">
-              <table className="app-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Team</th>
-                    <th>P</th>
-                    <th>W</th>
-                    <th>L</th>
-                    <th>T</th>
-                    <th>Pts</th>
-                    <th>NRR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((row, index) => (
-                    <tr key={row.teamId}>
-                      <td>{index + 1}</td>
-                      <td>
-                        <span className="font-semibold" style={{ color: row.primaryColor }}>{row.teamShortCode}</span>
-                        <span className="ml-2 text-sm text-slate-500">{row.teamName}</span>
-                      </td>
-                      <td>{row.played}</td>
-                      <td>{row.won}</td>
-                      <td>{row.lost}</td>
-                      <td>{row.tied}</td>
-                      <td>{row.points}</td>
-                      <td className={row.nrr >= 0 ? 'text-[#10994c]' : 'text-[#c54e4c]'}>
-                        {row.nrr >= 0 ? '+' : ''}{row.nrr.toFixed(3)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SurfaceCard>
       </div>
 
       <SurfaceCard className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="app-kicker">Fixtures</p>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Matches ({tournament.matches.length})</h2>
           </div>
           {canManageTournament && tournament.teams.length >= 2 ? (
@@ -518,7 +416,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950">{group.label}</h3>
                   <AppBadge tone="neutral">{group.matches.length} matches</AppBadge>
                 </div>
-                <div className="grid gap-3 xl:grid-cols-2">
+                <div className="grid gap-2 xl:grid-cols-3">
                   {group.matches.map((match) => (
                     <MatchCard
                       key={match.id}
@@ -535,6 +433,58 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </div>
         )}
       </SurfaceCard>
+
+      <div className="grid gap-4">
+        <SurfaceCard className="space-y-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Team Standing</h2>
+            </div>
+          </div>
+          {tournament.status === 'upcoming' || standings.length === 0 ? (
+            <EmptyState
+              title="No standings yet"
+              description="Standings will appear once group matches start producing results."
+            />
+          ) : (
+            <div className="app-table-wrap">
+              <table className="app-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>P</th>
+                    <th>W</th>
+                    <th>L</th>
+                    <th>T</th>
+                    <th>Pts</th>
+                    <th>NRR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((row, index) => (
+                    <tr key={row.teamId}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <span className="font-semibold" style={{ color: row.primaryColor }}>{row.teamShortCode}</span>
+                        <span className="ml-2 text-sm text-slate-500">{row.teamName}</span>
+                      </td>
+                      <td>{row.played}</td>
+                      <td>{row.won}</td>
+                      <td>{row.lost}</td>
+                      <td>{row.tied}</td>
+                      <td>{row.points}</td>
+                      <td className={row.nrr >= 0 ? 'text-[#10994c]' : 'text-[#c54e4c]'}>
+                        {row.nrr >= 0 ? '+' : ''}{row.nrr.toFixed(3)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SurfaceCard>
+      </div>
     </AppPage>
 
     {showTournamentEdit ? (
@@ -580,24 +530,59 @@ function MatchCard({
   stageStructure: TournamentStageStructure
   onEdited: () => void
 }) {
+  const router = useRouter()
   const stage = match.matchStage ?? 'group'
   const stageLabel = MATCH_STAGE_LABELS[stage]
   const [showEdit, setShowEdit] = useState(false)
+  const matchDateLabel = new Date(match.date).toLocaleDateString()
+  const isLiveMatch = match.status === 'active' || match.status === 'break' || match.status === 'paused'
+  const matchTargetPath = canManage && isLiveMatch ? `/admin/matches/${match.id}/score-editor` : `/viewer/${match.id}`
+
+  function resultText() {
+    if (match.status !== 'complete') return null
+    if (match.resultType === 'tie') return 'Match tied'
+    if (!match.resultWinnerId || !match.resultType || !match.resultMargin) return 'Result recorded'
+
+    const winner = match.resultWinnerId === match.homeTeam.id ? match.homeTeam.shortCode : match.awayTeam.shortCode
+    const unit = match.resultType === 'wickets' ? 'wicket' : 'run'
+    const suffix = match.resultMargin === 1 ? unit : `${unit}s`
+    return `${winner} won by ${match.resultMargin} ${suffix}`
+  }
 
   return (
     <>
-      <div className="rounded-[1.5rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
+      <div
+        className="cursor-pointer h-[170px] w-[380px] rounded-[1.1rem] border border-[#e1e7df] bg-[#f8faf7] p-2.5 transition hover:border-[#bcd8c3] hover:bg-[#eaf4ec]"
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push(matchTargetPath)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            router.push(matchTargetPath)
+          }
+        }}
+      >
         <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <AppBadge tone="neutral">{stageLabel}</AppBadge>
-            {match.matchLabel ? <AppBadge tone="blue">{match.matchLabel}</AppBadge> : null}
-            <AppBadge tone={match.status === 'active' ? 'green' : match.status === 'break' || match.status === 'paused' ? 'amber' : 'neutral'}>
+          <div className="flex h-[30px] w-full flex-wrap items-center gap-2">
+            <AppBadge className="h-[30px] w-[150px] justify-center px-2 py-0.5 text-center text-[12px] tracking-[2.5px]" tone="neutral">{stageLabel}</AppBadge>
+            {match.matchLabel ? <AppBadge className="h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]" tone="blue">{match.matchLabel}</AppBadge> : null}
+            <AppBadge
+              className={cn(
+                'h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]',
+                match.status === 'complete' ? 'bg-[#34b743] text-white font-bold' : null,
+              )}
+              tone={match.status === 'active' ? 'green' : match.status === 'break' || match.status === 'paused' ? 'amber' : 'neutral'}
+            >
               {match.status}
             </AppBadge>
           </div>
           {canManage && match.status !== 'complete' ? (
             <button
-              onClick={() => setShowEdit(true)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowEdit(true)
+              }}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dfe6df] bg-white text-slate-400 transition hover:border-[#b8d7c0] hover:text-slate-700"
               title="Edit match"
             >
@@ -605,27 +590,50 @@ function MatchCard({
             </button>
           ) : null}
         </div>
-        <p className="mt-4 text-lg font-semibold tracking-[-0.03em] text-slate-950">
-          <span style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
-          <span className="mx-2 text-slate-300">vs</span>
-          <span style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
-        </p>
-        <p className="mt-1 text-sm text-slate-500">
-          {match.venue ?? 'Venue TBD'} · {new Date(match.date).toLocaleDateString()}
-        </p>
-        {match.tossWinnerId ? (
-          <p className="mt-1 text-xs text-slate-400">
-            Toss: {teams.find((t) => t.id === match.tossWinnerId)?.shortCode ?? '?'} elected to {match.tossDecision}
-          </p>
-        ) : null}
-        <div className="mt-4 flex gap-2">
-          <AppButton href={`/viewer/${match.id}`} variant="secondary" className="h-9 px-3 text-xs">View</AppButton>
-          {match.status !== 'complete' ? (
-            <AppButton href={`/match/${match.id}/operator`} className="h-9 px-3 text-xs">Score</AppButton>
-          ) : (
-            <AppButton href={`/admin/matches/${match.id}/score-editor`} variant="secondary" className="h-9 px-3 text-xs">Edit Score</AppButton>
-          )}
+
+        <div className="mt-2.5 flex h-[70px] items-center justify-between gap-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            {match.homeTeam.logoCloudinaryId ? (
+              <img
+                src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_44,h_44,f_webp/${match.homeTeam.logoCloudinaryId}`}
+                alt={`${match.homeTeam.shortCode} logo`}
+                className="h-10 w-10 rounded-full border border-[#e1e7df] object-cover"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-full border border-[#e1e7df]" style={{ backgroundColor: match.homeTeam.primaryColor }} />
+            )}
+            <span className="text-lg font-semibold text-slate-900" style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
+          </div>
+          <span className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-400">vs</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-lg font-semibold text-slate-900" style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
+            {match.awayTeam.logoCloudinaryId ? (
+              <img
+                src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_44,h_44,f_webp/${match.awayTeam.logoCloudinaryId}`}
+                alt={`${match.awayTeam.shortCode} logo`}
+                className="h-10 w-10 rounded-full border border-[#e1e7df] object-cover"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-full border border-[#e1e7df]" style={{ backgroundColor: match.awayTeam.primaryColor }} />
+            )}
+          </div>
         </div>
+
+        {resultText() ? (
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.82rem]">
+            <p className="min-w-0 truncate text-slate-500">{match.venue ?? 'Venue TBD'} · {matchDateLabel}</p>
+            <p className="shrink-0 font-semibold text-slate-700">{resultText()}</p>
+          </div>
+        ) : (
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.82rem]">
+            <p className="min-w-0 truncate text-slate-500">{match.venue ?? 'Venue TBD'} · {matchDateLabel}</p>
+            {match.tossWinnerId ? (
+              <p className="shrink-0 text-slate-400">
+                Toss: {teams.find((t) => t.id === match.tossWinnerId)?.shortCode ?? '?'} elected to {match.tossDecision}
+              </p>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {showEdit ? (

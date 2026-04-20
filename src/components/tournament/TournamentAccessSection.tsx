@@ -133,11 +133,7 @@ export function TournamentAccessSection({
   return (
     <SurfaceCard className="space-y-5">
       <div>
-        <p className="app-kicker">Tournament access</p>
-        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Owner and operators</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          The creator is the owner and provides tournament branding. Additional granted users act as tournament operators.
-        </p>
+        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Tournament Access</h2>
       </div>
 
       {owner ? (

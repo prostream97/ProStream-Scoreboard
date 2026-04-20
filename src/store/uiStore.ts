@@ -5,7 +5,6 @@ type DisplayElements = {
   playerCard: boolean
   wicketAlert: boolean
   partnership: boolean
-  ticker: boolean
   summary: boolean
   teamSummary: boolean
   tossResult: boolean
@@ -16,6 +15,7 @@ type DisplayElements = {
   teamSquad: boolean
   squadWithImage: boolean
   teamVsTeam: boolean
+  matchSummary: boolean
 }
 
 // null teamId = add-new mode not yet targeted; set teamId before opening
@@ -62,7 +62,6 @@ export const useUIStore = create<UIStore>((set) => ({
     playerCard: false,
     wicketAlert: false,
     partnership: false,
-    ticker: false,
     summary: false,
     teamSummary: false,
     tossResult: false,
@@ -73,6 +72,7 @@ export const useUIStore = create<UIStore>((set) => ({
     teamSquad: false,
     squadWithImage: false,
     teamVsTeam: false,
+    matchSummary: false,
   },
   activePlayerId: null,
   activeSummaryTeamId: null,

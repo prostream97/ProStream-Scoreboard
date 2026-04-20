@@ -169,7 +169,7 @@ export function OCPTopBar() {
           visible: !isActive,
           summaryTeamId: isActive ? undefined : teamId,
           summaryView: isActive ? undefined : view,
-          themeScope: 'standard',
+          themeScope: 'all',
         },
       }),
     })

@@ -51,13 +51,13 @@ export type InningsChangePayload = {
   newInnings: InningsState
 }
 
-export type DisplayTogglePayload = {
-  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'ticker' | 'summary' | 'teamSummary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamSquad' | 'squadWithImage' | 'teamVsTeam'
+export type DisplayTogglePayload = { 
+  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'summary' | 'teamSummary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamSquad' | 'squadWithImage' | 'teamVsTeam' | 'matchSummary'
   visible: boolean
   playerId?: number
   summaryTeamId?: number
   summaryView?: 'batting' | 'bowling'
-  themeScope?: 'all' | 'standard' | 'icc2023' | 'standard1'
+  themeScope?: 'all' | 'standard' | 'icc2023' | 'standard1' | 'theme1'
   teamSquadTeamId?: number
   squadWithImageTeamId?: number
 }

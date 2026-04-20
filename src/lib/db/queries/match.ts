@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
-import { matches, innings, players, teams, matchState, deliveries, users, type DeliveryBuffer } from '@/lib/db/schema'
-import { eq, and, sql, gt, desc, inArray } from 'drizzle-orm'
+import { matches, innings, players, teams, matchState, deliveries, users } from '@/lib/db/schema'
+import { eq, and, sql, gt, desc, inArray, ne, SQL } from 'drizzle-orm'
 import type { MatchSnapshot, BatterStats, BowlerStats, PartnershipStats, InningsState, InningsStatus, TeamSummary, PlayerSummary } from '@/types/match'
 import { createPartnershipStats, getBatterContributionForDelivery } from '@/lib/match/partnership'
 import { applyLiveOverBufferToPlayerStats } from '@/lib/match/applyLiveOverBufferToPlayerStats'
@@ -8,23 +8,16 @@ import { applyLiveOverBufferToPlayerStats } from '@/lib/match/applyLiveOverBuffe
 const NON_BOWLER_WICKET_TYPES = new Set(['runout', 'obstructingfield', 'handledball'])
 
 /**
- * `match_state.current_over_buffer` keeps the full current over for UI dots; balls already flushed
- * to `deliveries` must not be applied again on top of SQL aggregates.
+ * `match_state.current_over_buffer` owns the live current over; `deliveries` rows for that
+ * over (written for durability by safety flushes) must be excluded from SQL aggregates so they
+ * aren't double-counted when the buffer is applied on top.
  */
-async function getUnpersistedCurrentOverBuffer(
-  inningsId: number,
-  overNumber: number,
-  buffer: DeliveryBuffer[],
-): Promise<DeliveryBuffer[]> {
-  if (buffer.length === 0) return []
-  const existingRows = await db
-    .select({ ballNumber: deliveries.ballNumber })
-    .from(deliveries)
-    .where(and(eq(deliveries.inningsId, inningsId), eq(deliveries.overNumber, overNumber)))
-  const persistedBallNumbers = new Set(existingRows.map((r) => r.ballNumber))
-  return buffer.filter(
-    (d) => d.overNumber === overNumber && !persistedBallNumbers.has(d.ballNumber),
-  )
+function deliveriesScopeForInnings(inningsId: number, excludeOverNumber?: number): SQL {
+  const base = eq(deliveries.inningsId, inningsId)
+  if (typeof excludeOverNumber === 'number') {
+    return and(base, ne(deliveries.overNumber, excludeOverNumber))!
+  }
+  return base
 }
 
 export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot | null> {
@@ -50,21 +43,14 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
   ) ?? null
 
   const bpo = matchRow.ballsPerOver ?? 6
-  const rawOverBuffer = state?.currentOverBuffer ?? []
-  const unpersistedOverBuffer =
-    currentInningsRow && rawOverBuffer.length > 0
-      ? await getUnpersistedCurrentOverBuffer(
-          currentInningsRow.id,
-          state?.currentOver ?? 0,
-          rawOverBuffer,
-        )
-      : []
+  const liveOverBuffer = state?.currentOverBuffer ?? []
+  const currentOverNumber = state?.currentOver ?? 0
 
   const [battingTeamPlayers, bowlingTeamPlayers, battersStats, bowlersStats] = await Promise.all([
     getTeamPlayers(currentInningsRow?.battingTeamId ?? matchRow.homeTeamId),
     getTeamPlayers(currentInningsRow?.bowlingTeamId ?? matchRow.awayTeamId),
-    currentInningsRow ? getBatterStats(currentInningsRow.id, state?.strikerId ?? null) : [],
-    currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null, bpo) : [],
+    currentInningsRow ? getBatterStats(currentInningsRow.id, state?.strikerId ?? null, currentOverNumber) : [],
+    currentInningsRow ? getBowlerStats(currentInningsRow.id, state?.currentBowlerId ?? null, bpo, currentOverNumber) : [],
   ])
 
   const partnershipStats =
@@ -73,14 +59,15 @@ export async function getMatchSnapshot(matchId: number): Promise<MatchSnapshot |
           currentInningsRow.id,
           state?.strikerId ?? null,
           state?.nonStrikerId ?? null,
-          unpersistedOverBuffer,
+          liveOverBuffer,
+          currentOverNumber,
         )
       : null
 
   const { batters: battersWithBuffer, bowlers: bowlersWithBuffer } = applyLiveOverBufferToPlayerStats(
     battersStats,
     bowlersStats,
-    unpersistedOverBuffer,
+    liveOverBuffer,
     battingTeamPlayers,
     bowlingTeamPlayers,
     bpo,
@@ -199,7 +186,13 @@ async function getTeamPlayers(teamId: number): Promise<PlayerSummary[]> {
   return rows
 }
 
-async function getBatterStats(inningsId: number, strikerId: number | null): Promise<BatterStats[]> {
+async function getBatterStats(
+  inningsId: number,
+  strikerId: number | null,
+  excludeOverNumber?: number,
+): Promise<BatterStats[]> {
+  const scope = deliveriesScopeForInnings(inningsId, excludeOverNumber)
+
   const rows = await db
     .select({
       playerId: deliveries.batsmanId,
@@ -212,7 +205,7 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
     })
     .from(deliveries)
     .innerJoin(players, eq(deliveries.batsmanId, players.id))
-    .where(eq(deliveries.inningsId, inningsId))
+    .where(scope)
     .groupBy(deliveries.batsmanId, players.name, players.displayName)
 
   const wicketRows = await db
@@ -226,7 +219,7 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
       fielder2Id: deliveries.fielder2Id,
     })
     .from(deliveries)
-    .where(and(eq(deliveries.inningsId, inningsId), eq(deliveries.isWicket, true)))
+    .where(and(scope, eq(deliveries.isWicket, true)))
     .orderBy(desc(deliveries.id))
 
   const latestWicketByBatter = new Map<number, (typeof wicketRows)[number]>()
@@ -353,7 +346,14 @@ async function getBatterStats(inningsId: number, strikerId: number | null): Prom
   })
 }
 
-async function getBowlerStats(inningsId: number, currentBowlerId: number | null, bpo = 6): Promise<BowlerStats[]> {
+async function getBowlerStats(
+  inningsId: number,
+  currentBowlerId: number | null,
+  bpo = 6,
+  excludeOverNumber?: number,
+): Promise<BowlerStats[]> {
+  const scope = deliveriesScopeForInnings(inningsId, excludeOverNumber)
+
   const rows = await db
     .select({
       playerId: deliveries.bowlerId,
@@ -365,7 +365,7 @@ async function getBowlerStats(inningsId: number, currentBowlerId: number | null,
     })
     .from(deliveries)
     .innerJoin(players, eq(deliveries.bowlerId, players.id))
-    .where(eq(deliveries.inningsId, inningsId))
+    .where(scope)
     .groupBy(deliveries.bowlerId, players.name, players.displayName)
 
   return rows.map((r) => {
@@ -401,14 +401,18 @@ async function getPartnershipStats(
     isLegal: boolean
     extraType: string | null
   }> = [],
+  excludeOverNumber?: number,
 ): Promise<PartnershipStats | null> {
   if (!strikerId || !nonStrikerId) return null
 
-  // Find the delivery ID of the most recent wicket in this innings
+  const scope = deliveriesScopeForInnings(inningsId, excludeOverNumber)
+
+  // Find the delivery ID of the most recent wicket in this innings (across all overs; wickets are
+  // rare and the filter excludes current-over rows that live in the buffer anyway).
   const lastWicket = await db
     .select({ id: deliveries.id })
     .from(deliveries)
-    .where(and(eq(deliveries.inningsId, inningsId), eq(deliveries.isWicket, true)))
+    .where(and(scope, eq(deliveries.isWicket, true)))
     .orderBy(desc(deliveries.id))
     .limit(1)
 
@@ -423,12 +427,7 @@ async function getPartnershipStats(
       extraType: deliveries.extraType,
     })
     .from(deliveries)
-    .where(
-      and(
-        eq(deliveries.inningsId, inningsId),
-        gt(deliveries.id, lastWicketId),
-      ),
-    )
+    .where(and(scope, gt(deliveries.id, lastWicketId)))
 
   const partnership = createPartnershipStats(strikerId, nonStrikerId)
   const contributionByBatter = new Map<number, { runs: number; balls: number }>()
@@ -807,11 +806,15 @@ export async function getInningsSummaries(matchId: number): Promise<InningsSumma
   const bpo = matchRow.ballsPerOver ?? 6
   const state = matchRow.state
 
+  const activeInningsNumber = state?.currentInnings ?? null
+  const currentOverNumber = state?.currentOver ?? 0
+
   return Promise.all(
     matchRow.innings.map(async (inn) => {
+      const excludeOver = inn.inningsNumber === activeInningsNumber ? currentOverNumber : undefined
       const [topBatters, topBowlers] = await Promise.all([
-        getBatterStats(inn.id, state?.strikerId ?? null),
-        getBowlerStats(inn.id, state?.currentBowlerId ?? null, bpo),
+        getBatterStats(inn.id, state?.strikerId ?? null, excludeOver),
+        getBowlerStats(inn.id, state?.currentBowlerId ?? null, bpo, excludeOver),
       ])
       return {
         inningsNumber: inn.inningsNumber as 1 | 2,

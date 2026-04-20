@@ -10,7 +10,6 @@ import {
   ChevronRight,
   LayoutDashboard,
   Monitor,
-  PlayCircle,
   Shield,
   Trophy,
   Wallet,
@@ -44,7 +43,6 @@ export function Sidebar() {
 
   const isDashboardActive = pathname === '/'
   const isTournamentsActive = pathname.startsWith('/admin/tournaments')
-  const isMatchActive = pathname.startsWith('/match/new')
   const isOverlayActive = pathname.startsWith('/overlay-manager')
   const isWalletActive = pathname.startsWith('/wallet')
   const isAdminActive =
@@ -61,12 +59,6 @@ export function Sidebar() {
       label: 'Tournaments',
       icon: Trophy,
       match: (path) => path.startsWith('/admin/tournaments'),
-    },
-    {
-      href: '/match/new',
-      label: 'Quick Match',
-      icon: PlayCircle,
-      match: (path) => path.startsWith('/match/new'),
     },
     {
       href: '/overlay-manager',
@@ -224,10 +216,9 @@ export function Sidebar() {
       </aside>
 
       <div className="app-shell-surface fixed inset-x-3 bottom-3 z-40 rounded-full border px-2 py-2 shadow-[0_18px_50px_rgba(10,14,18,0.16)] md:hidden">
-        <nav className="grid grid-cols-5 gap-1">
+        <nav className="grid grid-cols-4 gap-1">
           <BottomNavLink href="/" label="Home" active={isDashboardActive} icon={LayoutDashboard} />
           <BottomNavLink href="/admin/tournaments" label="Series" active={isTournamentsActive} icon={Trophy} />
-          <BottomNavLink href="/match/new" label="Match" active={isMatchActive} icon={PlayCircle} />
           <BottomNavLink
             href={isAdmin ? '/admin/users' : '/overlay-manager'}
             label={isAdmin ? 'Admin' : 'Overlay'}

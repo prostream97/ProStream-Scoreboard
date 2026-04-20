@@ -166,17 +166,22 @@ export async function getTournamentWithDetails(
     matchLabel: m.matchLabel ?? null,
     tossWinnerId: m.tossWinnerId ?? null,
     tossDecision: m.tossDecision ?? null,
+    resultWinnerId: m.resultWinnerId ?? null,
+    resultMargin: m.resultMargin ?? null,
+    resultType: m.resultType ?? null,
     homeTeam: {
       id: m.homeTeam.id,
       name: m.homeTeam.name,
       shortCode: m.homeTeam.shortCode,
       primaryColor: m.homeTeam.primaryColor,
+      logoCloudinaryId: m.homeTeam.logoCloudinaryId ?? null,
     },
     awayTeam: {
       id: m.awayTeam.id,
       name: m.awayTeam.name,
       shortCode: m.awayTeam.shortCode,
       primaryColor: m.awayTeam.primaryColor,
+      logoCloudinaryId: m.awayTeam.logoCloudinaryId ?? null,
     },
   }))
 

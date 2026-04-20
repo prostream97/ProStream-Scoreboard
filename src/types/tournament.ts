@@ -53,8 +53,11 @@ export type TournamentMatch = {
   matchLabel: string | null
   tossWinnerId: number | null
   tossDecision: 'bat' | 'field' | null
-  homeTeam: { id: number; name: string; shortCode: string; primaryColor: string }
-  awayTeam: { id: number; name: string; shortCode: string; primaryColor: string }
+  resultWinnerId: number | null
+  resultMargin: number | null
+  resultType: 'wickets' | 'runs' | 'tie' | null
+  homeTeam: { id: number; name: string; shortCode: string; primaryColor: string; logoCloudinaryId: string | null }
+  awayTeam: { id: number; name: string; shortCode: string; primaryColor: string; logoCloudinaryId: string | null }
 }
 
 export type TournamentWithDetails = Tournament & {

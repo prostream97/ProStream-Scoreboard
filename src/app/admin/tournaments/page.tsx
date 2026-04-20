@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, X, Trophy, Calendar, Zap } from 'lucide-react'
+import { Plus, X, Trophy, Calendar, Zap, Trash2 } from 'lucide-react'
 import { ImageUpload } from '@/components/shared/ImageUpload'
 import {
   AppBadge,
@@ -70,6 +70,8 @@ export default function TournamentsPage() {
   const [form, setForm] = useState(emptyForm)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [pricing, setPricing] = useState<Record<string, number>>({
     overlay_per_tournament: 500,
     overlay_per_match: 100,
@@ -167,12 +169,23 @@ export default function TournamentsPage() {
     }
   }
 
+  async function handleDelete(tournamentId: number) {
+    setDeletingId(tournamentId)
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTournaments((prev) => prev.filter((t) => t.id !== tournamentId))
+      }
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
+    }
+  }
+
   return (
     <AppPage className="max-w-7xl">
       <PageHeader
-        eyebrow="Tournament setup"
-        title="Series, formats and launch setup"
-        description="Manage tournaments"
+        title="Manage Tournament"
         actions={
           isAuthenticated ? (
             <AppButton onClick={() => { setShowForm(true); setCreateError('') }}>
@@ -405,64 +418,111 @@ export default function TournamentsPage() {
               : null
 
             return (
-              <div
-                key={t.id}
-                onClick={() => router.push(`/admin/tournaments/${t.id}`)}
-                className="cursor-pointer text-left"
-              >
-                <SurfaceCard className="h-full transition hover:-translate-y-0.5 hover:border-[#b8d7c0] hover:shadow-[0_18px_38px_rgba(26,36,32,0.08)]">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[1.2rem] border border-[#dfe6df] bg-[#f4f7f2]">
-                        {t.logoCloudinaryId && CLOUDINARY_CLOUD ? (
-                          <img
-                            src={`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/c_fill,w_80,h_80,f_webp/${t.logoCloudinaryId}`}
-                            alt={t.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <Trophy className="h-6 w-6 text-[#10994c]" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{t.name}</p>
-                          <AppBadge tone="neutral">{t.shortName}</AppBadge>
-                          <AppBadge tone={statusTone[t.status] ?? 'neutral'}>{t.status.replace('_', ' ')}</AppBadge>
-                          {(t as any).planType && (
-                            <AppBadge tone="blue">{PLAN_LABELS[(t as any).planType] ?? (t as any).planType}</AppBadge>
+              <div key={t.id} className="relative text-left">
+                <div
+                  onClick={() => router.push(`/admin/tournaments/${t.id}`)}
+                  className="cursor-pointer"
+                >
+                  <SurfaceCard className="h-full transition hover:-translate-y-0.5 hover:border-[#b8d7c0] hover:shadow-[0_18px_38px_rgba(26,36,32,0.08)]">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[1.2rem] border border-[#dfe6df] bg-[#f4f7f2]">
+                          {t.logoCloudinaryId && CLOUDINARY_CLOUD ? (
+                            <img
+                              src={`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/c_fill,w_80,h_80,f_webp/${t.logoCloudinaryId}`}
+                              alt={t.name}
+                              className="h-[61px] w-[61px] object-cover"
+                            />
+                          ) : (
+                            <Trophy className="h-6 w-6 text-[#10994c]" />
                           )}
                         </div>
-                        <p className="mt-2 text-sm text-slate-600">
-                          {t.format} . {t.totalOvers} overs
-                          {t.ballsPerOver !== 6 ? ` . ${t.ballsPerOver} balls/over` : ''}
-                          {(t as any).matchLimit ? ` . ${(t as any).matchLimit} matches` : ''}
-                        </p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">{fmtId(t.id)}</p>
+                        <div>
+                          <div className="flex h-16 w-[350px] flex-wrap items-center gap-2">
+                            <p className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{t.name}</p>
+                            <AppBadge tone="neutral">{t.shortName}</AppBadge>
+                            <AppBadge tone={statusTone[t.status] ?? 'neutral'}>{t.status.replace('_', ' ')}</AppBadge>
+                            {(t as any).planType && (
+                              <AppBadge tone="blue">{PLAN_LABELS[(t as any).planType] ?? (t as any).planType}</AppBadge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <AppButton variant="secondary" className="hidden sm:inline-flex">Manage</AppButton>
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(t.id) }}
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-500 transition hover:bg-red-100 hover:text-red-700"
+                            title="Delete tournament"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <AppButton variant="secondary" className="hidden sm:inline-flex">Manage</AppButton>
-                  </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[1.25rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Match window</p>
-                      <p className="mt-2 text-sm font-medium text-slate-900">
-                        {t.matchDaysFrom && t.matchDaysTo ? `${fmtDate(t.matchDaysFrom)} - ${fmtDate(t.matchDaysTo)}` : 'Not set'}
-                      </p>
-                      {windowActive !== null ? (
-                        <p className={`mt-1 text-xs font-medium ${windowActive ? 'text-[#10994c]' : 'text-slate-500'}`}>
-                          {windowActive ? 'Currently active' : 'Outside active window'}
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[1.25rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
+                        <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Match window</p>
+                        <p className="mt-2 text-sm font-medium text-slate-900">
+                          {t.matchDaysFrom && t.matchDaysTo ? `${fmtDate(t.matchDaysFrom)} - ${fmtDate(t.matchDaysTo)}` : 'Not set'}
                         </p>
-                      ) : null}
+                        {windowActive !== null ? (
+                          <p className={`mt-1 text-xs font-medium ${windowActive ? 'text-[#10994c]' : 'text-slate-500'}`}>
+                            {windowActive ? 'Currently active' : 'Outside active window'}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="rounded-[1.25rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
+                        <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Format summary</p>
+                        <p className="mt-2 text-sm font-medium text-slate-900">{t.format}</p>
+                        <p className="mt-1 text-sm text-slate-500">{t.totalOvers} overs</p>
+                      </div>
                     </div>
-                    <div className="rounded-[1.25rem] border border-[#e1e7df] bg-[#f8faf7] p-4">
-                      <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Format summary</p>
-                      <p className="mt-2 text-sm font-medium text-slate-900">{t.format}</p>
-                      <p className="mt-1 text-sm text-slate-500">{t.totalOvers} overs</p>
-                    </div>
-                  </div>
-                </SurfaceCard>
+                  </SurfaceCard>
+                </div>
+
+                {/* Confirm delete dialog */}
+                <AnimatePresence>
+                  {confirmDeleteId === t.id && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-10 flex items-center justify-center rounded-[1.5rem] bg-black/40 backdrop-blur-sm"
+                      onClick={() => setConfirmDeleteId(null)}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.9, opacity: 0 }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mx-4 w-full max-w-sm rounded-2xl border border-red-200 bg-white p-6 shadow-xl"
+                      >
+                        <p className="text-base font-semibold text-slate-900">Delete tournament?</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          <span className="font-medium text-slate-700">{t.name}</span> and all its data will be permanently deleted.
+                        </p>
+                        <div className="mt-4 flex gap-3">
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="flex-1 rounded-xl border border-[#dfe6df] bg-[#f8faf7] py-2 text-sm font-medium text-slate-700 transition hover:bg-[#f0f4ef]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleDelete(t.id)}
+                            disabled={deletingId === t.id}
+                            className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                          >
+                            {deletingId === t.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )
           })}

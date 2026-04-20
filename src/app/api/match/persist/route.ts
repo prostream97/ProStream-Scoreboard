@@ -44,9 +44,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Compute innings totals from buffer
-    const totalRuns = deliveryBuffer.reduce((s, d) => s + d.runs + d.extraRuns, 0)
-    const totalWickets = deliveryBuffer.filter((d) => d.isWicket).length
     const legalBalls = deliveryBuffer.filter((d) => d.isLegal).length
 
     const matchRow = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
@@ -79,10 +76,16 @@ export async function POST(req: NextRequest) {
     const currentInnings = await db.query.innings.findFirst({ where: eq(innings.id, inningsId) })
 
     if (currentInnings) {
-      const computedOvers = currentInnings.overs + Math.floor((currentInnings.balls + legalBalls) / bpo)
-      const computedBalls = (currentInnings.balls + legalBalls) % bpo
-      const authoritativeOvers = typeof currentOver === 'number' ? currentOver : computedOvers
-      const authoritativeBalls = typeof currentBalls === 'number' ? currentBalls : computedBalls
+      // Recompute from the full deliveries table (source of truth) rather than
+      // trusting client-supplied counters, which can drift after undo/redo.
+      const allDeliveries = await db.query.deliveries.findMany({
+        where: eq(deliveries.inningsId, inningsId),
+      })
+      const legalTotal = allDeliveries.filter((d) => d.isLegal).length
+      const authoritativeOvers = Math.floor(legalTotal / bpo)
+      const authoritativeBalls = legalTotal % bpo
+      const authoritativeRuns = allDeliveries.reduce((s, d) => s + d.runs + d.extraRuns, 0)
+      const authoritativeWickets = allDeliveries.filter((d) => d.isWicket).length
       const authoritativeBuffer = isOverComplete
         ? []
         : (currentOverBuffer ?? deliveryBuffer)
@@ -103,8 +106,8 @@ export async function POST(req: NextRequest) {
       await db
         .update(innings)
         .set({
-          totalRuns: currentInnings.totalRuns + totalRuns,
-          wickets: currentInnings.wickets + totalWickets,
+          totalRuns: authoritativeRuns,
+          wickets: authoritativeWickets,
           overs: authoritativeOvers,
           balls: authoritativeBalls,
         })

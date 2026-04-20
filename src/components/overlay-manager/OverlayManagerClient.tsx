@@ -9,7 +9,6 @@ import {
   AppButton,
   AppPage,
   EmptyState,
-  PageHeader,
   SurfaceCard,
   appInputClass,
   appLabelClass,
@@ -193,100 +192,128 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
 
   return (
     <AppPage className="max-w-7xl">
-      <PageHeader
-        eyebrow="Broadcast links"
-        title="Overlay manager"
-        description="Generate and copy overlay URLs"
-        actions={
-          !isAdmin && balance !== null ? (
-            <AppBadge tone="green">{balance} LKR available</AppBadge>
-          ) : isAdmin ? (
-            <AppBadge tone="blue">Admin unlimited</AppBadge>
-          ) : null
-        }
-      />
-
-      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+      <div className="grid gap-4">
         {/* Tournament selector */}
         <SurfaceCard className="space-y-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf5ff] text-[#2d6fb0]">
-            <Monitor className="h-6 w-6" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Choose tournament</h2>
-            <p className="mt-1 text-sm text-slate-500">Only active tournaments are shown here.</p>
-          </div>
-          {tournaments.length === 0 ? (
-            <EmptyState title="No active tournaments" description="Start by creating or activating a tournament." />
-          ) : (
-            <div>
-              <label className={appLabelClass}>Tournament</label>
-              <select
-                value={selectedTournamentId ?? ''}
-                onChange={(e) => setSelectedTournamentId(parseInt(e.target.value, 10))}
-                className={appInputClass}
-              >
-                {tournaments.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.shortName})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className={`grid gap-6 ${selectedTournamentId && !loadingTournament ? 'lg:grid-cols-2' : ''}`}>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf5ff] text-[#2d6fb0]">
+                  <Monitor className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Choose tournament</h2>
+                  <p className="mt-1 text-sm text-slate-500">Only active tournaments are shown here.</p>
+                </div>
+              </div>
+              {tournaments.length === 0 ? (
+                <EmptyState title="No active tournaments" description="Start by creating or activating a tournament." />
+              ) : (
+                <div>
+                  <label className={appLabelClass}>Tournament</label>
+                  <select
+                    value={selectedTournamentId ?? ''}
+                    onChange={(e) => setSelectedTournamentId(parseInt(e.target.value, 10))}
+                    className={appInputClass}
+                  >
+                    {tournaments.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.shortName})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-          {/* Plan info */}
-          {planType && (
-            <div className="rounded-2xl border border-[#e1e7df] bg-[#f8faf7] p-4 space-y-2">
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Plan</p>
-              <AppBadge tone="blue">{PLAN_LABELS[planType] ?? planType}</AppBadge>
-              {planType === 'match' && matchLimit !== undefined && (
-                <p className="text-sm text-slate-600">
-                  {matchCount} / {matchLimit} matches used
-                </p>
+              {/* Plan info */}
+              {planType && (
+                <div className="rounded-2xl border border-[#e1e7df] bg-[#f8faf7] p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Plan</p>
+                    <AppBadge tone="blue">{PLAN_LABELS[planType] ?? planType}</AppBadge>
+                  </div>
+                  {planType === 'match' && matchLimit !== undefined && (
+                    <p className="text-sm text-slate-600">
+                      {matchCount} / {matchLimit} matches used
+                    </p>
+                  )}
+                </div>
               )}
             </div>
-          )}
+
+            {selectedTournamentId && !loadingTournament ? (
+              <div className="space-y-4 lg:border-l lg:border-[#e1e7df] lg:pl-6">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+                  style={{ backgroundColor: activeTheme.accentBg }}
+                >
+                  <Link2 className="h-5 w-5" style={{ color: activeTheme.accentColor }} />
+                </div>
+                <div>
+                  <p className="app-kicker">Overlay URL</p>
+                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                    {activeTheme.name}
+                  </h3>
+                </div>
+              </div>
+
+              {loadingLinks ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-[#10994c]" />
+                </div>
+              ) : (
+                <>
+                  {activeLink ? (
+                    <div className="rounded-2xl border border-[#d8e8dc] bg-white p-4 space-y-3">
+                      <p className="font-mono text-[15px] text-slate-500 break-all">
+                        {typeof window !== 'undefined' ? window.location.origin : ''}/overlay/t/{activeLink.token}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <AppBadge tone="green">Active</AppBadge>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => copyUrl(activeLink.token)}
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#eef6f0] text-[#10994c] transition hover:bg-[#dff0e4]"
+                            title="Copy URL"
+                          >
+                            {copiedToken === activeLink.token ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => revokeLink(activeLink.id, selectedMode)}
+                              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff1f0] text-[#c54e4c] transition hover:bg-[#ffe5e3]"
+                              title="Revoke link"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <AppButton
+                      type="button"
+                      onClick={() => generateLibraryLink(selectedMode)}
+                      disabled={generatingMode === selectedMode}
+                    >
+                      {generatingMode === selectedMode ? 'Generating...' : `Generate ${activeTheme.name} URL`}
+                    </AppButton>
+                  )}
+                </>
+              )}
+              </div>
+            ) : null}
+          </div>
         </SurfaceCard>
 
-        {/* Match list */}
-        {selectedTournamentId && !loadingTournament && tournamentDetail?.matches && tournamentDetail.matches.length > 0 && (
-          <SurfaceCard className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eef6f0] text-[#10994c]">
-                <Link2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="app-kicker">Matches</p>
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">In this tournament</h2>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {tournamentDetail.matches.map((m) => (
-                <div key={m.id} className="flex items-center justify-between rounded-2xl border border-[#e1e7df] bg-[#f8faf7] px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {m.homeTeam.shortCode} <span className="text-slate-400">vs</span> {m.awayTeam.shortCode}
-                    </p>
-                    <p className="text-xs text-slate-500">{m.matchLabel ?? 'Match'}</p>
-                  </div>
-                  <AppBadge tone={m.status === 'active' ? 'green' : 'neutral'}>{m.status}</AppBadge>
-                </div>
-              ))}
-            </div>
-          </SurfaceCard>
-        )}
       </div>
 
       {/* Overlay Library */}
       {selectedTournamentId && !loadingTournament && (
         <section className="space-y-6">
           <div>
-            <p className="app-kicker">Overlay library</p>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Choose a theme</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Select a theme to preview it and generate its broadcast URL. Add the URL to OBS as a browser source at 1920×1080.
-            </p>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Overlay Library</h2>
           </div>
 
           {loadingLinks ? (
@@ -387,64 +414,6 @@ export function OverlayManagerClient({ initialTournaments, isAdmin }: Props) {
                 })}
               </div>
 
-              {/* Generate URL — common panel for selected theme */}
-              <SurfaceCard className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: activeTheme.accentBg }}
-                  >
-                    <Link2 className="h-5 w-5" style={{ color: activeTheme.accentColor }} />
-                  </div>
-                  <div>
-                    <p className="app-kicker">Overlay URL</p>
-                    <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                      {activeTheme.name}
-                    </h3>
-                  </div>
-                </div>
-
-                <p className="text-sm text-slate-500">
-                  This URL auto-switches to the active match in the selected tournament. Add it to OBS as a browser source (1920×1080).
-                </p>
-
-                {activeLink ? (
-                  <div className="rounded-2xl border border-[#d8e8dc] bg-white p-4 space-y-3">
-                    <p className="font-mono text-xs text-slate-500 break-all">
-                      {typeof window !== 'undefined' ? window.location.origin : ''}/overlay/t/{activeLink.token}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <AppBadge tone="green">Active</AppBadge>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => copyUrl(activeLink.token)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#eef6f0] text-[#10994c] transition hover:bg-[#dff0e4]"
-                          title="Copy URL"
-                        >
-                          {copiedToken === activeLink.token ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => revokeLink(activeLink.id, selectedMode)}
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff1f0] text-[#c54e4c] transition hover:bg-[#ffe5e3]"
-                            title="Revoke link"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <AppButton
-                    type="button"
-                    onClick={() => generateLibraryLink(selectedMode)}
-                    disabled={generatingMode === selectedMode}
-                  >
-                    {generatingMode === selectedMode ? 'Generating...' : `Generate ${activeTheme.name} URL`}
-                  </AppButton>
-                )}
-              </SurfaceCard>
             </>
           )}
         </section>

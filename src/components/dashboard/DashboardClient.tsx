@@ -47,16 +47,10 @@ export function DashboardClient({ tournaments }: TournamentProps) {
           title="Broadcast operations"
           description="Tournament setup, live scoring, overlays, and viewer output"
           actions={
-            <>
-              <AppButton href="/match/new">
-                <PlayCircle className="h-4 w-4" />
-                Start Match
-              </AppButton>
-              <AppButton href="/admin/tournaments" variant="secondary">
-                <Plus className="h-4 w-4" />
-                New Tournament
-              </AppButton>
-            </>
+            <AppButton href="/admin/tournaments" variant="secondary">
+              <Plus className="h-4 w-4" />
+              New Tournament
+            </AppButton>
           }
         />
       </motion.div>
@@ -144,16 +138,6 @@ export function DashboardClient({ tournaments }: TournamentProps) {
         )}
       </motion.div>
 
-      <Link href="/match/new" className="fixed bottom-24 right-4 z-50 group sm:bottom-8 sm:right-8">
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-3 rounded-full bg-[#17b45b] px-5 py-3 text-white shadow-[0_16px_36px_rgba(23,180,91,0.32)] transition-shadow hover:shadow-[0_20px_40px_rgba(23,180,91,0.4)]"
-        >
-          <PlayCircle className="h-5 w-5" />
-          <span className="text-sm font-semibold uppercase tracking-[0.18em]">Start Match</span>
-        </motion.div>
-      </Link>
     </motion.div>
   )
 }

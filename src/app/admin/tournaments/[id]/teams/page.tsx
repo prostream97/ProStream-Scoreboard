@@ -272,8 +272,24 @@ export default function TeamsPage({
       ) : (
         <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {teams.map((team) => (
-            <SurfaceCard key={team.id} className="flex h-full flex-col gap-4">
-              <div className="flex items-start gap-4">
+            <SurfaceCard
+              key={team.id}
+              className={`flex h-full flex-col gap-4 transition ${isAuthenticated ? 'cursor-pointer hover:border-[#b8d7c0] hover:bg-[#f8fcf9]' : ''}`}
+              role={isAuthenticated ? 'button' : undefined}
+              tabIndex={isAuthenticated ? 0 : undefined}
+              onClick={isAuthenticated ? () => openEdit(team) : undefined}
+              onKeyDown={
+                isAuthenticated
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openEdit(team)
+                      }
+                    }
+                  : undefined
+              }
+            >
+              <div className="flex items-start justify-between gap-4">
                 {team.logoCloudinaryId ? (
                   <img
                     src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_88,h_88,f_webp/${team.logoCloudinaryId}`}
@@ -302,32 +318,23 @@ export default function TeamsPage({
                   >
                     {team.shortCode}
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <AppBadge tone="blue">Manage Roster</AppBadge>
-                  </div>
                 </div>
+                <span
+                  className="mt-1 h-[70px] w-[40px] shrink-0 rounded-full border border-white"
+                  style={{ backgroundColor: team.primaryColor }}
+                  aria-label={`${team.name} team color`}
+                />
               </div>
 
-              <div className="rounded-[1.4rem] bg-[#f4f7f2] p-4">
-                <div>
-                  <p className="app-kicker">Team Color</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className="h-4 w-4 rounded-full border border-white"
-                      style={{ backgroundColor: team.primaryColor }}
-                    />
-                    <span className="text-sm font-medium text-slate-900">
-                      {team.primaryColor}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-auto flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+              <div
+                className="mt-auto h-[30px] flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
                 <AppButton
                   href={`/admin/players?teamId=${team.id}&teamName=${encodeURIComponent(team.name)}&tournamentId=${tournamentId}&tournamentName=${encodeURIComponent(tournamentName)}`}
                   variant="primary"
-                  className="w-full sm:w-auto"
+                  className="h-[30px] w-full px-3 text-xs sm:w-auto"
                 >
                   Manage Players
                 </AppButton>
@@ -335,17 +342,9 @@ export default function TeamsPage({
                   <div className="flex gap-2 sm:contents">
                     <AppButton
                       type="button"
-                      variant="secondary"
-                      onClick={() => openEdit(team)}
-                      className="flex-1 sm:flex-none"
-                    >
-                      Edit
-                    </AppButton>
-                    <AppButton
-                      type="button"
                       variant="danger"
                       onClick={() => handleDelete(team.id)}
-                      className="flex-1 sm:flex-none"
+                      className="h-[30px] flex-1 px-3 text-xs sm:flex-none"
                     >
                       Delete
                     </AppButton>
