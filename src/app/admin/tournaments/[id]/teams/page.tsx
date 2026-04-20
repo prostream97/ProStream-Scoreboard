@@ -272,9 +272,8 @@ export default function TeamsPage({
       ) : (
         <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {teams.map((team) => (
-            <SurfaceCard
+            <div
               key={team.id}
-              className={`flex h-full flex-col gap-4 transition ${isAuthenticated ? 'cursor-pointer hover:border-[#b8d7c0] hover:bg-[#f8fcf9]' : ''}`}
               role={isAuthenticated ? 'button' : undefined}
               tabIndex={isAuthenticated ? 0 : undefined}
               onClick={isAuthenticated ? () => openEdit(team) : undefined}
@@ -288,6 +287,9 @@ export default function TeamsPage({
                     }
                   : undefined
               }
+            >
+            <SurfaceCard
+              className={`flex h-full flex-col gap-4 transition ${isAuthenticated ? 'cursor-pointer hover:border-[#b8d7c0] hover:bg-[#f8fcf9]' : ''}`}
             >
               <div className="flex items-start justify-between gap-4">
                 {team.logoCloudinaryId ? (
@@ -352,6 +354,7 @@ export default function TeamsPage({
                 ) : null}
               </div>
             </SurfaceCard>
+            </div>
           ))}
         </section>
       )}
