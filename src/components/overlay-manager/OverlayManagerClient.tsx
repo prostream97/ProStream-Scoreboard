@@ -74,7 +74,7 @@ const OVERLAY_THEMES = [
     description: 'Retro-pulse scorebug with gold batting panel and blue bowling panel.',
     accentColor: '#f9cc01',
     accentBg: '#fffbe6',
-    previewImage: '',
+    previewImage: 'https://res.cloudinary.com/dcv4wu1b6/image/upload/v1776708277/944f0edd-49c7-4496-9e46-ba14ab45d15c.png',
   },
 ]
 

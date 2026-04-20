@@ -41,11 +41,7 @@ function LoginForm() {
       onSubmit={handleSubmit}
       className="rounded-[2rem] border border-[#d7ddd6] bg-white/95 p-8 shadow-[0_24px_80px_rgba(26,36,32,0.14)] backdrop-blur-xl"
     >
-      <div className="space-y-1">
-        <p className="app-kicker">Secure access</p>
-        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Operator login</h2>
-        <p className="text-sm text-slate-500">Admin and operator access for scoring, overlays, and tournament control.</p>
-      </div>
+      <h2 className="text-[28px] font-semibold tracking-[-0.03em] text-slate-950">Login</h2>
 
       {error ? (
         <p className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
@@ -87,48 +83,20 @@ export default function LoginPage() {
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(23,180,91,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(47,111,223,0.12),transparent_25%)]" />
       <div className="relative grid w-full max-w-5xl gap-8 lg:grid-cols-[1.05fr_0.85fr]">
-        <section className="hidden rounded-[2.25rem] border border-white/70 bg-white/72 p-10 shadow-[0_28px_80px_rgba(26,36,32,0.12)] backdrop-blur-xl lg:flex lg:flex-col lg:justify-between">
-          <div className="space-y-6">
-            <p className="app-kicker">Figma-informed redesign</p>
-            <div className="space-y-3">
-              <h1 className="text-6xl font-semibold leading-[0.95] tracking-[-0.06em] text-slate-950">
-                Live scoring and streaming control in one responsive workspace.
-              </h1>
-              <p className="max-w-xl text-base text-slate-600">
-                The new shell borrows the mobile cricket app language: dark navigation, bright green actions, lighter data cards, and clearer mobile-first hierarchy.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              ['Score', 'Operator-friendly control room'],
-              ['Overlay', 'Fast link generation for broadcast'],
-              ['Viewer', 'Cleaner live scorecard on mobile'],
-            ].map(([title, body]) => (
-              <div key={title} className="rounded-[1.5rem] border border-[#d7ddd6] bg-[#f8faf7] p-4">
-                <p className="text-sm font-semibold text-slate-950">{title}</p>
-                <p className="mt-1 text-sm text-slate-500">{body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <div className="relative mx-auto w-full max-w-md">
           <div className="mb-8 flex flex-col items-center text-center">
             <div className="relative mb-5">
-              <div className="absolute inset-0 rounded-full bg-[#17b45b]/20 blur-2xl" />
-              <div className="flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/70 bg-white/85 shadow-[0_18px_45px_rgba(26,36,32,0.12)]">
-                <img
-                  src={LOGO_URL}
-                  alt="ProStream"
-                  className="relative z-10 h-14 w-14 object-contain"
-                />
-              </div>
+              <img
+                src={LOGO_URL}
+                alt="ProStream"
+                className="h-24 w-24 object-contain"
+              />
             </div>
             <div className="flex flex-col items-center">
-              <p className="app-kicker">Broadcast scoreboard</p>
-              <h1 className="mt-2 text-5xl font-semibold leading-none tracking-[-0.06em] text-slate-950">
-                ProStream
+              <h1 className="mt-2 text-5xl font-semibold leading-none tracking-[-0.06em]">
+                <span style={{ color: '#4F46E5' }}>Pro</span>
+                <span style={{ color: '#10B981' }}>Stream</span>
+                <span className="text-black"> Scoreboard</span>
               </h1>
               <span className="mt-3 text-sm text-slate-500">
                 Sign in to manage tournaments, live scoring, overlays, and operator workflows.
