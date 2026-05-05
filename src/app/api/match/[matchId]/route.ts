@@ -30,6 +30,7 @@ export async function PATCH(
   if ('tossDecision' in body) patch.tossDecision = body.tossDecision  ?? null
   if ('matchLabel' in body)   patch.matchLabel   = body.matchLabel    ?? null
   if ('matchStage' in body)   patch.matchStage   = body.matchStage    ?? null
+  if ('groupId' in body)      patch.groupId      = body.groupId       ?? null
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })

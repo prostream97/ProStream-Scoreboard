@@ -146,6 +146,20 @@ export const tournaments = pgTable('tournaments', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+// ─── Tournament Groups ────────────────────────────────────────────────────────
+
+export const tournamentGroups = pgTable('tournament_groups', {
+  id: serial('id').primaryKey(),
+  tournamentId: integer('tournament_id')
+    .notNull()
+    .references(() => tournaments.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 50 }).notNull(),
+  shortName: varchar('short_name', { length: 10 }).notNull(),
+  qualifyCount: integer('qualify_count').notNull().default(2),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
 export const teams = pgTable('teams', {
@@ -153,6 +167,7 @@ export const teams = pgTable('teams', {
   tournamentId: integer('tournament_id')
     .notNull()
     .references(() => tournaments.id, { onDelete: 'cascade' }),
+  groupId: integer('group_id').references(() => tournamentGroups.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   shortCode: char('short_code', { length: 3 }).notNull(),
   primaryColor: varchar('primary_color', { length: 7 }).notNull().default('#4F46E5'),
@@ -195,6 +210,7 @@ export const matches = pgTable('matches', {
   tossWinnerId: integer('toss_winner_id').references(() => teams.id),
   tossDecision: tossDecisionEnum('toss_decision'),
   tournamentId: integer('tournament_id').references(() => tournaments.id, { onDelete: 'set null' }),
+  groupId: integer('group_id').references(() => tournamentGroups.id, { onDelete: 'set null' }),
   matchStage: matchStageEnum('match_stage'),
   matchLabel: varchar('match_label', { length: 20 }),
   resultWinnerId: integer('result_winner_id').references(() => teams.id),
@@ -378,12 +394,26 @@ export const pricingConfig = pgTable('pricing_config', {
 export const tournamentsRelations = relations(tournaments, ({ many }) => ({
   teams: many(teams),
   matches: many(matches),
+  groups: many(tournamentGroups),
+}))
+
+export const tournamentGroupsRelations = relations(tournamentGroups, ({ one, many }) => ({
+  tournament: one(tournaments, {
+    fields: [tournamentGroups.tournamentId],
+    references: [tournaments.id],
+  }),
+  teams: many(teams),
+  matches: many(matches),
 }))
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   tournament: one(tournaments, {
     fields: [teams.tournamentId],
     references: [tournaments.id],
+  }),
+  group: one(tournamentGroups, {
+    fields: [teams.groupId],
+    references: [tournamentGroups.id],
   }),
   players: many(players),
   homeMatches: many(matches, { relationName: 'homeTeam' }),
@@ -413,6 +443,10 @@ export const matchesRelations = relations(matches, ({ one, many }) => ({
   tournament: one(tournaments, {
     fields: [matches.tournamentId],
     references: [tournaments.id],
+  }),
+  group: one(tournamentGroups, {
+    fields: [matches.groupId],
+    references: [tournamentGroups.id],
   }),
 }))
 
@@ -519,3 +553,5 @@ export type Wallet = typeof wallets.$inferSelect
 export type WalletTransaction = typeof walletTransactions.$inferSelect
 export type PricingConfig = typeof pricingConfig.$inferSelect
 export type TournamentAccess = typeof tournamentAccess.$inferSelect
+export type TournamentGroup = typeof tournamentGroups.$inferSelect
+export type NewTournamentGroup = typeof tournamentGroups.$inferInsert

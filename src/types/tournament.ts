@@ -2,6 +2,15 @@ export type TournamentStatus = 'upcoming' | 'group_stage' | 'knockout' | 'comple
 export type MatchStage = 'group' | 'quarter_final' | 'semi_final' | 'final' | 'third_place'
 export type TournamentStagePath = 'semis_only' | 'with_quarters' | null
 
+export type TournamentGroup = {
+  id: number
+  tournamentId: number
+  name: string
+  shortName: string
+  qualifyCount: number
+  sortOrder: number
+}
+
 export type TournamentStageCounts = Record<MatchStage, number>
 
 export type TournamentStageStructure = {
@@ -40,6 +49,8 @@ export type TournamentTeamSummary = {
   shortCode: string
   primaryColor: string
   logoCloudinaryId: string | null
+  groupId: number | null
+  groupName: string | null
 }
 
 export type TournamentMatch = {
@@ -51,6 +62,7 @@ export type TournamentMatch = {
   totalOvers: number
   matchStage: MatchStage | null
   matchLabel: string | null
+  groupId: number | null
   tossWinnerId: number | null
   tossDecision: 'bat' | 'field' | null
   resultWinnerId: number | null
@@ -64,6 +76,7 @@ export type TournamentWithDetails = Tournament & {
   owner: TournamentUserSummary | null
   operators: TournamentUserSummary[]
   stageStructure: TournamentStageStructure
+  groups: TournamentGroup[]
   teams: TournamentTeamSummary[]
   matches: TournamentMatch[]
 }
@@ -80,3 +93,17 @@ export type StandingRow = {
   points: number
   nrr: number
 }
+
+export type GroupStandingRow = StandingRow & {
+  rank: number
+  qualifies: boolean
+}
+
+export type GroupStandings = {
+  group: TournamentGroup
+  rows: GroupStandingRow[]
+}
+
+export type TournamentStandingsResponse =
+  | { hasGroups: true; groups: GroupStandings[] }
+  | { hasGroups: false; rows: StandingRow[] }

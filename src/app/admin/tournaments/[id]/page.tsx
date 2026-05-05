@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Trophy, CalendarClock, Pencil, X } from 'lucide-react'
+import { Trophy, CalendarClock, Pencil, X, Plus, Layers, ChevronDown, ChevronUp } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import {
   AppBadge,
@@ -18,9 +18,10 @@ import {
 } from '@/components/shared/AppPrimitives'
 import type {
   MatchStage,
-  StandingRow,
+  TournamentGroup,
   TournamentMatch,
   TournamentStageStructure,
+  TournamentStandingsResponse,
   TournamentWithDetails,
 } from '@/types/tournament'
 import { getBattingFirstTeamId } from '@/lib/auth/utils'
@@ -43,6 +44,7 @@ const emptyMatchForm = {
   date: '',
   matchStage: 'group' as MatchStage,
   matchLabel: '',
+  groupId: '',
   tossWinnerId: '',
   tossDecision: '' as 'bat' | 'field' | '',
 }
@@ -69,7 +71,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   const [tournament, setTournament] = useState<TournamentWithDetails | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [standings, setStandings] = useState<StandingRow[]>([])
+  const [standingsData, setStandingsData] = useState<TournamentStandingsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [showMatchForm, setShowMatchForm] = useState(false)
   const [showTournamentEdit, setShowTournamentEdit] = useState(false)
@@ -99,7 +101,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     }
 
     if (sRes.ok) {
-      setStandings(await sRes.json())
+      setStandingsData(await sRes.json() as TournamentStandingsResponse)
     }
 
     setLoading(false)
@@ -171,6 +173,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           date: matchForm.date || null,
           matchStage: matchForm.matchStage,
           matchLabel: matchForm.matchLabel || null,
+          groupId: matchForm.groupId ? parseInt(matchForm.groupId, 10) : null,
           tossWinnerId: matchForm.tossWinnerId ? parseInt(matchForm.tossWinnerId, 10) : null,
           tossDecision: matchForm.tossDecision || null,
           battingFirstTeamId: getBattingFirstTeamId({
@@ -315,6 +318,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
       </div>
 
+      {canManageTournament ? (
+        <GroupsSection
+          tournamentId={tournamentId}
+          groups={tournament.groups}
+          teams={tournament.teams}
+          onChanged={load}
+        />
+      ) : null}
+
       <SurfaceCard className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -370,6 +382,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </Field>
             </div>
 
+            {matchForm.matchStage === 'group' && tournament.groups.length > 0 ? (
+              <Field label="Group">
+                <select name="groupId" value={matchForm.groupId} onChange={handleMatchFormChange} className={appInputClass}>
+                  <option value="">— No specific group</option>
+                  {tournament.groups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Venue">
                 <input name="venue" value={matchForm.venue} onChange={handleMatchFormChange} className={appInputClass} placeholder="Stadium name" />
@@ -423,6 +446,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       match={match}
                       canManage={canManageTournament}
                       teams={tournament.teams}
+                      groups={tournament.groups}
                       stageStructure={stageStructure}
                       onEdited={load}
                     />
@@ -434,57 +458,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         )}
       </SurfaceCard>
 
-      <div className="grid gap-4">
-        <SurfaceCard className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Team Standing</h2>
-            </div>
-          </div>
-          {tournament.status === 'upcoming' || standings.length === 0 ? (
-            <EmptyState
-              title="No standings yet"
-              description="Standings will appear once group matches start producing results."
-            />
-          ) : (
-            <div className="app-table-wrap">
-              <table className="app-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Team</th>
-                    <th>P</th>
-                    <th>W</th>
-                    <th>L</th>
-                    <th>T</th>
-                    <th>Pts</th>
-                    <th>NRR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((row, index) => (
-                    <tr key={row.teamId}>
-                      <td>{index + 1}</td>
-                      <td>
-                        <span className="font-semibold" style={{ color: row.primaryColor }}>{row.teamShortCode}</span>
-                        <span className="ml-2 text-sm text-slate-500">{row.teamName}</span>
-                      </td>
-                      <td>{row.played}</td>
-                      <td>{row.won}</td>
-                      <td>{row.lost}</td>
-                      <td>{row.tied}</td>
-                      <td>{row.points}</td>
-                      <td className={row.nrr >= 0 ? 'text-[#10994c]' : 'text-[#c54e4c]'}>
-                        {row.nrr >= 0 ? '+' : ''}{row.nrr.toFixed(3)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SurfaceCard>
-      </div>
+      <SurfaceCard className="space-y-4">
+        <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+          {standingsData?.hasGroups ? 'Group Standings' : 'Team Standing'}
+        </h2>
+        <StandingsSection tournament={tournament} standingsData={standingsData} />
+      </SurfaceCard>
     </AppPage>
 
     {showTournamentEdit ? (
@@ -496,6 +475,336 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       />
     ) : null}
     </>
+  )
+}
+
+// ─── Groups Section ───────────────────────────────────────────────────────────
+
+function GroupsSection({
+  tournamentId,
+  groups,
+  teams,
+  onChanged,
+}: {
+  tournamentId: number
+  groups: TournamentGroup[]
+  teams: TournamentWithDetails['teams']
+  onChanged: () => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', shortName: '', qualifyCount: '2' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [editingGroup, setEditingGroup] = useState<TournamentGroup | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', shortName: '', qualifyCount: '2' })
+  const [assigningTeam, setAssigningTeam] = useState<number | null>(null)
+
+  function handleFormChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+  }
+
+  async function handleCreateGroup(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          shortName: form.shortName,
+          qualifyCount: parseInt(form.qualifyCount, 10),
+          sortOrder: groups.length,
+        }),
+      })
+      if (res.ok) {
+        setForm({ name: '', shortName: '', qualifyCount: '2' })
+        setShowForm(false)
+        onChanged()
+      } else {
+        const data = await res.json() as { error?: string }
+        setError(data.error ?? 'Failed to create group')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteGroup(groupId: number) {
+    const res = await fetch(`/api/tournaments/${tournamentId}/groups/${groupId}`, { method: 'DELETE' })
+    if (res.ok) onChanged()
+  }
+
+  function startEditGroup(group: TournamentGroup) {
+    setEditingGroup(group)
+    setEditForm({ name: group.name, shortName: group.shortName, qualifyCount: String(group.qualifyCount) })
+  }
+
+  async function handleUpdateGroup(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingGroup) return
+    const res = await fetch(`/api/tournaments/${tournamentId}/groups/${editingGroup.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: editForm.name,
+        shortName: editForm.shortName,
+        qualifyCount: parseInt(editForm.qualifyCount, 10),
+      }),
+    })
+    if (res.ok) { setEditingGroup(null); onChanged() }
+  }
+
+  async function handleAssignTeam(teamId: number, groupId: number | null) {
+    setAssigningTeam(teamId)
+    try {
+      await fetch(`/api/tournaments/${tournamentId}/teams/${teamId}/group`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId }),
+      })
+      onChanged()
+    } finally {
+      setAssigningTeam(null)
+    }
+  }
+
+  const unassignedTeams = teams.filter((t) => t.groupId === null)
+
+  return (
+    <SurfaceCard className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Layers className="h-4 w-4 text-[#10994c]" />
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Groups ({groups.length})</h2>
+        </div>
+        <AppButton onClick={() => { setShowForm((v) => !v); setError('') }} variant="secondary">
+          {showForm ? <><X className="h-3.5 w-3.5 mr-1" />Cancel</> : <><Plus className="h-3.5 w-3.5 mr-1" />Add Group</>}
+        </AppButton>
+      </div>
+
+      {showForm ? (
+        <form onSubmit={handleCreateGroup}>
+          <SurfaceCard className="space-y-3 bg-[#f8faf7]">
+            {error ? <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p> : null}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Group Name">
+                <input name="name" value={form.name} onChange={handleFormChange} className={appInputClass} placeholder="Group A" required />
+              </Field>
+              <Field label="Short Name">
+                <input name="shortName" value={form.shortName} onChange={handleFormChange} className={appInputClass} placeholder="A" maxLength={10} required />
+              </Field>
+              <Field label="Top N qualify">
+                <input type="number" name="qualifyCount" value={form.qualifyCount} onChange={handleFormChange} className={appInputClass} min={1} required />
+              </Field>
+            </div>
+            <AppButton type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create Group'}</AppButton>
+          </SurfaceCard>
+        </form>
+      ) : null}
+
+      {groups.length === 0 && !showForm ? (
+        <p className="text-sm text-slate-500">No groups yet. Add groups to divide teams and show per-group standings.</p>
+      ) : null}
+
+      {groups.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {groups.map((group) => {
+            const groupTeams = teams.filter((t) => t.groupId === group.id)
+            const isEditing = editingGroup?.id === group.id
+            return (
+              <div key={group.id} className="rounded-[1.4rem] border border-[#dfe6df] bg-white p-4 space-y-3">
+                {isEditing ? (
+                  <form onSubmit={handleUpdateGroup} className="space-y-2">
+                    <div className="grid gap-2 grid-cols-2">
+                      <Field label="Name">
+                        <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className={appInputClass} required />
+                      </Field>
+                      <Field label="Short">
+                        <input value={editForm.shortName} onChange={(e) => setEditForm((f) => ({ ...f, shortName: e.target.value }))} className={appInputClass} maxLength={10} required />
+                      </Field>
+                    </div>
+                    <Field label="Top N qualify">
+                      <input type="number" value={editForm.qualifyCount} onChange={(e) => setEditForm((f) => ({ ...f, qualifyCount: e.target.value }))} className={appInputClass} min={1} required />
+                    </Field>
+                    <div className="flex gap-2">
+                      <AppButton type="submit" className="flex-1">Save</AppButton>
+                      <AppButton type="button" variant="secondary" onClick={() => setEditingGroup(null)} className="flex-1">Cancel</AppButton>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-950">{group.name}</p>
+                        <p className="text-xs text-slate-500">Top {group.qualifyCount} qualify</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => startEditGroup(group)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-[#dfe6df] text-slate-400 hover:text-slate-700"
+                          title="Edit group"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteGroup(group.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-[#dfe6df] text-slate-400 hover:text-red-500"
+                          title="Delete group"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Assigned teams */}
+                    <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                      {groupTeams.length === 0 ? (
+                        <span className="text-xs text-slate-400">No teams assigned</span>
+                      ) : (
+                        groupTeams.map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => handleAssignTeam(t.id, null)}
+                            disabled={assigningTeam === t.id}
+                            className="flex items-center gap-1 rounded-full border border-[#dfe6df] bg-[#f4f7f2] px-2 py-0.5 text-xs font-medium transition hover:border-red-300 hover:bg-red-50"
+                            title="Click to remove from group"
+                          >
+                            <span style={{ color: t.primaryColor }}>{t.shortCode}</span>
+                            <X className="h-2.5 w-2.5 text-slate-400" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add unassigned teams */}
+                    {unassignedTeams.length > 0 ? (
+                      <select
+                        className={appInputClass}
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) handleAssignTeam(parseInt(e.target.value, 10), group.id)
+                        }}
+                      >
+                        <option value="">+ Add team to {group.shortName}</option>
+                        {unassignedTeams.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name} ({t.shortCode})</option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+    </SurfaceCard>
+  )
+}
+
+// ─── Standings Section ────────────────────────────────────────────────────────
+
+function StandingsTable({ rows }: { rows: Array<{ teamId: number; teamShortCode: string; teamName: string; primaryColor: string; played: number; won: number; lost: number; tied: number; points: number; nrr: number; rank?: number; qualifies?: boolean }> }) {
+  return (
+    <div className="app-table-wrap">
+      <table className="app-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Team</th>
+            <th>P</th>
+            <th>W</th>
+            <th>L</th>
+            <th>T</th>
+            <th>Pts</th>
+            <th>NRR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr
+              key={row.teamId}
+              className={row.qualifies ? 'border-l-2 border-l-[#10994c] bg-[#f0faf3]' : undefined}
+            >
+              <td>{row.rank ?? index + 1}</td>
+              <td>
+                <span className="font-semibold" style={{ color: row.primaryColor }}>{row.teamShortCode}</span>
+                <span className="ml-2 text-sm text-slate-500">{row.teamName}</span>
+                {row.qualifies ? <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-[#10994c]">Q</span> : null}
+              </td>
+              <td>{row.played}</td>
+              <td>{row.won}</td>
+              <td>{row.lost}</td>
+              <td>{row.tied}</td>
+              <td className="font-semibold">{row.points}</td>
+              <td className={row.nrr >= 0 ? 'text-[#10994c]' : 'text-[#c54e4c]'}>
+                {row.nrr >= 0 ? '+' : ''}{row.nrr.toFixed(3)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function StandingsSection({
+  tournament,
+  standingsData,
+}: {
+  tournament: TournamentWithDetails
+  standingsData: TournamentStandingsResponse | null
+}) {
+  if (!standingsData) {
+    return (
+      <EmptyState
+        title="No standings yet"
+        description="Standings will appear once group matches start producing results."
+      />
+    )
+  }
+
+  if (!standingsData.hasGroups) {
+    if (tournament.status === 'upcoming' || standingsData.rows.length === 0) {
+      return (
+        <EmptyState
+          title="No standings yet"
+          description="Standings will appear once group matches start producing results."
+        />
+      )
+    }
+    return <StandingsTable rows={standingsData.rows} />
+  }
+
+  // Multi-group standings
+  if (standingsData.groups.length === 0) {
+    return (
+      <EmptyState
+        title="No standings yet"
+        description="Standings will appear once group matches start producing results."
+      />
+    )
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {standingsData.groups.map(({ group, rows }) => (
+        <div key={group.id} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-slate-950">{group.name}</h3>
+            <AppBadge tone="neutral">Top {group.qualifyCount} qualify</AppBadge>
+          </div>
+          {rows.length === 0 ? (
+            <p className="text-sm text-slate-400">No completed matches yet</p>
+          ) : (
+            <StandingsTable rows={rows} />
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -521,15 +830,18 @@ function MatchCard({
   match,
   canManage,
   teams,
+  groups,
   stageStructure,
   onEdited,
 }: {
   match: TournamentMatch
   canManage: boolean
   teams: TournamentWithDetails['teams']
+  groups: TournamentGroup[]
   stageStructure: TournamentStageStructure
   onEdited: () => void
 }) {
+  const matchGroup = match.groupId ? groups.find((g) => g.id === match.groupId) : null
   const router = useRouter()
   const stage = match.matchStage ?? 'group'
   const stageLabel = MATCH_STAGE_LABELS[stage]
@@ -566,6 +878,7 @@ function MatchCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex h-[30px] w-full flex-wrap items-center gap-2">
             <AppBadge className="h-[30px] w-[150px] justify-center px-2 py-0.5 text-center text-[12px] tracking-[2.5px]" tone="neutral">{stageLabel}</AppBadge>
+            {matchGroup ? <AppBadge className="h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]" tone="neutral">{matchGroup.shortName}</AppBadge> : null}
             {match.matchLabel ? <AppBadge className="h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]" tone="blue">{match.matchLabel}</AppBadge> : null}
             <AppBadge
               className={cn(
@@ -640,6 +953,7 @@ function MatchCard({
         <MatchEditModal
           match={match}
           teams={teams}
+          groups={groups}
           stageStructure={stageStructure}
           onClose={() => setShowEdit(false)}
           onSaved={() => { setShowEdit(false); onEdited() }}
@@ -652,17 +966,18 @@ function MatchCard({
 function MatchEditModal({
   match,
   teams,
+  groups,
   stageStructure,
   onClose,
   onSaved,
 }: {
   match: TournamentMatch
   teams: TournamentWithDetails['teams']
+  groups: TournamentGroup[]
   stageStructure: TournamentStageStructure
   onClose: () => void
   onSaved: () => void
 }) {
-  // Convert ISO date string to datetime-local format (YYYY-MM-DDTHH:mm)
   const toDatetimeLocal = (iso: string) => {
     try { return new Date(iso).toISOString().slice(0, 16) } catch { return '' }
   }
@@ -674,6 +989,7 @@ function MatchEditModal({
     tossDecision: match.tossDecision ?? '' as 'bat' | 'field' | '',
     matchStage: match.matchStage ?? 'group',
     matchLabel: match.matchLabel ?? '',
+    groupId: match.groupId ? String(match.groupId) : '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -698,6 +1014,7 @@ function MatchEditModal({
           tossDecision: form.tossDecision || null,
           matchStage: form.matchStage || null,
           matchLabel: form.matchLabel || null,
+          groupId: form.groupId ? parseInt(form.groupId, 10) : null,
         }),
       })
       if (res.ok) {
@@ -774,6 +1091,17 @@ function MatchEditModal({
               />
             </Field>
           </div>
+
+          {form.matchStage === 'group' && groups.length > 0 ? (
+            <Field label="Group">
+              <select name="groupId" value={form.groupId} onChange={handleChange} className={appInputClass}>
+                <option value="">— No specific group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
 
           <Field label="Venue">
             <input

@@ -64,6 +64,13 @@
       "when": 1776182800000,
       "tag": "0008_add_standard1_overlay_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778004821542,
+      "tag": "0009_lyrical_jackal",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
-import { tournaments, matches, teams, tournamentAccess, users } from '@/lib/db/schema'
+import { tournaments, matches, teams, tournamentAccess, users, tournamentGroups } from '@/lib/db/schema'
 import { eq, and, inArray, desc, asc } from 'drizzle-orm'
-import type { TournamentWithDetails, StandingRow, TournamentUserSummary } from '@/types/tournament'
+import type { TournamentWithDetails, StandingRow, TournamentUserSummary, TournamentGroup, TournamentStandingsResponse, GroupStandingRow } from '@/types/tournament'
 import { buildTournamentStageStructure } from '@/lib/tournament/stageRules'
 
 type TournamentAccessData = {
@@ -142,6 +142,9 @@ export async function getTournamentWithDetails(
   const row = await db.query.tournaments.findFirst({
     where: eq(tournaments.id, tournamentId),
     with: {
+      groups: {
+        orderBy: [asc(tournamentGroups.sortOrder), asc(tournamentGroups.createdAt)],
+      },
       teams: {
         orderBy: [asc(teams.createdAt)],
       },
@@ -155,6 +158,8 @@ export async function getTournamentWithDetails(
   if (!row) return null
 
   const accessData = await getTournamentAccessData(tournamentId)
+  const groupMap = new Map(row.groups.map((g) => [g.id, g.name]))
+
   const tournamentMatches = row.matches.map((m) => ({
     id: m.id,
     format: m.format,
@@ -164,6 +169,7 @@ export async function getTournamentWithDetails(
     totalOvers: m.totalOvers,
     matchStage: m.matchStage ?? null,
     matchLabel: m.matchLabel ?? null,
+    groupId: m.groupId ?? null,
     tossWinnerId: m.tossWinnerId ?? null,
     tossDecision: m.tossDecision ?? null,
     resultWinnerId: m.resultWinnerId ?? null,
@@ -206,6 +212,14 @@ export async function getTournamentWithDetails(
         status: match.status,
       })),
     ),
+    groups: row.groups.map((g) => ({
+      id: g.id,
+      tournamentId: g.tournamentId,
+      name: g.name,
+      shortName: g.shortName,
+      qualifyCount: g.qualifyCount,
+      sortOrder: g.sortOrder,
+    })),
     teams: row.teams.map((t) => ({
       id: t.id,
       tournamentId: t.tournamentId,
@@ -213,108 +227,221 @@ export async function getTournamentWithDetails(
       shortCode: t.shortCode,
       primaryColor: t.primaryColor,
       logoCloudinaryId: t.logoCloudinaryId ?? null,
+      groupId: t.groupId ?? null,
+      groupName: t.groupId ? (groupMap.get(t.groupId) ?? null) : null,
     })),
     matches: tournamentMatches,
   }
 }
 
+type Accum = {
+  played: number; won: number; lost: number; tied: number; points: number
+  runsFor: number; oversFaced: number; runsAgainst: number; oversConced: number
+}
+
+function buildAccum(): Accum {
+  return { played: 0, won: 0, lost: 0, tied: 0, points: 0, runsFor: 0, oversFaced: 0, runsAgainst: 0, oversConced: 0 }
+}
+
+function accumulateMatch(
+  acc: Map<number, Accum>,
+  match: { innings: { inningsNumber: number; battingTeamId: number; totalRuns: number; overs: number; balls: number }[] },
+) {
+  const inn1 = match.innings.find((i) => i.inningsNumber === 1)
+  const inn2 = match.innings.find((i) => i.inningsNumber === 2)
+  if (!inn1 || !inn2) return
+
+  const team1 = inn1.battingTeamId
+  const team2 = inn2.battingTeamId
+  if (!acc.has(team1) || !acc.has(team2)) return
+
+  const overs1 = inn1.overs + inn1.balls / 6
+  const overs2 = inn2.overs + inn2.balls / 6
+
+  const a1 = acc.get(team1)!
+  const a2 = acc.get(team2)!
+
+  a1.runsFor += inn1.totalRuns;   a1.oversFaced += overs1
+  a1.runsAgainst += inn2.totalRuns; a1.oversConced += overs2
+  a2.runsFor += inn2.totalRuns;   a2.oversFaced += overs2
+  a2.runsAgainst += inn1.totalRuns; a2.oversConced += overs1
+
+  a1.played += 1
+  a2.played += 1
+
+  if (inn2.totalRuns > inn1.totalRuns) {
+    a2.won += 1; a2.points += 2; a1.lost += 1
+  } else if (inn1.totalRuns > inn2.totalRuns) {
+    a1.won += 1; a1.points += 2; a2.lost += 1
+  } else {
+    a1.tied += 1; a1.points += 1; a2.tied += 1; a2.points += 1
+  }
+}
+
+function accToStandingRow(
+  tid: number,
+  a: Accum,
+  teamMap: Map<number, { name: string; shortCode: string; primaryColor: string }>,
+): StandingRow | null {
+  const team = teamMap.get(tid)
+  if (!team) return null
+  const nrr = a.oversFaced > 0 && a.oversConced > 0
+    ? (a.runsFor / a.oversFaced) - (a.runsAgainst / a.oversConced)
+    : 0
+  return {
+    teamId: tid,
+    teamName: team.name,
+    teamShortCode: team.shortCode,
+    primaryColor: team.primaryColor,
+    played: a.played,
+    won: a.won,
+    lost: a.lost,
+    tied: a.tied,
+    points: a.points,
+    nrr: Math.round(nrr * 1000) / 1000,
+  }
+}
+
 export async function getTournamentStandings(
   tournamentId: number,
-): Promise<StandingRow[]> {
-  // 1. Get team IDs belonging to this tournament
-  const tournamentTeams = await db
-    .select({ teamId: teams.id })
-    .from(teams)
-    .where(eq(teams.tournamentId, tournamentId))
+): Promise<TournamentStandingsResponse> {
+  const groups = await db
+    .select()
+    .from(tournamentGroups)
+    .where(eq(tournamentGroups.tournamentId, tournamentId))
+    .orderBy(asc(tournamentGroups.sortOrder), asc(tournamentGroups.createdAt))
 
-  if (tournamentTeams.length === 0) return []
-  const teamIds = tournamentTeams.map((r) => r.teamId)
+  if (groups.length === 0) {
+    // Legacy path: single flat standings table
+    const tournamentTeams = await db
+      .select({ teamId: teams.id })
+      .from(teams)
+      .where(eq(teams.tournamentId, tournamentId))
 
-  // 2. Fetch completed group matches with their innings
-  const groupMatches = await db.query.matches.findMany({
-    where: and(
-      eq(matches.tournamentId, tournamentId),
-      eq(matches.status, 'complete'),
-      eq(matches.matchStage, 'group'),
-    ),
-    with: { innings: true },
-  })
+    if (tournamentTeams.length === 0) return { hasGroups: false, rows: [] }
+    const teamIds = tournamentTeams.map((r) => r.teamId)
 
-  // 3. Accumulate per-team stats
-  type Accum = {
-    played: number; won: number; lost: number; tied: number; points: number
-    runsFor: number; oversFaced: number; runsAgainst: number; oversConced: number
-  }
+    const groupMatches = await db.query.matches.findMany({
+      where: and(
+        eq(matches.tournamentId, tournamentId),
+        eq(matches.status, 'complete'),
+        eq(matches.matchStage, 'group'),
+      ),
+      with: { innings: true },
+    })
 
-  const acc = new Map<number, Accum>()
-  for (const tid of teamIds) {
-    acc.set(tid, { played: 0, won: 0, lost: 0, tied: 0, points: 0, runsFor: 0, oversFaced: 0, runsAgainst: 0, oversConced: 0 })
-  }
+    const acc = new Map<number, Accum>()
+    for (const tid of teamIds) acc.set(tid, buildAccum())
+    for (const match of groupMatches) accumulateMatch(acc, match)
 
-  for (const match of groupMatches) {
-    const inn1 = match.innings.find((i) => i.inningsNumber === 1)
-    const inn2 = match.innings.find((i) => i.inningsNumber === 2)
-    if (!inn1 || !inn2) continue
+    const teamRows = await db
+      .select({ id: teams.id, name: teams.name, shortCode: teams.shortCode, primaryColor: teams.primaryColor })
+      .from(teams)
+      .where(inArray(teams.id, teamIds))
+    const teamMap = new Map(teamRows.map((t) => [t.id, t]))
 
-    const team1 = inn1.battingTeamId  // batted first
-    const team2 = inn2.battingTeamId  // batted second
-
-    if (!acc.has(team1) || !acc.has(team2)) continue
-
-    const overs1 = inn1.overs + inn1.balls / 6
-    const overs2 = inn2.overs + inn2.balls / 6
-
-    const a1 = acc.get(team1)!
-    const a2 = acc.get(team2)!
-
-    a1.runsFor += inn1.totalRuns;   a1.oversFaced += overs1
-    a1.runsAgainst += inn2.totalRuns; a1.oversConced += overs2
-
-    a2.runsFor += inn2.totalRuns;   a2.oversFaced += overs2
-    a2.runsAgainst += inn1.totalRuns; a2.oversConced += overs1
-
-    a1.played += 1
-    a2.played += 1
-
-    if (inn2.totalRuns > inn1.totalRuns) {
-      a2.won += 1; a2.points += 2; a1.lost += 1
-    } else if (inn1.totalRuns > inn2.totalRuns) {
-      a1.won += 1; a1.points += 2; a2.lost += 1
-    } else {
-      a1.tied += 1; a1.points += 1; a2.tied += 1; a2.points += 1
+    const rows: StandingRow[] = []
+    for (const [tid, a] of acc) {
+      const row = accToStandingRow(tid, a, teamMap)
+      if (row) rows.push(row)
     }
+    return { hasGroups: false, rows: rows.sort((a, b) => b.points - a.points || b.nrr - a.nrr) }
   }
 
-  // 4. Fetch team details
-  const teamRows = await db
-    .select({ id: teams.id, name: teams.name, shortCode: teams.shortCode, primaryColor: teams.primaryColor })
-    .from(teams)
-    .where(inArray(teams.id, teamIds))
+  // Multi-group path: per-group standings
+  const allTeamIds = (
+    await db.select({ id: teams.id }).from(teams).where(eq(teams.tournamentId, tournamentId))
+  ).map((r) => r.id)
+
+  const teamRows = allTeamIds.length > 0
+    ? await db
+        .select({ id: teams.id, name: teams.name, shortCode: teams.shortCode, primaryColor: teams.primaryColor })
+        .from(teams)
+        .where(inArray(teams.id, allTeamIds))
+    : []
   const teamMap = new Map(teamRows.map((t) => [t.id, t]))
 
-  // 5. Build sorted StandingRow[]
-  const rows: StandingRow[] = []
-  for (const [tid, a] of acc) {
-    const team = teamMap.get(tid)
-    if (!team) continue
-    const nrr = a.oversFaced > 0 && a.oversConced > 0
-      ? (a.runsFor / a.oversFaced) - (a.runsAgainst / a.oversConced)
-      : 0
-    rows.push({
-      teamId: tid,
-      teamName: team.name,
-      teamShortCode: team.shortCode,
-      primaryColor: team.primaryColor,
-      played: a.played,
-      won: a.won,
-      lost: a.lost,
-      tied: a.tied,
-      points: a.points,
-      nrr: Math.round(nrr * 1000) / 1000,
+  const result: TournamentStandingsResponse = { hasGroups: true, groups: [] }
+
+  for (const group of groups) {
+    const groupTeams = await db
+      .select({ teamId: teams.id })
+      .from(teams)
+      .where(eq(teams.groupId, group.id))
+
+    const groupTeamIds = groupTeams.map((r) => r.teamId)
+
+    const groupMatches = await db.query.matches.findMany({
+      where: and(
+        eq(matches.groupId, group.id),
+        eq(matches.status, 'complete'),
+        eq(matches.matchStage, 'group'),
+      ),
+      with: { innings: true },
+    })
+
+    const acc = new Map<number, Accum>()
+    for (const tid of groupTeamIds) acc.set(tid, buildAccum())
+    for (const match of groupMatches) accumulateMatch(acc, match)
+
+    const rows: GroupStandingRow[] = []
+    for (const [tid, a] of acc) {
+      const row = accToStandingRow(tid, a, teamMap)
+      if (row) rows.push({ ...row, rank: 0, qualifies: false })
+    }
+    rows.sort((a, b) => b.points - a.points || b.nrr - a.nrr)
+    rows.forEach((r, i) => {
+      r.rank = i + 1
+      r.qualifies = r.rank <= group.qualifyCount
+    })
+
+    result.groups.push({
+      group: {
+        id: group.id,
+        tournamentId: group.tournamentId,
+        name: group.name,
+        shortName: group.shortName,
+        qualifyCount: group.qualifyCount,
+        sortOrder: group.sortOrder,
+      },
+      rows,
     })
   }
 
-  return rows.sort((a, b) => b.points - a.points || b.nrr - a.nrr)
+  return result
+}
+
+// ─── Group CRUD Helpers ───────────────────────────────────────────────────────
+
+export async function createGroup(
+  tournamentId: number,
+  data: { name: string; shortName: string; qualifyCount: number; sortOrder: number },
+): Promise<TournamentGroup> {
+  const [row] = await db
+    .insert(tournamentGroups)
+    .values({ tournamentId, ...data })
+    .returning()
+  return { id: row.id, tournamentId: row.tournamentId, name: row.name, shortName: row.shortName, qualifyCount: row.qualifyCount, sortOrder: row.sortOrder }
+}
+
+export async function updateGroup(
+  groupId: number,
+  data: Partial<{ name: string; shortName: string; qualifyCount: number; sortOrder: number }>,
+): Promise<TournamentGroup> {
+  const [row] = await db
+    .update(tournamentGroups)
+    .set(data)
+    .where(eq(tournamentGroups.id, groupId))
+    .returning()
+  return { id: row.id, tournamentId: row.tournamentId, name: row.name, shortName: row.shortName, qualifyCount: row.qualifyCount, sortOrder: row.sortOrder }
+}
+
+export async function deleteGroup(groupId: number): Promise<void> {
+  await db.delete(tournamentGroups).where(eq(tournamentGroups.id, groupId))
+}
+
+export async function assignTeamToGroup(teamId: number, groupId: number | null): Promise<void> {
+  await db.update(teams).set({ groupId }).where(eq(teams.id, teamId))
 }
 
 // ─── Tournament Status Auto-Transition ────────────────────────────────────────

@@ -3,8 +3,8 @@ import { auth } from '@/lib/auth/config'
 import { getBattingFirstTeamId, isAdminSession } from '@/lib/auth/utils'
 import { canEditTournament } from '@/lib/auth/access'
 import { db } from '@/lib/db'
-import { matches, matchState, innings, tournaments, teams } from '@/lib/db/schema'
-import { count, eq } from 'drizzle-orm'
+import { matches, matchState, innings, tournaments, teams, tournamentGroups } from '@/lib/db/schema'
+import { count, eq, and } from 'drizzle-orm'
 import type { MatchStage } from '@/types/tournament'
 import { buildTournamentStageStructure, MATCH_STAGE_ORDER } from '@/lib/tournament/stageRules'
 import { maybeAdvanceTournamentStatus } from '@/lib/db/queries/tournament'
@@ -46,6 +46,7 @@ export async function POST(
     battingFirstTeamId,
     matchStage = 'group',
     matchLabel,
+    groupId,
   } = body
 
   if (!isMatchStage(matchStage)) {
@@ -88,6 +89,23 @@ export async function POST(
       { error: stageStructure.reasonsByStage[matchStage] ?? 'This match stage is not available right now.' },
       { status: 400 },
     )
+  }
+
+  // Validate groupId if provided
+  let resolvedGroupId: number | null = null
+  if (groupId !== undefined && groupId !== null && groupId !== '') {
+    const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : groupId
+    if (Number.isNaN(gid)) {
+      return NextResponse.json({ error: 'Invalid groupId' }, { status: 400 })
+    }
+    const group = await db.query.tournamentGroups.findFirst({
+      where: and(eq(tournamentGroups.id, gid), eq(tournamentGroups.tournamentId, tournamentId)),
+      columns: { id: true },
+    })
+    if (!group) {
+      return NextResponse.json({ error: 'Group not found in this tournament' }, { status: 404 })
+    }
+    resolvedGroupId = gid
   }
 
   // ── Plan limit enforcement (operators only) ────────────────────────────────
@@ -137,6 +155,7 @@ export async function POST(
         tournamentId,
         matchStage,
         matchLabel: matchLabel ?? null,
+        groupId: resolvedGroupId,
       })
       .returning()
 
