@@ -536,7 +536,7 @@ function MatchCard({
   const [showEdit, setShowEdit] = useState(false)
   const matchDateLabel = new Date(match.date).toLocaleDateString()
   const isLiveMatch = match.status === 'active' || match.status === 'break' || match.status === 'paused'
-  const matchTargetPath = canManage && isLiveMatch ? `/admin/matches/${match.id}/score-editor` : `/viewer/${match.id}`
+  const matchTargetPath = canManage && isLiveMatch ? `/match/${match.id}/operator` : `/viewer/${match.id}`
 
   function resultText() {
     if (match.status !== 'complete') return null
