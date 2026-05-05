@@ -42,6 +42,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
   const [squadWithImageVisible, setSquadWithImageVisible] = useState(false)
   const [teamVsTeamVisible, setTeamVsTeamVisible] = useState(false)
   const [matchSummaryVisible, setMatchSummaryVisible] = useState(false)
+  const [matchWonVisible, setMatchWonVisible] = useState(false)
   const [activeTeamSquadTeamId, setActiveTeamSquadTeamId] = useState<number | null>(null)
   const [activeSquadWithImageTeamId, setActiveSquadWithImageTeamId] = useState<number | null>(null)
   const [inningsSummaries, setInningsSummaries] = useState<InningsSummaryData[]>([])
@@ -328,6 +329,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     }
     if (data.element === 'teamVsTeam') setTeamVsTeamVisible(data.visible)
     if (data.element === 'matchSummary') setMatchSummaryVisible(data.visible)
+    if (data.element === 'matchWon') setMatchWonVisible(data.visible)
   })
 
   useEvent(`match-${matchId}`, 'over.complete', (_data: OverCompletePayload) => {
@@ -363,6 +365,7 @@ export function useOverlayState({ matchId, initialSnapshot, initialMostWickets, 
     squadWithImageVisible,
     teamVsTeamVisible,
     matchSummaryVisible,
+    matchWonVisible,
     activeTeamSquadTeamId,
     activeSquadWithImageTeamId,
     inn,

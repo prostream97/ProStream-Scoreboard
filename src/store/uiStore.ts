@@ -16,6 +16,7 @@ type DisplayElements = {
   squadWithImage: boolean
   teamVsTeam: boolean
   matchSummary: boolean
+  matchWon: boolean
 }
 
 // null teamId = add-new mode not yet targeted; set teamId before opening
@@ -73,6 +74,7 @@ export const useUIStore = create<UIStore>((set) => ({
     squadWithImage: false,
     teamVsTeam: false,
     matchSummary: false,
+    matchWon: false,
   },
   activePlayerId: null,
   activeSummaryTeamId: null,

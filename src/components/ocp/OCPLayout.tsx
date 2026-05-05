@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
@@ -27,11 +27,13 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
   const updateFromPusher = useMatchStore((s) => s.updateFromPusher)
   const legalDeliveryCount = useMatchStore((s) => s.legalDeliveryCount)
   const ballsPerOver = useMatchStore((s) => s.snapshot?.ballsPerOver ?? 6)
+  const snapshot = useMatchStore((s) => s.snapshot)
   const winDetected = useMatchStore((s) => s.winDetected)
   const clearWinDetected = useMatchStore((s) => s.clearWinDetected)
   const openBowlerSelect = useUIStore((s) => s.openBowlerSelect)
   const isBowlerSelectOpen = useUIStore((s) => s.isBowlerSelectOpen)
   const router = useRouter()
+  const [matchComplete, setMatchComplete] = useState(false)
 
   useEffect(() => {
     hydrate(initialSnapshot)
@@ -46,9 +48,9 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
   useEffect(() => {
     if (winDetected) {
       clearWinDetected()
-      router.push('/')
+      setMatchComplete(true)
     }
-  }, [winDetected, clearWinDetected, router])
+  }, [winDetected, clearWinDetected])
 
   useEvent(`match-${initialSnapshot.matchId}`, 'delivery.added', (data: DeliveryAddedPayload) => {
     updateFromPusher({
@@ -94,6 +96,44 @@ function OCPInner({ initialSnapshot }: OCPLayoutProps) {
       <BowlerSelect />
       <SquadPanel />
       <PlayerEditModal />
+      {matchComplete && snapshot && (
+        <MatchCompleteModal snapshot={snapshot} onNavigate={() => router.push('/')} />
+      )}
+    </div>
+  )
+}
+
+function MatchCompleteModal({ snapshot, onNavigate }: { snapshot: MatchSnapshot; onNavigate: () => void }) {
+  const isTie = snapshot.resultType === 'tie'
+  const winner = !isTie && snapshot.resultWinnerId
+    ? (snapshot.resultWinnerId === snapshot.homeTeam.id ? snapshot.homeTeam : snapshot.awayTeam)
+    : null
+
+  let resultText = 'Match Complete'
+  if (snapshot.resultType === 'tie') {
+    resultText = 'Match Tied'
+  } else if (winner && snapshot.resultMargin != null) {
+    const unit = snapshot.resultType === 'wickets' ? 'wicket' : 'run'
+    const suffix = snapshot.resultMargin === 1 ? unit : `${unit}s`
+    resultText = `${winner.name} won by ${snapshot.resultMargin} ${suffix}`
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md rounded-[2rem] bg-[#f8faf7] p-8 shadow-[0_24px_70px_rgba(10,14,18,0.25)] text-center">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#10994c]">Match Complete</div>
+        <h2 className="mb-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+          {winner ? winner.name : 'Final Result'}
+        </h2>
+        <p className="mb-8 text-lg text-slate-600">{resultText}</p>
+        <button
+          onClick={onNavigate}
+          className="w-full rounded-[1.2rem] bg-[#10994c] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0c7a3a]"
+        >
+          Back to Tournament
+        </button>
+      </div>
     </div>
   )
 }

@@ -20,6 +20,7 @@ import { Standard1TeamVsTeamOverlay } from '@/components/overlay/standard1/Stand
 import { Standard1TossDetailsOverlay } from '@/components/overlay/standard1/Standard1TossDetailsOverlay'
 import { Standard1TournamentNameOverlay } from '@/components/overlay/standard1/Standard1TournamentNameOverlay'
 import { Standard1MatchSummaryOverlay } from '@/components/overlay/standard1/Standard1MatchSummaryOverlay'
+import { Standard1MatchWonOverlay } from '@/components/overlay/standard1/Standard1MatchWonOverlay'
 
 type Props = {
   matchId: number
@@ -42,6 +43,7 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
     teamSquadVisible,
     squadWithImageVisible,
     teamVsTeamVisible,
+    matchWonVisible,
     activeSquadWithImageTeamId,
     inningsSummaries,
     battingTeam,
@@ -176,6 +178,12 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
             team={squadWithImageTeam}
             players={squadWithImagePlayers}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {matchWonVisible && (
+          <Standard1MatchWonOverlay snapshot={snapshot} />
         )}
       </AnimatePresence>
 

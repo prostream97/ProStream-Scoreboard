@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useMatchStore } from '@/store/matchStore'
 import { useUIStore } from '@/store/uiStore'
 
-type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'summary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamVsTeam'
+type Element = 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'summary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamVsTeam' | 'matchWon'
 
 const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'header', label: 'Header' },
@@ -16,6 +16,7 @@ const ELEMENTS: { key: Element; label: string }[] = [
   { key: 'mostBoundaries', label: 'Most Boundaries' },
   { key: 'teamVsTeam', label: 'Team Vs Team' },
   { key: 'lastOutCard', label: 'Last Out Card' },
+  { key: 'matchWon', label: 'Match Won' },
 ]
 
 export function OverlayPanel() {

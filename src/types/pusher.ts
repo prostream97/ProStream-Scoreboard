@@ -52,7 +52,7 @@ export type InningsChangePayload = {
 }
 
 export type DisplayTogglePayload = { 
-  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'summary' | 'teamSummary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamSquad' | 'squadWithImage' | 'teamVsTeam' | 'matchSummary'
+  element: 'scorebug' | 'playerCard' | 'wicketAlert' | 'partnership' | 'summary' | 'teamSummary' | 'tossResult' | 'header' | 'mostWickets' | 'mostBoundaries' | 'lastOutCard' | 'teamSquad' | 'squadWithImage' | 'teamVsTeam' | 'matchSummary' | 'matchWon'
   visible: boolean
   playerId?: number
   summaryTeamId?: number

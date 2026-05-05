@@ -22,6 +22,7 @@ import { Theme1TossResultOverlay } from '@/components/overlay/theme1/Theme1TossR
 import { Theme1PartnershipOverlay } from '@/components/overlay/theme1/Theme1PartnershipOverlay'
 import { Theme1MostWicketsOverlay } from '@/components/overlay/theme1/Theme1MostWicketsOverlay'
 import { Theme1MostBoundariesOverlay } from '@/components/overlay/theme1/Theme1MostBoundariesOverlay'
+import { Theme1MatchWonOverlay } from '@/components/overlay/theme1/Theme1MatchWonOverlay'
 
 type Props = {
   matchId: number
@@ -54,6 +55,7 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
     squadWithImageVisible,
     activeSquadWithImageTeamId,
     lastOutCardVisible,
+    matchWonVisible,
   } = useOverlayState({
     matchId,
     initialSnapshot,
@@ -208,6 +210,12 @@ function OverlayInner({ matchId, initialSnapshot, initialMostWickets }: Props) {
       <AnimatePresence>
         {squadWithImageVisible && squadWithImageTeam && (
           <Theme1SquadWithImageOverlay team={squadWithImageTeam} players={squadWithImagePlayers} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {matchWonVisible && (
+          <Theme1MatchWonOverlay snapshot={snapshot} />
         )}
       </AnimatePresence>
     </div>
