@@ -1,0 +1,1 @@
+ALTER TYPE "public"."match_stage" ADD VALUE 'super_round' BEFORE 'quarter_final';

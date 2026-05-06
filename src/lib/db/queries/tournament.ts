@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { tournaments, matches, teams, tournamentAccess, users, tournamentGroups } from '@/lib/db/schema'
-import { eq, and, inArray, desc, asc } from 'drizzle-orm'
+import { eq, and, inArray, or, desc, asc } from 'drizzle-orm'
 import type { TournamentWithDetails, StandingRow, TournamentUserSummary, TournamentGroup, TournamentStandingsResponse, GroupStandingRow } from '@/types/tournament'
 import { buildTournamentStageStructure } from '@/lib/tournament/stageRules'
 
@@ -325,7 +325,7 @@ export async function getTournamentStandings(
       where: and(
         eq(matches.tournamentId, tournamentId),
         eq(matches.status, 'complete'),
-        eq(matches.matchStage, 'group'),
+        or(eq(matches.matchStage, 'group'), eq(matches.matchStage, 'super_round')),
       ),
       with: { innings: true },
     })
@@ -375,7 +375,7 @@ export async function getTournamentStandings(
       where: and(
         eq(matches.groupId, group.id),
         eq(matches.status, 'complete'),
-        eq(matches.matchStage, 'group'),
+        or(eq(matches.matchStage, 'group'), eq(matches.matchStage, 'super_round')),
       ),
       with: { innings: true },
     })
@@ -448,11 +448,14 @@ export async function assignTeamToGroup(teamId: number, groupId: number | null):
 
 import type { TournamentStatus } from '@/types/tournament'
 
+const GROUP_LIKE_STAGES = new Set(['group', 'super_round'])
+const KNOCKOUT_STAGES = new Set(['quarter_final', 'semi_final', 'final', 'third_place'])
+
 function deriveDesiredTournamentStatus(
   allMatches: { matchStage: string | null; status: string }[],
 ): TournamentStatus {
-  const groupMatches = allMatches.filter((m) => (m.matchStage ?? 'group') === 'group')
-  const knockoutMatches = allMatches.filter((m) => m.matchStage !== null && m.matchStage !== 'group')
+  const groupMatches = allMatches.filter((m) => GROUP_LIKE_STAGES.has(m.matchStage ?? 'group'))
+  const knockoutMatches = allMatches.filter((m) => m.matchStage !== null && KNOCKOUT_STAGES.has(m.matchStage))
   const finalMatch = allMatches.find((m) => m.matchStage === 'final')
 
   // Final match complete → tournament done

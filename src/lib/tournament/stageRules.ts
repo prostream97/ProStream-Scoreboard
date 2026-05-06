@@ -12,6 +12,7 @@ type StageRuleMatch = {
 
 export const MATCH_STAGE_ORDER: MatchStage[] = [
   'group',
+  'super_round',
   'quarter_final',
   'semi_final',
   'final',
@@ -20,6 +21,7 @@ export const MATCH_STAGE_ORDER: MatchStage[] = [
 
 export const MATCH_STAGE_LABELS: Record<MatchStage, string> = {
   group: 'Group Stage',
+  super_round: 'Super Round',
   quarter_final: 'Quarter Final',
   semi_final: 'Semi Final',
   final: 'Final',
@@ -28,13 +30,15 @@ export const MATCH_STAGE_LABELS: Record<MatchStage, string> = {
 
 const EMPTY_COUNTS: TournamentStageCounts = {
   group: 0,
+  super_round: 0,
   quarter_final: 0,
   semi_final: 0,
   final: 0,
   third_place: 0,
 }
 
-const MAX_COUNTS: Record<Exclude<MatchStage, 'group'>, number> = {
+// group and super_round are unlimited; only knockout stages have caps
+const MAX_COUNTS: Record<Exclude<MatchStage, 'group' | 'super_round'>, number> = {
   quarter_final: 4,
   semi_final: 2,
   final: 1,
@@ -74,6 +78,7 @@ export function buildTournamentStageStructure(matches: StageRuleMatch[]): Tourna
 
   if (knockoutStarted) {
     reasonsByStage.group = 'Group-stage matches are locked once knockout matches exist.'
+    reasonsByStage.super_round = 'Super round matches are locked once knockout matches exist.'
   }
 
   if (path === 'semis_only') {

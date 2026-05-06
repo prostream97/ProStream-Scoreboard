@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Trophy, CalendarClock, Pencil, X, Plus, Layers, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trophy, CalendarClock, Pencil, X, Plus, Layers, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { TournamentNav } from '@/components/shared/TournamentNav'
 import {
   AppBadge,
@@ -382,7 +382,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </Field>
             </div>
 
-            {matchForm.matchStage === 'group' && tournament.groups.length > 0 ? (
+            {(matchForm.matchStage === 'group' || matchForm.matchStage === 'super_round') && tournament.groups.length > 0 ? (
               <Field label="Group">
                 <select name="groupId" value={matchForm.groupId} onChange={handleMatchFormChange} className={appInputClass}>
                   <option value="">— No specific group</option>
@@ -846,9 +846,22 @@ function MatchCard({
   const stage = match.matchStage ?? 'group'
   const stageLabel = MATCH_STAGE_LABELS[stage]
   const [showEdit, setShowEdit] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const matchDateLabel = new Date(match.date).toLocaleDateString()
   const isOperatorMatch = match.status !== 'complete' && match.status !== 'abandoned'
   const matchTargetPath = canManage && isOperatorMatch ? `/match/${match.id}/operator` : `/viewer/${match.id}`
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/match/${match.id}`, { method: 'DELETE' })
+      if (res.ok) onEdited()
+    } finally {
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
+  }
 
   function resultText() {
     if (match.status !== 'complete') return null
@@ -863,8 +876,9 @@ function MatchCard({
 
   return (
     <>
+      <div className="relative">
       <div
-        className="cursor-pointer h-[170px] w-[380px] rounded-[1.1rem] border border-[#e1e7df] bg-[#f8faf7] p-2.5 transition hover:border-[#bcd8c3] hover:bg-[#eaf4ec]"
+        className="cursor-pointer w-full rounded-[1.1rem] border border-[#e1e7df] bg-[#f8faf7] p-3 transition hover:border-[#bcd8c3] hover:bg-[#eaf4ec]"
         role="button"
         tabIndex={0}
         onClick={() => router.push(matchTargetPath)}
@@ -875,78 +889,122 @@ function MatchCard({
           }
         }}
       >
+        {/* ── Header: context badges left, action buttons right ── */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex h-[30px] w-full flex-wrap items-center gap-2">
-            <AppBadge className="h-[30px] w-[150px] justify-center px-2 py-0.5 text-center text-[12px] tracking-[2.5px]" tone="neutral">{stageLabel}</AppBadge>
-            {matchGroup ? <AppBadge className="h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]" tone="neutral">{matchGroup.shortName}</AppBadge> : null}
-            {match.matchLabel ? <AppBadge className="h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]" tone="blue">{match.matchLabel}</AppBadge> : null}
+          <div className="min-w-0 space-y-1.5">
+            {/* Row 1: stage / group / label */}
+            <div className="flex flex-wrap items-center gap-1">
+              <AppBadge tone="neutral" className="px-2 py-0.5 text-[10px] tracking-[2px]">{stageLabel}</AppBadge>
+              {matchGroup ? <AppBadge tone="neutral" className="px-2 py-0.5 text-[10px] tracking-[1.5px]">{matchGroup.shortName}</AppBadge> : null}
+              {match.matchLabel ? <AppBadge tone="blue" className="px-2 py-0.5 text-[10px] tracking-[1.5px]">{match.matchLabel}</AppBadge> : null}
+            </div>
+            {/* Row 2: status — always visible on its own line */}
             <AppBadge
               className={cn(
-                'h-[30px] px-2 py-0.5 text-[11px] tracking-[1.6px]',
-                match.status === 'complete' ? 'bg-[#34b743] text-white font-bold' : null,
+                'px-2.5 py-0.5 text-[10px] tracking-[1.5px]',
+                match.status === 'complete' ? 'border-transparent bg-[#34b743] font-bold text-white' : null,
               )}
               tone={match.status === 'active' ? 'green' : match.status === 'break' || match.status === 'paused' ? 'amber' : 'neutral'}
             >
               {match.status}
             </AppBadge>
           </div>
-          {canManage && match.status !== 'complete' ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowEdit(true)
-              }}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#dfe6df] bg-white text-slate-400 transition hover:border-[#b8d7c0] hover:text-slate-700"
-              title="Edit match"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
+
+          {canManage ? (
+            <div className="flex shrink-0 items-center gap-1">
+              {match.status !== 'complete' ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowEdit(true) }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#dfe6df] bg-white text-slate-400 transition hover:border-[#b8d7c0] hover:text-slate-700"
+                  title="Edit match"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-white text-red-400 transition hover:bg-red-50 hover:text-red-600"
+                title="Delete match"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ) : null}
         </div>
 
-        <div className="mt-2.5 flex h-[70px] items-center justify-between gap-1.5">
+        {/* ── Teams ── */}
+        <div className="mt-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             {match.homeTeam.logoCloudinaryId ? (
               <img
                 src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_44,h_44,f_webp/${match.homeTeam.logoCloudinaryId}`}
                 alt={`${match.homeTeam.shortCode} logo`}
-                className="h-10 w-10 rounded-full border border-[#e1e7df] object-cover"
+                className="h-9 w-9 shrink-0 rounded-full border border-[#e1e7df] object-cover"
               />
             ) : (
-              <div className="h-10 w-10 rounded-full border border-[#e1e7df]" style={{ backgroundColor: match.homeTeam.primaryColor }} />
+              <div className="h-9 w-9 shrink-0 rounded-full border border-[#e1e7df]" style={{ backgroundColor: match.homeTeam.primaryColor }} />
             )}
-            <span className="text-lg font-semibold text-slate-900" style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
+            <span className="text-base font-semibold" style={{ color: match.homeTeam.primaryColor }}>{match.homeTeam.shortCode}</span>
           </div>
-          <span className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-slate-400">vs</span>
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-lg font-semibold text-slate-900" style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
+          <span className="shrink-0 text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-slate-400">vs</span>
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            <span className="text-base font-semibold" style={{ color: match.awayTeam.primaryColor }}>{match.awayTeam.shortCode}</span>
             {match.awayTeam.logoCloudinaryId ? (
               <img
                 src={`https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_44,h_44,f_webp/${match.awayTeam.logoCloudinaryId}`}
                 alt={`${match.awayTeam.shortCode} logo`}
-                className="h-10 w-10 rounded-full border border-[#e1e7df] object-cover"
+                className="h-9 w-9 shrink-0 rounded-full border border-[#e1e7df] object-cover"
               />
             ) : (
-              <div className="h-10 w-10 rounded-full border border-[#e1e7df]" style={{ backgroundColor: match.awayTeam.primaryColor }} />
+              <div className="h-9 w-9 shrink-0 rounded-full border border-[#e1e7df]" style={{ backgroundColor: match.awayTeam.primaryColor }} />
             )}
           </div>
         </div>
 
-        {resultText() ? (
-          <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.82rem]">
-            <p className="min-w-0 truncate text-slate-500">{match.venue ?? 'Venue TBD'} · {matchDateLabel}</p>
+        {/* ── Venue / result / toss ── */}
+        <div className="mt-2.5 flex items-center justify-between gap-2 text-[0.78rem]">
+          <p className="min-w-0 truncate text-slate-500">{match.venue ?? 'Venue TBD'} · {matchDateLabel}</p>
+          {resultText() ? (
             <p className="shrink-0 font-semibold text-slate-700">{resultText()}</p>
+          ) : match.tossWinnerId ? (
+            <p className="shrink-0 text-slate-400">
+              Toss: {teams.find((t) => t.id === match.tossWinnerId)?.shortCode ?? '?'} elected to {match.tossDecision}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {confirmDelete ? (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-[1.1rem] bg-black/45 backdrop-blur-sm"
+          onClick={() => setConfirmDelete(false)}
+        >
+          <div
+            className="mx-3 w-full max-w-[320px] rounded-2xl border border-red-200 bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-slate-900">Delete this match?</p>
+            <p className="mt-1 text-xs text-slate-500">
+              <span className="font-medium text-slate-700">{match.homeTeam.shortCode} vs {match.awayTeam.shortCode}</span> and all its data will be permanently removed.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 rounded-xl border border-[#dfe6df] bg-[#f8faf7] py-1.5 text-xs font-medium text-slate-700 transition hover:bg-[#f0f4ef]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 rounded-xl bg-red-600 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.82rem]">
-            <p className="min-w-0 truncate text-slate-500">{match.venue ?? 'Venue TBD'} · {matchDateLabel}</p>
-            {match.tossWinnerId ? (
-              <p className="shrink-0 text-slate-400">
-                Toss: {teams.find((t) => t.id === match.tossWinnerId)?.shortCode ?? '?'} elected to {match.tossDecision}
-              </p>
-            ) : null}
-          </div>
-        )}
+        </div>
+      ) : null}
       </div>
 
       {showEdit ? (
@@ -1092,7 +1150,7 @@ function MatchEditModal({
             </Field>
           </div>
 
-          {form.matchStage === 'group' && groups.length > 0 ? (
+          {(form.matchStage === 'group' || form.matchStage === 'super_round') && groups.length > 0 ? (
             <Field label="Group">
               <select name="groupId" value={form.groupId} onChange={handleChange} className={appInputClass}>
                 <option value="">— No specific group</option>

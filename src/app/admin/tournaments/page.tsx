@@ -424,9 +424,9 @@ export default function TournamentsPage() {
                   className="cursor-pointer"
                 >
                   <SurfaceCard className="h-full transition hover:-translate-y-0.5 hover:border-[#b8d7c0] hover:shadow-[0_18px_38px_rgba(26,36,32,0.08)]">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-[1.2rem] border border-[#dfe6df] bg-[#f4f7f2]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] border border-[#dfe6df] bg-[#f4f7f2]">
                           {t.logoCloudinaryId && CLOUDINARY_CLOUD ? (
                             <img
                               src={`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/c_fill,w_80,h_80,f_webp/${t.logoCloudinaryId}`}
@@ -437,8 +437,8 @@ export default function TournamentsPage() {
                             <Trophy className="h-6 w-6 text-[#10994c]" />
                           )}
                         </div>
-                        <div>
-                          <div className="flex h-16 w-[350px] flex-wrap items-center gap-2">
+                        <div className="min-w-0 flex-1 pt-1">
+                          <div className="flex flex-wrap items-center gap-2">
                             <p className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{t.name}</p>
                             <AppBadge tone="neutral">{t.shortName}</AppBadge>
                             <AppBadge tone={statusTone[t.status] ?? 'neutral'}>{t.status.replace('_', ' ')}</AppBadge>
@@ -448,7 +448,7 @@ export default function TournamentsPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <AppButton variant="secondary" className="hidden sm:inline-flex">Manage</AppButton>
                         {isAdmin && (
                           <button

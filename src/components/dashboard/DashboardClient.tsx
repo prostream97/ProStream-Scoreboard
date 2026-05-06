@@ -112,7 +112,7 @@ export function DashboardClient({ tournaments }: TournamentProps) {
                   whileHover={{ y: -4, scale: 1.005 }}
                   className="app-card flex h-full items-start justify-between gap-4 transition-all hover:border-[#b8d7c0] hover:shadow-[0_18px_38px_rgba(26,36,32,0.08)]"
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <span className="text-xl font-semibold tracking-[-0.03em] text-slate-950 transition-colors group-hover:text-[#10994c]">
                         {t.name}
@@ -127,7 +127,7 @@ export function DashboardClient({ tournaments }: TournamentProps) {
                       <span className="mx-1 text-slate-300">.</span> {t.teamCount} teams
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 rounded-full bg-[#f4f7f2] px-3 py-2 text-sm font-semibold text-[#10994c]">
+                  <div className="flex shrink-0 items-center gap-2 rounded-full bg-[#f4f7f2] px-3 py-2 text-sm font-semibold text-[#10994c]">
                     <span>Manage</span>
                     <PlayCircle className="h-4 w-4" />
                   </div>

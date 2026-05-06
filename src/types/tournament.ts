@@ -1,5 +1,5 @@
 export type TournamentStatus = 'upcoming' | 'group_stage' | 'knockout' | 'complete'
-export type MatchStage = 'group' | 'quarter_final' | 'semi_final' | 'final' | 'third_place'
+export type MatchStage = 'group' | 'super_round' | 'quarter_final' | 'semi_final' | 'final' | 'third_place'
 export type TournamentStagePath = 'semis_only' | 'with_quarters' | null
 
 export type TournamentGroup = {

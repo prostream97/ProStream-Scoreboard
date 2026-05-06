@@ -4,6 +4,27 @@ import { db } from '@/lib/db'
 import { matches } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ matchId: string }> },
+) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { matchId } = await params
+  const id = parseInt(matchId, 10)
+  if (isNaN(id)) return NextResponse.json({ error: 'Invalid matchId' }, { status: 400 })
+
+  try {
+    const [deleted] = await db.delete(matches).where(eq(matches.id, id)).returning()
+    if (!deleted) return NextResponse.json({ error: 'Match not found' }, { status: 404 })
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Match delete error:', err)
+    return NextResponse.json({ error: 'Failed to delete match' }, { status: 500 })
+  }
+}
+
 export const runtime = 'nodejs'
 
 // PATCH — edit match details (venue, date, toss, matchLabel, matchStage)
