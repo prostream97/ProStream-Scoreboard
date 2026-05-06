@@ -110,31 +110,78 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Wallet deduction for operators ──────────────────────────────────────
-    // Determine price key
-    const priceKey =
-      planType === 'daily' ? 'overlay_per_day' :
-      planType === 'match' ? 'overlay_per_match' :
-      'overlay_per_tournament'
+    if (planType !== 'tournament') {
+      // ── Wallet deduction for match / daily plans ────────────────────────────
+      const priceKey = planType === 'daily' ? 'overlay_per_day' : 'overlay_per_match'
+      const priceDefaults: Record<string, number> = { overlay_per_match: 100, overlay_per_day: 200 }
 
-    const priceDefaults: Record<string, number> = {
-      overlay_per_match: 100,
-      overlay_per_tournament: 500,
-      overlay_per_day: 200,
+      const priceRow = await db.query.pricingConfig.findFirst({ where: eq(pricingConfig.key, priceKey) })
+      const unitPrice = priceRow?.value ?? priceDefaults[priceKey]
+      const totalCost = planType === 'match' ? unitPrice * matchLimit! : unitPrice
+
+      const wallet = await db.query.wallets.findFirst({ where: eq(wallets.userId, userId) })
+      const balance = wallet?.balance ?? 0
+      if (balance < totalCost) {
+        return NextResponse.json({ error: `Insufficient credits. Required: ${totalCost} LKR, available: ${balance} LKR` }, { status: 402 })
+      }
+
+      try {
+        return await db.transaction(async (tx) => {
+          const [tournament] = await tx
+            .insert(tournaments)
+            .values({
+              name: name.trim(),
+              shortName: shortName.trim(),
+              format,
+              totalOvers,
+              ballsPerOver,
+              logoCloudinaryId: logoCloudinaryId || null,
+              status: 'upcoming',
+              createdBy: userId,
+              matchDaysFrom,
+              matchDaysTo,
+              planType,
+              matchLimit,
+              planDay,
+            })
+            .returning()
+
+          await tx
+            .insert(tournamentAccess)
+            .values({ userId, tournamentId: tournament.id, grantedBy: null })
+            .onConflictDoNothing()
+
+          const token = randomBytes(32).toString('hex')
+          const [link] = await tx
+            .insert(overlayLinks)
+            .values({ tournamentId: tournament.id, matchId: null, userId, token, mode: 'standard' })
+            .returning()
+
+          const newBalance = balance - totalCost
+          await tx.update(wallets).set({ balance: newBalance, updatedAt: new Date() }).where(eq(wallets.userId, userId))
+
+          if (wallet) {
+            await tx.insert(walletTransactions).values({
+              walletId: wallet.id,
+              type: 'deduction',
+              amount: -totalCost,
+              balanceBefore: balance,
+              balanceAfter: newBalance,
+              description: `${planType} plan for tournament "${tournament.name}"`,
+              referenceId: link.id,
+              createdBy: userId,
+            })
+          }
+
+          return NextResponse.json({ ...tournament, overlayToken: token }, { status: 201 })
+        })
+      } catch (err) {
+        console.error('Tournament create error:', err)
+        return NextResponse.json({ error: 'Failed to create tournament' }, { status: 500 })
+      }
     }
 
-    const priceRow = await db.query.pricingConfig.findFirst({ where: eq(pricingConfig.key, priceKey) })
-    const unitPrice = priceRow?.value ?? priceDefaults[priceKey]
-    const totalCost = planType === 'match' ? unitPrice * matchLimit! : unitPrice
-
-    // Check wallet
-    const wallet = await db.query.wallets.findFirst({ where: eq(wallets.userId, userId) })
-    const balance = wallet?.balance ?? 0
-    if (balance < totalCost) {
-      return NextResponse.json({ error: `Insufficient credits. Required: ${totalCost} LKR, available: ${balance} LKR` }, { status: 402 })
-    }
-
-    // All good — create tournament, overlay link, and deduct wallet in a transaction
+    // ── Tournament plan: free creation, deduction deferred to overlay generation ──
     try {
       return await db.transaction(async (tx) => {
         const [tournament] = await tx
@@ -161,30 +208,7 @@ export async function POST(req: NextRequest) {
           .values({ userId, tournamentId: tournament.id, grantedBy: null })
           .onConflictDoNothing()
 
-        const token = randomBytes(32).toString('hex')
-        const [link] = await tx
-          .insert(overlayLinks)
-          .values({ tournamentId: tournament.id, matchId: null, userId, token, mode: 'standard' })
-          .returning()
-
-        // Deduct wallet (wallet existence is already verified above)
-        const newBalance = balance - totalCost
-        await tx.update(wallets).set({ balance: newBalance, updatedAt: new Date() }).where(eq(wallets.userId, userId))
-
-        if (wallet) {
-          await tx.insert(walletTransactions).values({
-            walletId: wallet.id,
-            type: 'deduction',
-            amount: -totalCost,
-            balanceBefore: balance,
-            balanceAfter: newBalance,
-            description: `${planType} plan for tournament "${tournament.name}"`,
-            referenceId: link.id,
-            createdBy: userId,
-          })
-        }
-
-        return NextResponse.json({ ...tournament, overlayToken: token }, { status: 201 })
+        return NextResponse.json({ ...tournament }, { status: 201 })
       })
     } catch (err) {
       console.error('Tournament create error:', err)

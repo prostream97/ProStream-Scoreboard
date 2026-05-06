@@ -47,7 +47,7 @@ const statusTone: Record<string, 'neutral' | 'blue' | 'amber'> = {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  tournament: 'Tournament',
+  tournament: 'Tournament Score Plan',
   match: 'Match',
   daily: 'Daily',
 }
@@ -257,8 +257,8 @@ export default function TournamentsPage() {
                       {([
                         {
                           value: 'tournament' as const,
-                          label: 'Tournament Plan',
-                          desc: 'Unlimited matches within the date range',
+                          label: 'Tournament Score Plan',
+                          desc: 'Scoring always free. Overlay charged when first generated.',
                           price: pricing.overlay_per_tournament,
                         },
                         {
@@ -318,8 +318,12 @@ export default function TournamentsPage() {
                     {/* Price preview for operators */}
                     {!isAdmin && (
                       <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 border border-[#dfe6df]">
-                        <p className="text-xs text-slate-500 uppercase tracking-[0.18em]">Total charge</p>
-                        <p className="text-base font-bold text-slate-900">{calcPrice()} LKR</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-[0.18em]">
+                          {form.planType === 'tournament' ? 'Charged at overlay generation' : 'Total charge'}
+                        </p>
+                        <p className="text-base font-bold text-slate-900">
+                          {form.planType === 'tournament' ? `${pricing.overlay_per_tournament} LKR` : `${calcPrice()} LKR`}
+                        </p>
                       </div>
                     )}
                   </SurfaceCard>

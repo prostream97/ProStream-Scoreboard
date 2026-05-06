@@ -49,9 +49,17 @@ const emptyMatchForm = {
   tossDecision: '' as 'bat' | 'field' | '',
 }
 
-function createEmptyMatchForm(stageStructure?: TournamentStageStructure | null) {
+function localDatetimeNow() {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
+}
+
+function createEmptyMatchForm(stageStructure?: TournamentStageStructure | null, lastVenue?: string) {
   return {
     ...emptyMatchForm,
+    date: localDatetimeNow(),
+    venue: lastVenue ?? emptyMatchForm.venue,
     matchStage: stageStructure?.allowedStages[0] ?? emptyMatchForm.matchStage,
   }
 }
@@ -151,7 +159,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     setShowMatchForm((visible) => {
       const nextVisible = !visible
       if (nextVisible && tournament) {
-        setMatchForm(createEmptyMatchForm(tournament.stageStructure))
+        const lastVenue = [...tournament.matches]
+          .reverse()
+          .find((m) => m.venue)?.venue ?? undefined
+        setMatchForm(createEmptyMatchForm(tournament.stageStructure, lastVenue))
       }
       return nextVisible
     })

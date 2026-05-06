@@ -46,7 +46,7 @@ const TRANSPARENT_PREVIEW_STYLE = {
 const OVERLAY_THEMES = [
   {
     mode: 'standard',
-    name: 'Standard',
+    name: 'Theme 1',
     description: 'Clean, minimal scorebug for general broadcast use.',
     accentColor: '#10994c',
     accentBg: '#eef8f1',
@@ -54,7 +54,7 @@ const OVERLAY_THEMES = [
   },
   {
     mode: 'standard1',
-    name: 'Standard 1',
+    name: 'Theme 2',
     description: 'Modern broadcast theme with enhanced player cards, squad displays, and team vs team intro.',
     accentColor: '#0066cc',
     accentBg: '#e8f2ff',
@@ -70,7 +70,7 @@ const OVERLAY_THEMES = [
   },
   {
     mode: 'theme1',
-    name: 'Theme 1',
+    name: 'Theme 3',
     description: 'Retro-pulse scorebug with gold batting panel and blue bowling panel.',
     accentColor: '#f9cc01',
     accentBg: '#fffbe6',

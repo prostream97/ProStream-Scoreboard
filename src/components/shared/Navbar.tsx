@@ -17,6 +17,7 @@ const TITLES: Array<{ match: (pathname: string) => boolean; label: string }> = [
   { match: (pathname) => pathname.startsWith('/admin/users'), label: 'User Management' },
   { match: (pathname) => pathname.startsWith('/admin/access'), label: 'Tournament Access' },
   { match: (pathname) => pathname.startsWith('/admin/pricing'), label: 'Pricing' },
+  { match: (pathname) => pathname.startsWith('/profile'), label: 'My Profile' },
 ]
 
 function getPageTitle(pathname: string) {
@@ -122,7 +123,10 @@ export function Navbar() {
 
           {session ? (
             <>
-              <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-2 py-1.5 text-white">
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-2 py-1.5 text-white transition hover:bg-white/14"
+              >
                 <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/8">
                   {session.user.photoCloudinaryId && CLOUD_NAME ? (
                     <img
@@ -142,7 +146,7 @@ export function Navbar() {
                     {session.user.role}
                   </p>
                 </div>
-              </div>
+              </Link>
 
               <button
                 onClick={handleLogout}

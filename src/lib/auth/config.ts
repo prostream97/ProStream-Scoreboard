@@ -110,13 +110,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = (user as { role?: 'admin' | 'operator' }).role
         token.username = (user as { username?: string }).username
         token.phone = (user as { phone?: string }).phone
         token.photoCloudinaryId = (user as { photoCloudinaryId?: string }).photoCloudinaryId
         token.sub = user.id
+      }
+
+      if (trigger === 'update' && token.sub) {
+        const uid = parseInt(token.sub, 10)
+        if (!isNaN(uid)) {
+          const [dbUser] = await db.select().from(users).where(eq(users.id, uid)).limit(1)
+          if (dbUser) {
+            token.name = dbUser.displayName
+            token.username = dbUser.username
+            token.phone = dbUser.phone ?? undefined
+            token.photoCloudinaryId = dbUser.photoCloudinaryId ?? undefined
+          }
+        }
       }
 
       if (isLegacyEnvAdminToken({
